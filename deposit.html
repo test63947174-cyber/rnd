@@ -374,18 +374,32 @@
     "imports": {
         "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
         "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js",
+        "ethers": "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js"
     }
 }
 </script>
 <script type="module">
 // ============================================================
-// 🔥 NEW FIREBASE CONFIG (rwebsite-e031b)
+// 🔥 IMPORTS - Firebase + Real Verification
 // ============================================================
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase, ref, get, onValue, remove, set, update, runTransaction } from "firebase/database";
+import { getDatabase, ref, get, onValue, remove } from "firebase/database";
 
+// Real verification from external file
+import { 
+    completeDeposit as realCompleteDeposit,
+    cleanupStaleLocks as realCleanupStaleLocks,
+    checkPendingVerifications as realCheckPendingVerifications
+} from './verifyTransaction.js';
+
+// Wallet config from external file
+import { WALLET_CONFIG } from './wallet.js';
+
+// ============================================================
+// 🔥 FIREBASE CONFIG (rwebsite-e031b)
+// ============================================================
 const firebaseConfig = {
     apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
     authDomain: "rwebsite-e031b.firebaseapp.com",
@@ -402,18 +416,6 @@ console.log('✅ Firebase initialized with NEW config (rwebsite-e031b)');
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-
-// ============================================================
-// 🔥 WALLET CONFIG - Updated Deposit Address
-// ============================================================
-const WALLET_CONFIG = {
-    DEPOSIT_WALLET: "0x088adFEad63589CAeb8b4d6C3F545e247288C71D",
-    USDT_CONTRACT: "0x55d398326f99059fF775485246999027B3197955",
-    MIN_CONFIRMATIONS: 5,
-    POLLING_INTERVAL: 3000,
-    MAX_POLLING_ATTEMPTS: 300,
-    LOCK_TIMEOUT: 60000
-};
 
 // ============================================================
 // 🔥 TOAST
@@ -480,246 +482,14 @@ document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) 
 });
 
 // ============================================================
-// 🔥 GENERATE TX ID
-// ============================================================
-function generateTxId() {
-    return 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
-}
-
-// ============================================================
-// 🔥 CHECK DUPLICATE TRANSACTION
-// ============================================================
-async function checkDuplicateTransaction(uid, txHash) {
-    try {
-        const transactionsRef = ref(db, `users/${uid}/transactions`);
-        const snap = await get(transactionsRef);
-        if (!snap.exists()) return false;
-        
-        const transactions = snap.val();
-        for (let key in transactions) {
-            const tx = transactions[key];
-            if (tx.txHash === txHash && tx.type === 'deposit') {
-                return true;
-            }
-        }
-        return false;
-    } catch (error) {
-        console.error('Error checking duplicate:', error);
-        return false;
-    }
-}
-
-// ============================================================
-// 🔥 CLEANUP STALE LOCKS
-// ============================================================
-async function cleanupStaleLocks() {
-    try {
-        const locksRef = ref(db, 'deposit_locks');
-        const snap = await get(locksRef);
-        if (!snap.exists()) return;
-        
-        const locks = snap.val();
-        const now = Date.now();
-        let cleanupCount = 0;
-        
-        for (let key in locks) {
-            if (locks[key] && (now - (locks[key].lockedAt || 0)) > WALLET_CONFIG.LOCK_TIMEOUT) {
-                await remove(ref(db, `deposit_locks/${key}`));
-                cleanupCount++;
-            }
-        }
-        if (cleanupCount > 0) {
-            console.log(`✅ Cleaned up ${cleanupCount} stale locks`);
-        }
-    } catch (error) {
-        console.error('Error cleaning up locks:', error);
-    }
-}
-
-// ============================================================
-// 🔥 CHECK PENDING VERIFICATIONS
-// ============================================================
-async function checkPendingVerifications(uid) {
-    try {
-        const locksRef = ref(db, `deposit_locks/${uid}`);
-        const snap = await get(locksRef);
-        if (!snap.exists()) return [];
-        
-        const locks = snap.val();
-        const pending = [];
-        for (let key in locks) {
-            const lock = locks[key];
-            if (lock && lock.status === 'pending') {
-                pending.push({
-                    txHash: key,
-                    lockData: lock
-                });
-            }
-        }
-        return pending;
-    } catch (error) {
-        console.error('Error checking pending verifications:', error);
-        return [];
-    }
-}
-
-// ============================================================
-// 🔥 SIMULATE BLOCKCHAIN VERIFICATION (MOCK)
-// ============================================================
-async function verifyOnBlockchain(txHash, expectedAmount) {
-    return new Promise((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 5;
-        const interval = 2000;
-        
-        const check = () => {
-            attempts++;
-            if (attempts > maxAttempts) {
-                resolve({
-                    verified: true,
-                    amount: expectedAmount,
-                    confirmations: 6,
-                    blockNumber: 12345678 + attempts
-                });
-                return;
-            }
-            
-            // Mock verification: 70% chance of success after 2 attempts
-            if (attempts >= 2 && Math.random() < 0.8) {
-                resolve({
-                    verified: true,
-                    amount: expectedAmount,
-                    confirmations: 5 + attempts,
-                    blockNumber: 12345678 + attempts
-                });
-            } else if (attempts >= 3) {
-                resolve({
-                    verified: true,
-                    amount: expectedAmount,
-                    confirmations: 5 + attempts,
-                    blockNumber: 12345678 + attempts
-                });
-            } else {
-                setTimeout(check, interval);
-            }
-        };
-        
-        setTimeout(check, 1000);
-    });
-}
-
-// ============================================================
-// 🔥 COMPLETE DEPOSIT
-// ============================================================
-async function completeDeposit(uid, txHash, amount, onPending, onSuccess, onError) {
-    try {
-        // ============================================================
-        // 🔒 LAYER 1: DUPLICATE CHECK
-        // ============================================================
-        const isDuplicate = await checkDuplicateTransaction(uid, txHash);
-        if (isDuplicate) {
-            onError('This transaction hash has already been used for a deposit.');
-            return { error: 'Duplicate transaction' };
-        }
-        
-        // ============================================================
-        // 🔒 LAYER 2: ACQUIRE LOCK
-        // ============================================================
-        const lockRef = ref(db, `deposit_locks/${uid}/${txHash}`);
-        const lockSnap = await get(lockRef);
-        
-        if (lockSnap.exists()) {
-            onError('This transaction is already being processed. Please wait.');
-            return { error: 'Lock already exists' };
-        }
-        
-        await set(lockRef, {
-            amount: amount,
-            lockedAt: Date.now(),
-            status: 'pending',
-            txHash: txHash
-        });
-        
-        // ============================================================
-        // 🔒 LAYER 3: BLOCKCHAIN VERIFICATION
-        // ============================================================
-        onPending(0, 0, 'pending');
-        
-        const result = await verifyOnBlockchain(txHash, amount);
-        
-        if (!result.verified) {
-            await remove(lockRef);
-            onError('Transaction could not be verified on blockchain. Please check the hash and try again.');
-            return { error: 'Verification failed' };
-        }
-        
-        // ============================================================
-        // 🔒 LAYER 4: ATOMIC BALANCE UPDATE
-        // ============================================================
-        const userRef = ref(db, `users/${uid}`);
-        
-        const txResult = await runTransaction(userRef, (currentData) => {
-            if (!currentData) return currentData;
-            
-            const currentBalance = currentData.depositWallet || 0;
-            const newBalance = currentBalance + amount;
-            
-            const transactions = currentData.transactions || {};
-            const txId = generateTxId();
-            transactions[txId] = {
-                type: 'deposit',
-                amount: amount,
-                txHash: txHash,
-                currency: 'USDT',
-                timestamp: Date.now(),
-                date: new Date().toISOString().split('T')[0],
-                status: 'success',
-                blockNumber: result.blockNumber || 0,
-                confirmations: result.confirmations || 0,
-                description: `Deposit of $${amount} USDT verified on blockchain`
-            };
-            
-            return {
-                ...currentData,
-                depositWallet: newBalance,
-                transactions: transactions
-            };
-        });
-        
-        // ============================================================
-        // 🔒 LAYER 5: CLEANUP LOCK
-        // ============================================================
-        await remove(lockRef);
-        
-        if (txResult.committed && txResult.snapshot.exists()) {
-            const updatedData = txResult.snapshot.val();
-            const newBalance = updatedData.depositWallet || 0;
-            onSuccess(newBalance);
-            return { success: true, newBalance: newBalance };
-        } else {
-            onError('Failed to update wallet balance. Please contact support.');
-            return { error: 'Transaction failed' };
-        }
-        
-    } catch (error) {
-        console.error('Complete deposit error:', error);
-        try {
-            await remove(ref(db, `deposit_locks/${uid}/${txHash}`));
-        } catch (e) {}
-        onError(error.message || 'Something went wrong. Please try again.');
-        return { error: error.message };
-    }
-}
-
-// ============================================================
-// 🔥 MAIN DEPOSIT PAGE
+// 🔥 MAIN DEPOSIT PAGE - USING REAL BLOCKCHAIN VERIFICATION
 // ============================================================
 onAuthStateChanged(auth, async (user) => {
     if (!user) { window.location.href = 'login.html'; return; }
 
     try {
-        // Clean up stale locks on page load
-        await cleanupStaleLocks();
+        // Clean up stale locks using real function
+        await realCleanupStaleLocks();
         
         // Get user data
         const userSnap = await get(ref(db, 'users/' + user.uid));
@@ -779,12 +549,12 @@ onAuthStateChanged(auth, async (user) => {
                 <!-- Deposit Form -->
                 <div class="col-12">
                     <div class="card-glass">
-                        <div class="card-title"><i class="bi bi-shield-check text-success me-2"></i>🔒 Verify Deposit (Secure)</div>
+                        <div class="card-title"><i class="bi bi-shield-check text-success me-2"></i>🔒 Verify Deposit (Blockchain)</div>
                         <div class="alert alert-info" style="background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);color:#60a5fa;border-radius:12px;font-size:0.8rem;">
                             <i class="bi bi-info-circle me-1"></i> 
-                            <strong>Important:</strong> Amount will be verified from blockchain. 
-                            You cannot claim more than you actually sent.
-                            <br>Minimum confirmations required: <strong>${WALLET_CONFIG.MIN_CONFIRMATIONS}</strong>
+                            <strong>Real Blockchain Verification:</strong> Transaction is verified directly on BSC blockchain.
+                            <br>Minimum confirmations required: <strong>${WALLET_CONFIG.MIN_CONFIRMATIONS || 3}</strong>
+                            <br>❌ <strong>Cannot fake or bypass verification!</strong>
                         </div>
                         <form id="depositForm">
                             <div class="row g-3">
@@ -792,13 +562,13 @@ onAuthStateChanged(auth, async (user) => {
                                     <label class="form-label">Amount You Sent (USDT) <span class="required">*</span></label>
                                     <input type="number" id="depositAmount" class="form-control form-control-custom" 
                                            placeholder="Enter amount" min="1" step="0.01" required>
-                                    <small class="text-muted" style="font-size:0.65rem;">This will be verified from blockchain</small>
+                                    <small class="text-muted" style="font-size:0.65rem;">Must match exactly what you sent</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Transaction Hash (TXID) <span class="required">*</span></label>
                                     <input type="text" id="txHash" class="form-control form-control-custom" 
                                            placeholder="0x..." required>
-                                    <small class="text-muted" style="font-size:0.65rem;">Paste your BSC transaction hash</small>
+                                    <small class="text-muted" style="font-size:0.65rem;">Real BSC transaction hash from your wallet</small>
                                 </div>
                                 <div class="col-md-2 d-flex align-items-end">
                                     <button type="submit" class="btn-primary-custom" id="verifyBtn">
@@ -838,10 +608,10 @@ onAuthStateChanged(auth, async (user) => {
         });
 
         // ============================================================
-        // 🔥 CHECK PENDING VERIFICATIONS
+        // 🔥 CHECK PENDING VERIFICATIONS - Using REAL function
         // ============================================================
         async function resumePendingVerifications() {
-            const pendingTxs = await checkPendingVerifications(user.uid);
+            const pendingTxs = await realCheckPendingVerifications(user.uid);
             const container = document.getElementById('pendingVerifications');
             
             if (pendingTxs.length === 0) {
@@ -873,18 +643,18 @@ onAuthStateChanged(auth, async (user) => {
             
             container.innerHTML = html;
             
-            // Resume each pending verification
+            // Resume each pending verification using REAL function
             for (const pending of pendingTxs) {
                 try {
-                    await completeDeposit(
+                    await realCompleteDeposit(
                         user.uid,
                         pending.txHash,
                         pending.lockData.amount || 0,
                         (confirmations, currentBlock, blockNumber) => {
                             updateVerificationStatus(
                                 'polling',
-                                `⏳ Waiting for confirmations... (${confirmations}/${WALLET_CONFIG.MIN_CONFIRMATIONS})<br>
-                                 <small>Auto-checking every ${WALLET_CONFIG.POLLING_INTERVAL/1000} seconds...</small>`
+                                `⏳ Waiting for confirmations... (${confirmations}/${WALLET_CONFIG.MIN_CONFIRMATIONS || 3})<br>
+                                 <small>Block: ${blockNumber || 'pending'} | Auto-checking every ${WALLET_CONFIG.POLLING_INTERVAL/1000 || 15} seconds...</small>`
                             );
                         },
                         (newBalance) => {
@@ -942,9 +712,10 @@ onAuthStateChanged(auth, async (user) => {
                             <div class="date">${tx.timestamp ? new Date(tx.timestamp).toLocaleString('hi-IN') : 'N/A'}</div>
                         </div>
                         <div>
-                            <span class="status-active">✅ Verified</span>
+                            <span class="status-active">✅ Verified (Blockchain)</span>
                             ${tx.txHash ? `<div style="font-size:0.65rem;color:#556688;font-family:monospace;">${tx.txHash.substring(0, 16)}...</div>` : ''}
                             ${tx.blockNumber ? `<span style="background:rgba(46,204,113,0.1);color:#2ecc71;padding:2px 10px;border-radius:12px;font-size:0.6rem;">Block: ${tx.blockNumber}</span>` : ''}
+                            ${tx.confirmations ? `<span style="background:rgba(96,165,250,0.1);color:#60a5fa;padding:2px 10px;border-radius:12px;font-size:0.6rem;">${tx.confirmations} Confirmations</span>` : ''}
                         </div>
                     </div>
                 `).join('');
@@ -986,7 +757,7 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         // ============================================================
-        // 🔥 DEPOSIT FORM SUBMISSION
+        // 🔥 DEPOSIT FORM SUBMISSION - USING REAL BLOCKCHAIN VERIFICATION
         // ============================================================
         document.getElementById('depositForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -1009,9 +780,6 @@ onAuthStateChanged(auth, async (user) => {
                 return;
             }
             
-            // ============================================================
-            // 🔒 PREVENT DOUBLE CLICK
-            // ============================================================
             if (verifyBtn.disabled) {
                 showToast('⏳ Please wait, verification in progress...', 'info');
                 return;
@@ -1020,8 +788,9 @@ onAuthStateChanged(auth, async (user) => {
             updateVerificationStatus(
                 'pending',
                 `<i class="bi bi-hourglass-split me-2"></i>
-                 🔒 Verifying transaction on blockchain... 
-                 <span class="spinner-border spinner-border-sm ms-2" role="status"></span>`
+                 🔒 Verifying on BSC blockchain... 
+                 <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                 <br><small>This may take a few moments...</small>`
             );
             
             verifyBtn.disabled = true;
@@ -1029,9 +798,9 @@ onAuthStateChanged(auth, async (user) => {
             
             try {
                 // ============================================================
-                // 🔒 COMPLETE DEPOSIT - ALL SECURITY CHECKS
+                // 🔒 REAL COMPLETE DEPOSIT - REAL BLOCKCHAIN VERIFICATION
                 // ============================================================
-                const result = await completeDeposit(
+                const result = await realCompleteDeposit(
                     user.uid,
                     txHash,
                     amount,
@@ -1040,24 +809,25 @@ onAuthStateChanged(auth, async (user) => {
                         updateVerificationStatus(
                             'polling',
                             `<span class="polling-indicator"></span>
-                             ⏳ Waiting for confirmations... (${confirmations}/${WALLET_CONFIG.MIN_CONFIRMATIONS})<br>
-                             <small>Block: ${blockNumber || 'pending'} | Auto-checking every ${WALLET_CONFIG.POLLING_INTERVAL/1000} seconds...</small>`
+                             ⏳ Waiting for confirmations... (${confirmations}/${WALLET_CONFIG.MIN_CONFIRMATIONS || 3})<br>
+                             <small>Block: ${blockNumber || 'pending'} | Auto-checking every ${WALLET_CONFIG.POLLING_INTERVAL/1000 || 15} seconds...</small>
+                             <br><small>⚠️ Transaction must have ${WALLET_CONFIG.MIN_CONFIRMATIONS || 3} confirmations</small>`
                         );
-                        showToast(`⏳ Waiting for confirmations... (${confirmations}/${WALLET_CONFIG.MIN_CONFIRMATIONS})`, 'info');
+                        showToast(`⏳ Waiting for confirmations... (${confirmations}/${WALLET_CONFIG.MIN_CONFIRMATIONS || 3})`, 'info');
                     },
                     // onSuccess
                     (newBalance) => {
                         updateVerificationStatus(
                             'success',
                             `<i class="bi bi-check-circle me-2"></i>
-                             ✅ Deposit verified successfully! 
+                             ✅ Deposit verified successfully on blockchain!
                              <br><small>$${amount} USDT added to your Deposit Wallet.</small>
-                             <br><small>New Balance: $${newBalance.toFixed(2)}</small>`
+                             <br><small>New Balance: $${newBalance.toFixed(2)}</small>
+                             <br><small>🔒 Verified on BSC block: ${result?.receipt?.blockNumber || 'confirmed'}</small>`
                         );
-                        showToast(`✅ $${amount} USDT deposited successfully!`, 'success');
+                        showToast(`✅ $${amount} USDT deposited successfully! (Blockchain verified)`, 'success');
                         updateBalance(newBalance);
                         
-                        // Clear form
                         document.getElementById('depositAmount').value = '';
                         document.getElementById('txHash').value = '';
                     },

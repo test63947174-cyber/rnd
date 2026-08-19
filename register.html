@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Register - RND Staking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(135deg, #080e1a 0%, #0f1f3a 50%, #1a2a4a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .register-container { width: 100%; max-width: 480px; }
+        .card-glass {
+            background: rgba(19,34,55,0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(46,204,113,0.15);
+            border-radius: 24px;
+            padding: 2.5rem;
+        }
+        .form-control-custom {
+            background: rgba(8,14,26,0.8) !important;
+            border: 1px solid rgba(46,204,113,0.15) !important;
+            color: #f0f4ff !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .form-control-custom:focus {
+            border-color: #2ecc71 !important;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
+            background: rgba(8,14,26,0.9) !important;
+        }
+        .form-control-custom::placeholder { color: #556688 !important; }
+        .form-label { font-weight: 600; color: #a0b8d0; font-size: 0.9rem; margin-bottom: 6px; }
+        .form-label .required { color: #ef4444; }
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            padding: 14px;
+            border-radius: 12px;
+            width: 100%;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+        .btn-primary-custom:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+        .text-link { color: #2ecc71; text-decoration: none; font-weight: 600; }
+        .text-link:hover { text-decoration: underline; }
+        .logo-text { font-size: 1.8rem; font-weight: 800; color: #fff; }
+        .logo-text span { color: #2ecc71; }
+        
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px; }
+        .toast-custom {
+            background: rgba(19,34,55,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 16px;
+            padding: 16px 20px;
+            color: #f0f4ff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.4s ease;
+            margin-bottom: 10px;
+        }
+        .toast-custom.success { border-left: 4px solid #2ecc71; }
+        .toast-custom.error { border-left: 4px solid #ef4444; }
+        .toast-custom i { font-size: 1.5rem; }
+        .toast-custom .toast-msg { flex: 1; font-size: 0.9rem; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        .referral-notice {
+            background: rgba(46,204,113,0.05);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            color: #2ecc71;
+            margin-top: 5px;
+        }
+        .referral-notice.active {
+            border-color: rgba(46,204,113,0.3);
+            background: rgba(46,204,113,0.08);
+        }
+        
+        @media (max-width: 576px) { .card-glass { padding: 1.5rem; } .logo-text { font-size: 1.5rem; } }
+    </style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="register-container">
+    <div class="card-glass">
+        <div class="text-center mb-4">
+            <div class="logo-text"><i class="bi bi-currency-bitcoin me-2"></i>RND<span>Staking</span></div>
+            <p class="text-muted small">Create your account</p>
+        </div>
+
+        <form id="registerForm" novalidate>
+            <div class="mb-3">
+                <label class="form-label">Full Name <span class="required">*</span></label>
+                <input type="text" id="regName" class="form-control form-control-custom" placeholder="Enter your full name" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email Address <span class="required">*</span></label>
+                <input type="email" id="regEmail" class="form-control form-control-custom" placeholder="you@example.com" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password <span class="required">*</span></label>
+                <input type="password" id="regPassword" class="form-control form-control-custom" placeholder="Min. 6 characters" required minlength="6">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Referral Code <span style="font-size:0.65rem;background:rgba(46,204,113,0.15);color:#2ecc71;padding:2px 10px;border-radius:20px;font-weight:500;margin-left:6px;">Optional</span></label>
+                <input type="text" id="regRef" class="form-control form-control-custom" placeholder="Enter referrer's User ID" style="background:#0a1425 !important;">
+                <div class="referral-notice" id="referralNotice">
+                    <i class="bi bi-info-circle me-1"></i> 
+                    <span id="referralNoticeText">Enter referrer's User ID if you have one</span>
+                </div>
+            </div>
+            <button type="submit" class="btn-primary-custom" id="registerBtn">Create Account <i class="bi bi-arrow-right ms-2"></i></button>
+        </form>
+
+        <p class="text-center mt-4 text-muted small">
+            Already have an account? <a href="login.html" class="text-link">Login</a>
+        </p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+    }
+}
+</script>
+<script type="module">
+// ============================================================
+// 🔥 NEW FIREBASE CONFIG (from the snippet)
+// ============================================================
+import { initializeApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { getDatabase, ref, set, get, update } from "firebase/database";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+  authDomain: "rwebsite-e031b.firebaseapp.com",
+  databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rwebsite-e031b",
+  storageBucket: "rwebsite-e031b.firebasestorage.app",
+  messagingSenderId: "376966041558",
+  appId: "1:376966041558:web:02bc9062ec182590275e77",
+  measurementId: "G-0T1FREXHD3"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+console.log('✅ Firebase initialized with NEW config (rwebsite-e031b)');
+
+// ============================================================
+// TOAST SYSTEM (unchanged)
+// ============================================================
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast-custom ${type}`;
+    const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
+    toast.innerHTML = `<i class="bi ${icon}"></i><span class="toast-msg">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 6000);
+}
+
+// ============================================================
+// REFERRAL FROM URL (unchanged)
+// ============================================================
+let referralCodeFromURL = '';
+
+function getReferralFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get('ref');
+    console.log('🔍 URL Referral Code Found:', ref);
+    if (ref) {
+        referralCodeFromURL = ref;
+        return ref;
+    }
+    return '';
+}
+
+const refFromURL = getReferralFromURL();
+if (refFromURL) {
+    document.getElementById('regRef').value = refFromURL;
+    document.getElementById('referralNoticeText').textContent = '✅ Referral code auto-filled from link!';
+    document.getElementById('referralNotice').className = 'referral-notice active';
+    console.log('✅✅✅ Referral code auto-filled:', refFromURL);
+} else {
+    console.log('ℹ️ No referral code in URL');
+}
+
+document.getElementById('regRef').addEventListener('input', function() {
+    const val = this.value.trim();
+    if (val) {
+        document.getElementById('referralNoticeText').textContent = '📌 Referral code: ' + val;
+        document.getElementById('referralNotice').className = 'referral-notice active';
+    } else {
+        document.getElementById('referralNoticeText').textContent = 'Enter referrer\'s User ID if you have one';
+        document.getElementById('referralNotice').className = 'referral-notice';
+    }
+});
+
+// ============================================================
+// 🔥 5 LEVEL REFERRAL UPDATE (unchanged logic)
+// ============================================================
+async function update5LevelReferral(referralCode, newUserUid, newUserName, newUserEmail) {
+    try {
+        console.log('🔍 ===== STARTING REFERRAL UPDATE =====');
+        console.log('🔍 Referral Code to search:', referralCode);
+        
+        const allUsersSnap = await get(ref(db, 'users'));
+        if (!allUsersSnap.exists()) {
+            console.log('❌ No users found in database');
+            return;
+        }
+        const allUsers = allUsersSnap.val();
+        
+        let referrerUid = null;
+        let referrerData = null;
+        for (let key in allUsers) {
+            const u = allUsers[key];
+            if (u.referralCode === referralCode) {
+                referrerUid = key;
+                referrerData = u;
+                console.log('✅ REFERRER FOUND! Name:', u.name, 'UID:', referrerUid);
+                break;
+            }
+        }
+        
+        if (!referrerUid) {
+            console.log('❌ REFERRER NOT FOUND with code:', referralCode);
+            return;
+        }
+        
+        // Add to direct referrals
+        const directRefs = referrerData.directReferrals || {};
+        directRefs[newUserUid] = {
+            uid: newUserUid,
+            name: newUserName,
+            email: newUserEmail,
+            joinedAt: Date.now(),
+            level: 1
+        };
+        
+        // LEVEL 1
+        const currentLevel1 = referrerData.teamStructure?.level1 || 0;
+        await update(ref(db, 'users/' + referrerUid), {
+            totalReferrals: (referrerData.totalReferrals || 0) + 1,
+            downline: (referrerData.downline || 0) + 1,
+            directReferrals: directRefs,
+            'teamStructure/level1': currentLevel1 + 1
+        });
+        console.log('✅ Level 1 updated:', referrerUid, 'New totalReferrals:', (referrerData.totalReferrals || 0) + 1);
+        
+        // LEVEL 2
+        const level2RefCode = referrerData.referredBy;
+        if (level2RefCode && level2RefCode !== '') {
+            console.log('🔍 Level 2 referral code:', level2RefCode);
+            for (let key in allUsers) {
+                if (allUsers[key].referralCode === level2RefCode) {
+                    const level2User = allUsers[key];
+                    const level2TeamStructure = level2User.teamStructure || { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
+                    await update(ref(db, 'users/' + key), {
+                        totalReferrals: (level2User.totalReferrals || 0) + 1,
+                        downline: ((level2User.downline || 0) + 1),
+                        'teamStructure/level2': (level2TeamStructure.level2 || 0) + 1
+                    });
+                    console.log('✅ Level 2 updated:', key, 'New totalReferrals:', (level2User.totalReferrals || 0) + 1);
+                    
+                    // LEVEL 3
+                    const level3RefCode = level2User.referredBy;
+                    if (level3RefCode && level3RefCode !== '') {
+                        for (let k3 in allUsers) {
+                            if (allUsers[k3].referralCode === level3RefCode) {
+                                const level3User = allUsers[k3];
+                                const level3TeamStructure = level3User.teamStructure || { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
+                                await update(ref(db, 'users/' + k3), {
+                                    totalReferrals: (level3User.totalReferrals || 0) + 1,
+                                    downline: ((level3User.downline || 0) + 1),
+                                    'teamStructure/level3': (level3TeamStructure.level3 || 0) + 1
+                                });
+                                console.log('✅ Level 3 updated:', k3, 'New totalReferrals:', (level3User.totalReferrals || 0) + 1);
+                                
+                                // LEVEL 4
+                                const level4RefCode = level3User.referredBy;
+                                if (level4RefCode && level4RefCode !== '') {
+                                    for (let k4 in allUsers) {
+                                        if (allUsers[k4].referralCode === level4RefCode) {
+                                            const level4User = allUsers[k4];
+                                            const level4TeamStructure = level4User.teamStructure || { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
+                                            await update(ref(db, 'users/' + k4), {
+                                                totalReferrals: (level4User.totalReferrals || 0) + 1,
+                                                downline: ((level4User.downline || 0) + 1),
+                                                'teamStructure/level4': (level4TeamStructure.level4 || 0) + 1
+                                            });
+                                            console.log('✅ Level 4 updated:', k4, 'New totalReferrals:', (level4User.totalReferrals || 0) + 1);
+                                            
+                                            // LEVEL 5
+                                            const level5RefCode = level4User.referredBy;
+                                            if (level5RefCode && level5RefCode !== '') {
+                                                for (let k5 in allUsers) {
+                                                    if (allUsers[k5].referralCode === level5RefCode) {
+                                                        const level5User = allUsers[k5];
+                                                        const level5TeamStructure = level5User.teamStructure || { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
+                                                        await update(ref(db, 'users/' + k5), {
+                                                            totalReferrals: (level5User.totalReferrals || 0) + 1,
+                                                            downline: ((level5User.downline || 0) + 1),
+                                                            'teamStructure/level5': (level5TeamStructure.level5 || 0) + 1
+                                                        });
+                                                        console.log('✅ Level 5 updated:', k5, 'New totalReferrals:', (level5User.totalReferrals || 0) + 1);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        
+        console.log('✅ ===== REFERRAL SYSTEM FULLY UPDATED (Levels 1-5 with totalReferrals) =====');
+    } catch (error) {
+        console.error('❌ Error updating referral system:', error);
+    }
+}
+
+// ============================================================
+// 🔥 REGISTRATION (only firebase config changed)
+// ============================================================
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const pass = document.getElementById('regPassword').value;
+    const refCode = document.getElementById('regRef').value.trim();
+    const registerBtn = document.getElementById('registerBtn');
+    
+    console.log('📝 ===== REGISTRATION STARTED =====');
+    console.log('📝 Name:', name);
+    console.log('📝 Email:', email);
+    console.log('📝 Referral Code from input:', refCode);
+    console.log('📝 Referral Code from URL:', referralCodeFromURL);
+    
+    if (!name || name.length < 2) { showToast('❌ Please enter your full name', 'error'); return; }
+    if (!email || !email.includes('@')) { showToast('❌ Please enter a valid email address', 'error'); return; }
+    if (pass.length < 6) { showToast('❌ Password must be at least 6 characters long!', 'error'); return; }
+    
+    registerBtn.disabled = true;
+    registerBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating Account...';
+
+    try {
+        // Create user
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        const uid = cred.user.uid;
+        await updateProfile(auth.currentUser, { displayName: name });
+        console.log('✅ User created with UID:', uid);
+        
+        // Referral Code = UID
+        const referralCode = uid;
+        console.log('✅ Generated Referral Code:', referralCode);
+        
+        const finalRefCode = refCode || referralCodeFromURL || '';
+        console.log('✅✅✅ FINAL REFERRAL CODE TO SAVE:', finalRefCode);
+        
+        // User data
+        const userData = {
+            uid: uid,
+            username: uid,
+            name: name,
+            email: email,
+            referralCode: uid,
+            referredBy: finalRefCode,
+            rank: 'Member',
+            role: 'user',
+            banned: false,
+            createdAt: Date.now(),
+            lastActive: Date.now(),
+            depositWallet: 0,
+            referralWallet: 0,
+            rndWallet: 0,
+            lockedRND: 0,
+            releaseWallet: 0,
+            totalStake: 0,
+            totalReward: 0,
+            availableReward: 0,
+            totalWithdrawn: 0,
+            level1Earnings: 0,
+            level2Earnings: 0,
+            level3Earnings: 0,
+            level4Earnings: 0,
+            level5Earnings: 0,
+            referralEarnings: 0,
+            teamBusiness: 0,
+            subscriptions: 0,
+            totalReferrals: 0,
+            downline: 0,
+            teamStructure: { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 },
+            directReferrals: {},
+            packages: {},
+            transferHistory: []
+        };
+        
+        console.log('💾 SAVING USER DATA:');
+        console.log('   - referralCode:', userData.referralCode);
+        console.log('   - referredBy:', userData.referredBy);
+        
+        await set(ref(db, 'users/' + uid), userData);
+        await set(ref(db, 'usernames/' + uid), uid);
+        console.log('✅ User data saved to database!');
+
+        // Update referrer (all levels)
+        if (finalRefCode) {
+            console.log('🔗 ===== UPDATING REFERRER (All Levels 1-5) =====');
+            console.log('🔗 Referrer Code:', finalRefCode);
+            await update5LevelReferral(finalRefCode, uid, name, email);
+        } else {
+            console.log('ℹ️ No referral code provided - skipping referrer update');
+        }
+        
+        console.log('⏳ Waiting 2 seconds for data to be fully saved...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        showToast('✅ Account created successfully! Welcome ' + name + '!', 'success');
+        window.location.href = 'dashboard.html';
+        
+    } catch (err) {
+        console.error('❌ Registration Error:', err);
+        let msg = 'Registration failed. Please try again.';
+        if (err.code === 'auth/email-already-in-use') msg = '❌ This email is already registered.';
+        else if (err.code === 'auth/weak-password') msg = '❌ Password must be at least 6 characters.';
+        else if (err.code === 'auth/invalid-email') msg = '❌ Please enter a valid email address.';
+        showToast(msg, 'error');
+    }
+    
+    registerBtn.disabled = false;
+    registerBtn.innerHTML = 'Create Account <i class="bi bi-arrow-right ms-2"></i>';
+});
+</script>
+</body>
+</html>

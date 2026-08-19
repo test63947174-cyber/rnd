@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  
+  <!-- ====== SEO ====== -->
+  <title>RND Staking — Earn Up to 100% Bonus • Daily Automatic Release</title>
+  <meta name="description" content="Stake RND tokens and earn up to 100% bonus with daily automatic release. Multi-level referral commission 8%+4%+2%+1%+1%. Limited supply of 20,000 RND tokens.">
+  <meta name="keywords" content="RND staking, crypto staking, daily release, referral commission, RND token, blockchain staking">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://staking.randigital.in/">
+  
+  <!-- ====== Open Graph / Social Media ====== -->
+  <meta property="og:title" content="RND Staking — Earn Up to 100% Bonus">
+  <meta property="og:description" content="Stake RND tokens with daily automatic release. Multi-level referral: 8%+4%+2%+1%+1%. Limited supply of 20,000 RND.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://staking.randigital.in/">
+  <meta property="og:image" content="https://staking.randigital.in/og-image.jpg">
+  
+  <!-- ====== Theme Color ====== -->
+  <meta name="theme-color" content="#0b1120">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- ====== Favicon ====== -->
+  <link rel="icon" type="image/png" sizes="32x32" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛓️</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛓️</text></svg>">
+  
+  <!-- ====== Bootstrap & Fonts ====== -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0b1120; color: #f0f4ff; }
+    
+    .navbar-custom { background: rgba(15,26,46,0.95); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(46,204,113,0.15); padding: 12px 0; }
+    .navbar-custom .navbar-brand { font-weight: 800; font-size: 1.2rem; color: #fff !important; }
+    .navbar-custom .navbar-brand i { color: #2ecc71; }
+    
+    .btn-primary-custom { background: linear-gradient(135deg, #2ecc71, #27ae60); border: none; color: #fff; font-weight: 600; padding: 12px 30px; border-radius: 12px; transition: all 0.3s ease; }
+    .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+    .btn-outline-light-custom { border: 1px solid rgba(255,255,255,0.15); color: #a0b8d0; padding: 12px 24px; border-radius: 12px; transition: all 0.3s ease; background: transparent; }
+    .btn-outline-light-custom:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    
+    .hero { background: linear-gradient(135deg, #0b1120 0%, #1a2a4a 100%); min-height: 90vh; display: flex; align-items: center; padding: 60px 0; }
+    .card-dark { background: rgba(19,34,55,0.6); border: 1px solid rgba(46,204,113,0.1); border-radius: 24px; padding: 2rem; backdrop-filter: blur(10px); }
+    .text-green { color: #2ecc71; }
+    .domain-badge { background: rgba(46,204,113,0.12); border: 1px solid rgba(46,204,113,0.15); border-radius: 30px; padding: 4px 14px; font-size: 0.65rem; color: #2ecc71; }
+    
+    .feature-card { background: rgba(19,34,55,0.4); border: 1px solid rgba(46,204,113,0.08); border-radius: 16px; padding: 1.5rem; transition: all 0.3s ease; text-align: center; }
+    .feature-card:hover { border-color: rgba(46,204,113,0.2); transform: translateY(-5px); }
+    .feature-card .icon { width: 60px; height: 60px; background: rgba(46,204,113,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: #2ecc71; margin: 0 auto 15px; }
+    .feature-card h5 { color: #fff; font-weight: 600; }
+    .feature-card p { color: #8899bb; font-size: 0.9rem; }
+    
+    .badge-referral { background: rgba(167,139,250,0.15); color: #a78bfa; border: 1px solid rgba(167,139,250,0.2); padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+    
+    footer { background: rgba(8,14,26,0.8); border-top: 1px solid rgba(46,204,113,0.08); padding: 30px 0; }
+    
+    .commission-levels { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .commission-levels .level { background: rgba(46,204,113,0.08); border: 1px solid rgba(46,204,113,0.1); border-radius: 8px; padding: 4px 12px; font-size: 0.75rem; color: #a0b8d0; }
+    .commission-levels .level span { color: #2ecc71; font-weight: 600; }
+    
+    /* 🔥 NEW: Withdrawal Info Cards */
+    .withdrawal-info { background: rgba(8,14,26,0.3); border-radius: 12px; padding: 12px 16px; border: 1px solid rgba(46,204,113,0.06); }
+    .withdrawal-info .min-amount { font-weight: 700; font-size: 1.1rem; }
+    
+    /* 🔥 NEW: Supply Badge */
+    .supply-badge { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.15); border-radius: 30px; padding: 4px 14px; font-size: 0.7rem; color: #fbbf24; display: inline-flex; align-items: center; gap: 6px; }
+    
+    /* ====== RESPONSIVE ====== */
+    @media (max-width: 768px) {
+      .hero { min-height: auto; padding: 40px 0; }
+      .hero h1 { font-size: 2rem; }
+      
+      /* 🔥 FIX: Commission boxes on mobile */
+      .commission-levels .level {
+        font-size: 0.7rem;
+        padding: 4px 10px;
+      }
+      
+      /* 🔥 FIX: Withdrawal info on mobile */
+      .withdrawal-info {
+        padding: 10px 12px;
+      }
+      .withdrawal-info .min-amount {
+        font-size: 0.95rem;
+      }
+      
+      /* 🔥 FIX: Supply badge on mobile */
+      .supply-badge {
+        font-size: 0.6rem;
+        padding: 3px 10px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .commission-levels .level {
+        font-size: 0.65rem;
+        padding: 3px 8px;
+      }
+      .commission-levels {
+        gap: 5px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== NAVBAR ====== -->
+<nav class="navbar navbar-expand-lg navbar-custom">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="index.html">
+      <i class="bi bi-currency-bitcoin me-2"></i>RND Staking
+      <span class="domain-badge ms-2">staking.randigital.in</span>
+    </a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" style="color:#fff;font-size:1.5rem;">
+      <i class="bi bi-list"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+        <li class="nav-item"><a class="nav-link text-light" href="#features">Features</a></li>
+        <li class="nav-item"><a class="nav-link text-light" href="#plans">Plans</a></li>
+        <li class="nav-item"><a class="btn btn-outline-light-custom me-2" href="login.html">Login</a></li>
+        <li class="nav-item"><a class="btn btn-primary-custom" href="register.html">Register</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ====== HERO SECTION ====== -->
+<section class="hero">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-6">
+        <!-- 🔥 NEW: Supply Badge -->
+        <div class="mb-3">
+          <span class="supply-badge">
+            <i class="bi bi-database"></i> Total Supply: 20,000 RND
+          </span>
+        </div>
+        
+        <h1 class="display-4 fw-bold">Stake RND Tokens <br><span class="text-green">Earn Up to 100% Bonus</span></h1>
+        <p class="lead text-muted" style="font-size:1.1rem;">Lock your tokens and earn daily automatic release rewards. Refer friends and earn multi-level commission.</p>
+        
+        <div class="d-flex flex-wrap gap-3 mt-4">
+          <a href="register.html" class="btn btn-primary-custom btn-lg">Get Started <i class="bi bi-arrow-right ms-2"></i></a>
+          <a href="#plans" class="btn btn-outline-light-custom btn-lg">View Plans</a>
+        </div>
+        
+        <div class="mt-4 d-flex flex-wrap gap-4">
+          <div><i class="bi bi-check-circle-fill text-green me-2"></i> <span class="text-light">Min. 10 USDT</span></div>
+          <div><i class="bi bi-check-circle-fill text-green me-2"></i> <span class="text-light">Daily Automatic Release</span></div>
+          <div><i class="bi bi-check-circle-fill text-green me-2"></i> <span class="text-light">Limited: 20,000 RND</span></div>
+        </div>
+        
+        <!-- 🔥 NEW: Referral Commission Breakdown -->
+        <div class="mt-3">
+          <span class="text-muted small">Multi-Level Referral Commission:</span>
+          <div class="commission-levels mt-1">
+            <span class="level">L1 <span>8%</span></span>
+            <span class="level">L2 <span>4%</span></span>
+            <span class="level">L3 <span>2%</span></span>
+            <span class="level">L4 <span>1%</span></span>
+            <span class="level">L5 <span>1%</span></span>
+          </div>
+          <div class="text-muted small mt-1" style="font-size:0.65rem;">
+            <i class="bi bi-info-circle me-1"></i> Commission credited instantly after successful package purchase
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-lg-6">
+        <div class="card-dark">
+          <h5 class="text-green mb-3"><i class="bi bi-fire me-2"></i>🔥 Staking Plans</h5>
+          
+          <div class="row g-3">
+            <div class="col-4">
+              <div class="bg-dark p-3 rounded text-center" style="background:rgba(8,14,26,0.6) !important;">
+                <small>6 Months</small>
+                <br><strong class="text-green">25% Bonus</strong>
+                <br><small style="color:#556688;">Min $10</small>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="bg-dark p-3 rounded text-center" style="background:rgba(8,14,26,0.6) !important;">
+                <small>12 Months</small>
+                <br><strong class="text-green">60% Bonus</strong>
+                <br><small style="color:#556688;">Min $100</small>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="bg-dark p-3 rounded text-center" style="background:rgba(8,14,26,0.6) !important;">
+                <small>18 Months</small>
+                <br><strong class="text-green">100% Bonus</strong>
+                <br><small style="color:#556688;">Min $200</small>
+              </div>
+            </div>
+          </div>
+          
+          <hr class="border-secondary">
+          
+          <p><i class="bi bi-check-circle-fill text-green me-2"></i> Minimum Deposit: 10 USDT</p>
+          <p><i class="bi bi-check-circle-fill text-green me-2"></i> Daily Automatic Release</p>
+          <p><i class="bi bi-check-circle-fill text-green me-2"></i> Multi-Level Referral: 8% + 4% + 2% + 1% + 1%</p>
+          <p><i class="bi bi-check-circle-fill text-green me-2"></i> Pending Release Support</p>
+          
+          <!-- 🔥 NEW: Withdrawal Info -->
+          <div class="withdrawal-info mt-3">
+            <div class="row g-2">
+              <div class="col-6">
+                <div style="font-size:0.65rem;color:#8899bb;">Referral Wallet</div>
+                <div class="min-amount" style="color:#fbbf24;">Min 20 USDT</div>
+              </div>
+              <div class="col-6">
+                <div style="font-size:0.65rem;color:#8899bb;">RND Wallet</div>
+                <div class="min-amount" style="color:#34d399;">Min 5 RND</div>
+              </div>
+            </div>
+          </div>
+          
+          <a href="register.html" class="btn btn-primary-custom w-100 mt-3">Join Now</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FEATURES ====== -->
+<section id="features" class="py-5">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">Why Choose <span class="text-green">RND Staking</span></h2>
+      <p class="text-muted">Secure, transparent, and profitable staking platform</p>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-shield-check"></i></div>
+          <h5>Secure & Backup</h5>
+          <p>Bank-grade security with automatic backup & recovery system</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-graph-up-arrow"></i></div>
+          <h5>High Bonus</h5>
+          <p>Earn up to 100% bonus on your staked tokens with daily release</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-people"></i></div>
+          <h5>Multi-Level Referral</h5>
+          <p>Earn 8% + 4% + 2% + 1% + 1% from your referral network</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-clock-history"></i></div>
+          <h5>Daily Release</h5>
+          <p>Get daily automatic release with pending release support</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== PLANS ====== -->
+<section id="plans" class="py-5" style="background:rgba(8,14,26,0.4);">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">Our <span class="text-green">Staking Plans</span></h2>
+      <p class="text-muted">Choose the plan that best suits your investment goals</p>
+      <p class="text-muted small">All plans include <span class="text-green">Daily Automatic Release</span> with <span class="text-green">Pending Release</span> support</p>
+      <div class="mt-2">
+        <span class="supply-badge"><i class="bi bi-database"></i> Total Supply: 20,000 RND</span>
+      </div>
+    </div>
+    
+    <div class="row g-4 justify-content-center">
+      <!-- 6 Months Plan -->
+      <div class="col-md-3">
+        <div class="card-dark text-center">
+          <h5 class="text-green">6 Months</h5>
+          <h3 class="fw-bold mt-2">$10 <small style="font-size:0.8rem;color:#556688;">Min</small></h3>
+          <p class="text-muted small">25% Bonus • 180 Days</p>
+          <ul class="list-unstyled text-start mt-3" style="color:#a0b8d0;font-size:0.85rem;">
+            <li><i class="bi bi-check-circle text-green me-2"></i>25% Bonus</li>
+            <li><i class="bi bi-check-circle text-green me-2"></i>180 Days Lock</li>
+            <li><i class="bi bi-check-circle text-green me-2"></i>Daily Release</li>
+            <li><i class="bi bi-check-circle text-green me-2"></i>Min $10</li>
+          </ul>
+          <a href="register.html" class="btn btn-primary-custom w-100 mt-2">Start Now</a>
+        </div>
+      </div>
+      
+      <!-- 12 Months Plan -->
+      <div class="col-md-3">
+        <div class="card-dark text-center" style="border-color:rgba(46,204,113,0.3);">
+          <h5 class="text-green">12 Months</h5>
+          <h3 class="fw-bold mt-2">$100 <small style="font-size:0.8rem;color:#556688;">Min</small></h3>
+          <p class="text-muted small">60% Bonus • 365 Days</p>
+          <ul class="list-unstyled text-start mt-3" style="color:#a0b8d0;font-size:0.85rem;">
+            <li><i class="bi bi-check-circle text-green me-2"></i>60% Bonus</li>
+            <li><i class="bi bi-check-circle text-green me-2"></i>365 Days Lock</li>
+            <li><i class="bi bi-check-circle text-green me-2"></i>Daily Release</li>
+            <li><i class="bi bi-check-circle text-green me-2"></i>Min $100</li>
+          </ul>
+          <a href="register.html" class="btn btn-primary-custom w-100 mt-2">Start Now</a>
+        </div>
+      </div>
+      
+      <!-- 18 Months Plan -->
+      <div class="col-md-3">
+        <div class="card-dark text-center" style="border-color:rgba(251,191,36,0.2);">
+          <h5 style="color:#fbbf24;">18 Months</h5>
+          <h3 class="fw-bold mt-2">$200 <small style="font-size:0.8rem;color:#556688;">Min</small></h3>
+          <p class="text-muted small">100% Bonus • 540 Days</p>
+          <ul class="list-unstyled text-start mt-3" style="color:#a0b8d0;font-size:0.85rem;">
+            <li><i class="bi bi-check-circle" style="color:#fbbf24;"></i><span class="ms-2">100% Bonus</span></li>
+            <li><i class="bi bi-check-circle" style="color:#fbbf24;"></i><span class="ms-2">540 Days Lock</span></li>
+            <li><i class="bi bi-check-circle" style="color:#fbbf24;"></i><span class="ms-2">Daily Release</span></li>
+            <li><i class="bi bi-check-circle" style="color:#fbbf24;"></i><span class="ms-2">Min $200</span></li>
+          </ul>
+          <a href="register.html" class="btn btn-primary-custom w-100 mt-2">Start Now</a>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Referral Commission Breakdown -->
+    <div class="row mt-5">
+      <div class="col-12">
+        <div class="card-dark text-center">
+          <h5 class="text-green"><i class="bi bi-people me-2"></i>Referral Commission Structure</h5>
+          <p class="text-muted small">Earn from your entire referral network</p>
+          <p class="text-muted small" style="font-size:0.7rem;">
+            <i class="bi bi-info-circle me-1"></i> Commission is credited instantly after successful package purchase
+          </p>
+          
+          <div class="d-flex flex-wrap justify-content-center gap-3 mt-3">
+            <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;min-width:100px;">
+              <div style="font-size:1.2rem;font-weight:700;color:#2ecc71;">8%</div>
+              <div style="font-size:0.7rem;color:#8899bb;">Level 1</div>
+            </div>
+            <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;min-width:100px;">
+              <div style="font-size:1.2rem;font-weight:700;color:#34d399;">4%</div>
+              <div style="font-size:0.7rem;color:#8899bb;">Level 2</div>
+            </div>
+            <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;min-width:100px;">
+              <div style="font-size:1.2rem;font-weight:700;color:#60a5fa;">2%</div>
+              <div style="font-size:0.7rem;color:#8899bb;">Level 3</div>
+            </div>
+            <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;min-width:100px;">
+              <div style="font-size:1.2rem;font-weight:700;color:#a78bfa;">1%</div>
+              <div style="font-size:0.7rem;color:#8899bb;">Level 4</div>
+            </div>
+            <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;min-width:100px;">
+              <div style="font-size:1.2rem;font-weight:700;color:#f472b6;">1%</div>
+              <div style="font-size:0.7rem;color:#8899bb;">Level 5</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 🔥 NEW: Withdrawal Information Section -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card-dark text-center">
+          <h5 class="text-green"><i class="bi bi-wallet2 me-2"></i>Withdrawal Information</h5>
+          <div class="row g-3 mt-2 justify-content-center">
+            <div class="col-md-3">
+              <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;">
+                <div style="font-size:0.7rem;color:#8899bb;">Referral Wallet</div>
+                <div style="font-size:1.3rem;font-weight:700;color:#fbbf24;">Min 20 USDT</div>
+                <div style="font-size:0.6rem;color:#556688;">Minimum withdrawal amount</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;">
+                <div style="font-size:0.7rem;color:#8899bb;">RND Wallet</div>
+                <div style="font-size:1.3rem;font-weight:700;color:#34d399;">Min 5 RND</div>
+                <div style="font-size:0.6rem;color:#556688;">Minimum withdrawal amount</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="bg-dark p-3 rounded" style="background:rgba(8,14,26,0.6) !important;">
+                <div style="font-size:0.7rem;color:#8899bb;">Processing Time</div>
+                <div style="font-size:1.1rem;font-weight:700;color:#60a5fa;">24-48 Hours</div>
+                <div style="font-size:0.6rem;color:#556688;">Admin approval required</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FEATURES SECTION 2 ====== -->
+<section class="py-5">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-wallet2"></i></div>
+          <h5>Dual Wallet System</h5>
+          <p>Separate RND Wallet and Referral Wallet for easy management</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-arrow-left-right"></i></div>
+          <h5>Easy Withdrawal</h5>
+          <p>Withdraw from both RND and Referral wallets anytime</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-receipt"></i></div>
+          <h5>Invoice Download</h5>
+          <p>Download complete package statements and invoices</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="feature-card">
+          <div class="icon"><i class="bi bi-clock-fill"></i></div>
+          <h5>Pending Release</h5>
+          <p>Automatic pending release for missed daily releases</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer>
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-6">
+        <a class="navbar-brand fw-bold text-white" href="#">
+          <i class="bi bi-currency-bitcoin text-green me-2"></i>RND Staking
+        </a>
+        <div class="mt-2">
+          <span class="supply-badge"><i class="bi bi-database"></i> Total Supply: 20,000 RND</span>
+          <span class="domain-badge ms-2">staking.randigital.in</span>
+        </div>
+        <p class="text-muted small mt-2">&copy; 2026 Ran Digital (RND) — Staking Platform</p>
+        <p class="text-muted small" style="font-size:0.65rem;">Secure Staking • Daily Automatic Release • Pending Release Support</p>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <a href="login.html" class="text-muted me-3">Login</a>
+        <a href="register.html" class="text-green">Register</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

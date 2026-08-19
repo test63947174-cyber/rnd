@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Dashboard - RND Staking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ============================================================
+           ROOT & BODY
+           ============================================================ */
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #080e1a; color: #f0f4ff; min-height: 100vh; }
+        
+        /* ============================================================
+           NAVBAR
+           ============================================================ */
+        .navbar-custom {
+            background: rgba(8,14,26,0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(46,204,113,0.15);
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1050;
+        }
+        .navbar-custom .navbar-brand { font-weight: 800; font-size: 1.2rem; color: #fff !important; }
+        .navbar-custom .navbar-brand i { color: #2ecc71; }
+        
+        /* ============================================================
+           SIDEBAR TOGGLE
+           ============================================================ */
+        .sidebar-toggle {
+            background: rgba(46,204,113,0.12);
+            border: 1px solid rgba(46,204,113,0.2);
+            color: #2ecc71;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-toggle:hover { background: rgba(46,204,113,0.2); }
+        
+        /* ============================================================
+           SIDEBAR OVERLAY
+           ============================================================ */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1060;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.active { display: block; opacity: 1; }
+        
+        /* ============================================================
+           SIDEBAR PANEL
+           ============================================================ */
+        .sidebar-panel {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background: rgba(12,20,35,0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(46,204,113,0.15);
+            z-index: 1070;
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 25px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-panel.open { right: 0; }
+        
+        .sidebar-panel .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.1);
+            margin-bottom: 15px;
+        }
+        .sidebar-panel .sidebar-header h5 { color: #fff; font-weight: 700; margin: 0; font-size: 1.1rem; }
+        .sidebar-panel .sidebar-header h5 i { color: #2ecc71; }
+        
+        .sidebar-close {
+            background: rgba(255,255,255,0.08);
+            border: none;
+            color: #8899bb;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        
+        .sidebar-panel .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 20px;
+            color: #8899bb;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            margin: 2px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .sidebar-panel .nav-item:hover { background: rgba(46,204,113,0.08); color: #fff; }
+        .sidebar-panel .nav-item.active { background: rgba(46,204,113,0.12); color: #2ecc71; }
+        .sidebar-panel .nav-item i { font-size: 1.2rem; width: 28px; text-align: center; }
+        .sidebar-panel .nav-item .badge {
+            margin-left: auto;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            font-weight: 600;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        
+        .sidebar-panel .sidebar-footer {
+            margin-top: auto;
+            padding: 20px;
+            border-top: 1px solid rgba(46,204,113,0.08);
+        }
+        .sidebar-panel .sidebar-footer .nav-item { color: #f87171; }
+        .sidebar-panel .sidebar-footer .nav-item:hover { background: rgba(239,68,68,0.08); color: #f87171; }
+        
+        /* ============================================================
+           USER PROFILE SIDEBAR
+           ============================================================ */
+        .user-profile-sidebar {
+            padding: 10px 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.08);
+            margin-bottom: 10px;
+        }
+        .user-profile-sidebar .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2ecc71, #1a7a3a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+        .user-profile-sidebar .user-name { color: #fff; font-weight: 600; font-size: 0.95rem; }
+        .user-profile-sidebar .user-id { color: #8899bb; font-size: 0.75rem; }
+        
+        /* ============================================================
+           DASHBOARD CONTAINER
+           ============================================================ */
+        .dashboard-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        
+        /* ============================================================
+           WELCOME SECTION
+           ============================================================ */
+        .welcome-section {
+            background: linear-gradient(135deg, rgba(46,204,113,0.08), rgba(26,122,58,0.05));
+            border-radius: 20px;
+            padding: 25px 30px;
+            border: 1px solid rgba(46,204,113,0.1);
+            margin-bottom: 25px;
+        }
+        .welcome-section h2 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .welcome-section h2 span { color: #2ecc71; }
+        .welcome-section .user-id-badge {
+            background: rgba(46,204,113,0.15);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 30px;
+            padding: 6px 18px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #2ecc71;
+            font-weight: 600;
+        }
+        .user-id-badge .copy-btn-small {
+            background: rgba(46,204,113,0.15);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 0.6rem;
+            color: #2ecc71;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .user-id-badge .copy-btn-small:hover { background: rgba(46,204,113,0.25); }
+        
+        /* ============================================================
+           RANK BADGE
+           ============================================================ */
+        .rank-badge {
+            background: rgba(251,191,36,0.12);
+            border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 30px;
+            padding: 6px 18px;
+            display: inline-block;
+            font-size: 0.8rem;
+            color: #fbbf24;
+            font-weight: 600;
+        }
+        .rank-badge.member {
+            background: rgba(46,204,113,0.08);
+            border-color: rgba(46,204,113,0.15);
+            color: #8899bb;
+        }
+        
+        /* ============================================================
+           WALLET CARDS
+           ============================================================ */
+        .wallet-card {
+            background: rgba(19,34,55,0.6);
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 16px;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .wallet-card:hover { border-color: rgba(46,204,113,0.2); transform: translateY(-3px); }
+        .wallet-card .wallet-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin: 0 auto 10px;
+        }
+        .wallet-card .wallet-icon.deposit { background: rgba(46,204,113,0.12); color: #2ecc71; }
+        .wallet-card .wallet-icon.referral { background: rgba(251,191,36,0.12); color: #fbbf24; }
+        .wallet-card .wallet-icon.rnd { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .wallet-card .wallet-icon.locked { background: rgba(139,92,246,0.12); color: #a78bfa; }
+        .wallet-card .wallet-icon.release { background: rgba(52,211,153,0.12); color: #34d399; }
+        
+        .wallet-card .wallet-number { font-size: 1.8rem; font-weight: 800; color: #fff; }
+        .wallet-card .wallet-number.green { color: #2ecc71; }
+        .wallet-card .wallet-number.gold { color: #fbbf24; }
+        .wallet-card .wallet-number.blue { color: #60a5fa; }
+        .wallet-card .wallet-number.purple { color: #a78bfa; }
+        .wallet-card .wallet-number.teal { color: #34d399; }
+        .wallet-card .wallet-label { color: #8899bb; font-size: 0.75rem; font-weight: 500; margin-top: 4px; }
+        .wallet-card .wallet-sub { color: #556688; font-size: 0.65rem; margin-top: 2px; }
+        
+        /* ============================================================
+           NETWORK STATS
+           ============================================================ */
+        .network-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .network-stat-card {
+            background: rgba(19,34,55,0.6);
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 16px;
+            padding: 18px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .network-stat-card:hover { border-color: rgba(46,204,113,0.2); transform: translateY(-2px); }
+        .network-stat-card .number { font-size: 1.8rem; font-weight: 800; color: #2ecc71; }
+        .network-stat-card .label { color: #8899bb; font-size: 0.75rem; font-weight: 500; margin-top: 2px; }
+        
+        /* ============================================================
+           LEVEL STATS
+           ============================================================ */
+        .level-stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .level-stat-card {
+            background: rgba(19,34,55,0.6);
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .level-stat-card:hover { border-color: rgba(46,204,113,0.2); }
+        .level-stat-card .number { font-size: 1.5rem; font-weight: 700; color: #2ecc71; }
+        .level-stat-card .label { color: #8899bb; font-size: 0.65rem; font-weight: 500; }
+        
+        /* ============================================================
+           GLASS CARDS
+           ============================================================ */
+        .card-glass {
+            background: rgba(19,34,55,0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .card-glass:hover { border-color: rgba(46,204,113,0.3); transform: translateY(-3px); }
+        .card-glass .card-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 15px; }
+        .card-glass .card-title i { color: #2ecc71; margin-right: 8px; }
+        
+        /* ============================================================
+           REFERRAL BOX
+           ============================================================ */
+        .referral-box {
+            background: rgba(8,14,26,0.6);
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            border: 1px dashed rgba(46,204,113,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .referral-box code { color: #a0b8d0; font-size: 0.8rem; word-break: break-all; flex: 1; }
+        .copy-btn {
+            cursor: pointer;
+            padding: 4px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(46,204,113,0.2);
+            background: transparent;
+            color: #a0b8d0;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+        }
+        .copy-btn:hover { background: rgba(46,204,113,0.1); color: #2ecc71; }
+        
+        /* ============================================================
+           BUTTONS
+           ============================================================ */
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            padding: 10px 24px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.9rem;
+        }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+        
+        .btn-outline-custom {
+            border: 2px solid rgba(46,204,113,0.3);
+            color: #a0b8d0;
+            padding: 10px 24px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 500;
+            background: transparent;
+            font-size: 0.9rem;
+        }
+        .btn-outline-custom:hover { border-color: #2ecc71; color: #2ecc71; }
+        
+        /* ============================================================
+           FORM CONTROLS
+           ============================================================ */
+        .form-control-custom {
+            background: rgba(8,14,26,0.8) !important;
+            border: 1px solid rgba(46,204,113,0.15) !important;
+            color: #f0f4ff !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .form-control-custom:focus {
+            border-color: #2ecc71 !important;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
+        }
+        .form-control-custom::placeholder { color: #556688 !important; }
+        .form-select-custom {
+            background: rgba(8,14,26,0.8) !important;
+            border: 1px solid rgba(46,204,113,0.15) !important;
+            color: #f0f4ff !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .form-select-custom:focus {
+            border-color: #2ecc71 !important;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
+        }
+        .form-select-custom option { background: #080e1a; color: #f0f4ff; }
+        
+        /* ============================================================
+           TRANSFER HISTORY
+           ============================================================ */
+        .transfer-history { margin-top: 15px; max-height: 200px; overflow-y: auto; }
+        .transfer-history::-webkit-scrollbar { width: 4px; }
+        .transfer-history::-webkit-scrollbar-track { background: rgba(46,204,113,0.05); border-radius: 10px; }
+        .transfer-history::-webkit-scrollbar-thumb { background: rgba(46,204,113,0.3); border-radius: 10px; }
+        
+        .transfer-item {
+            background: rgba(8,14,26,0.4);
+            border-radius: 10px;
+            padding: 10px 14px;
+            border: 1px solid rgba(46,204,113,0.06);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+        .transfer-item .sent { color: #f87171; }
+        .transfer-item .received { color: #34d399; }
+        .transfer-item .amount { font-weight: 700; }
+        .transfer-item .date { color: #556688; font-size: 0.65rem; }
+        .transfer-item .user { color: #a78bfa; font-weight: 500; }
+        
+        /* ============================================================
+           TOAST NOTIFICATIONS
+           ============================================================ */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .toast-custom {
+            background: rgba(19,34,55,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 16px;
+            padding: 16px 20px;
+            color: #f0f4ff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.4s ease;
+            margin-bottom: 10px;
+        }
+        .toast-custom.success { border-left: 4px solid #2ecc71; }
+        .toast-custom.error { border-left: 4px solid #ef4444; }
+        .toast-custom i { font-size: 1.5rem; }
+        .toast-custom .toast-msg { flex: 1; font-size: 0.9rem; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        /* ============================================================
+           RND PRICE BADGE
+           ============================================================ */
+        .rnd-price-badge {
+            background: rgba(46,204,113,0.1);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 30px;
+            padding: 4px 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #2ecc71;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        
+        /* ============================================================
+           COMMISSION ROWS
+           ============================================================ */
+        .commission-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(251,191,36,0.05);
+        }
+        .commission-row:last-child { border-bottom: none; }
+        .commission-row .level { color: #8899bb; }
+        .commission-row .earnings { color: #fbbf24; font-weight: 600; }
+        
+        /* ============================================================
+           RELEASE INFO BOX
+           ============================================================ */
+        .release-info-box {
+            background: rgba(52,211,153,0.08);
+            border: 1px solid rgba(52,211,153,0.15);
+            border-radius: 12px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .release-info-box .label { color: #8899bb; font-size: 0.75rem; }
+        .release-info-box .value { color: #34d399; font-weight: 700; font-size: 0.95rem; }
+        
+        /* ============================================================
+           DAYS REMAINING
+           ============================================================ */
+        .days-remaining {
+            background: rgba(251,191,36,0.05);
+            border: 1px solid rgba(251,191,36,0.1);
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-size: 0.65rem;
+            color: #fbbf24;
+        }
+        
+        /* ============================================================
+           LIVE INDICATOR
+           ============================================================ */
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(46,204,113,0.15);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #2ecc71;
+        }
+        .live-indicator .pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #2ecc71;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        /* ============================================================
+           STATUS BADGE
+           ============================================================ */
+        .status-badge {
+            font-size: 0.65rem;
+            color: #556688;
+            padding: 2px 10px;
+            border-radius: 12px;
+            background: rgba(46,204,113,0.05);
+        }
+        .status-badge.active { color: #2ecc71; background: rgba(46,204,113,0.1); }
+        
+        /* ============================================================
+           RESPONSIVE DESIGN
+           ============================================================ */
+        @media (max-width: 992px) {
+            .network-stats { grid-template-columns: repeat(2, 1fr); }
+            .level-stats { grid-template-columns: repeat(3, 1fr); }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-container { padding: 15px; }
+            .welcome-section { padding: 20px; }
+            .welcome-section h2 { font-size: 1.2rem; }
+            .network-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .level-stats { grid-template-columns: repeat(2, 1fr); }
+            .sidebar-panel { width: 280px; right: -300px; }
+            .sidebar-panel .nav-item { padding: 10px 16px; font-size: 0.85rem; }
+        }
+        
+        @media (max-width: 480px) {
+            .sidebar-panel { width: 100%; right: -100%; }
+            .sidebar-panel.open { right: 0; }
+            .network-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .level-stats { grid-template-columns: 1fr 1fr; }
+            .release-info-box { flex-direction: column; text-align: center; }
+        }
+        
+        @media print {
+            .navbar-custom, .sidebar-toggle, .sidebar-panel, .sidebar-overlay { display: none !important; }
+            body { background: #fff; }
+            .wallet-card { background: #f8f8f8; border-color: #ddd; }
+            .welcome-section { background: #f0f0f0; }
+            .wallet-card .wallet-number { color: #000 !important; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====== TOAST CONTAINER ====== -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ====== NAVBAR ====== -->
+<nav class="navbar navbar-custom">
+    <div class="container-fluid px-3">
+        <a class="navbar-brand fw-bold" href="dashboard.html">
+            <i class="bi bi-currency-bitcoin me-2"></i>RND Staking
+        </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="live-indicator d-none d-md-flex">
+                <span class="pulse"></span> Live
+            </span>
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Menu">
+                <i class="bi bi-list"></i>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<!-- ====== SIDEBAR OVERLAY ====== -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ====== SIDEBAR PANEL ====== -->
+<div class="sidebar-panel" id="sidebarPanel">
+    <div class="sidebar-header">
+        <h5><i class="bi bi-grid-1x2-fill me-2"></i>Menu</h5>
+        <button class="sidebar-close" id="sidebarClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    
+    <div class="user-profile-sidebar">
+        <div class="d-flex align-items-center gap-3">
+            <div class="avatar" id="sidebarAvatar">U</div>
+            <div>
+                <div class="user-name" id="sidebarName">User</div>
+                <div class="user-id" id="sidebarUserId">ID: ---</div>
+            </div>
+        </div>
+    </div>
+    
+    <a href="dashboard.html" class="nav-item active">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </a>
+    <a href="deposit.html" class="nav-item">
+        <i class="bi bi-arrow-down-circle"></i> Deposit
+    </a>
+    <a href="withdrawal.html" class="nav-item">
+        <i class="bi bi-arrow-up-circle"></i> Withdraw
+    </a>
+    <a href="referrals.html" class="nav-item">
+        <i class="bi bi-people"></i> Referrals
+        <span class="badge" id="referralBadge">0</span>
+    </a>
+    <a href="buy-package.html" class="nav-item">
+        <i class="bi bi-box-seam"></i> Buy Package
+    </a>
+    <a href="transactions.html" class="nav-item">
+        <i class="bi bi-receipt"></i> Transactions
+    </a>
+    <a href="invoice.html" class="nav-item">
+        <i class="bi bi-file-text"></i> Invoice
+    </a>
+    <a href="profile.html" class="nav-item">
+        <i class="bi bi-person"></i> Profile
+    </a>
+    <a href="#" onclick="window.open('support.html', '_blank'); return false;" class="nav-item">
+        <i class="bi bi-headset"></i> Support Center
+    </a>
+    
+    <div class="sidebar-footer">
+        <a href="#" class="nav-item" id="logoutBtnSidebar">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </div>
+</div>
+
+<!-- ====== DASHBOARD CONTENT ====== -->
+<div class="dashboard-container" id="dashboardContent">
+    <div class="text-center py-5">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="text-muted mt-3">Loading dashboard...</p>
+    </div>
+</div>
+
+<!-- ====== SCRIPTS ====== -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ====== IMPORT MAP ====== -->
+<script type="importmap">
+{
+    "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+    }
+}
+</script>
+
+<!-- ====== DASHBOARD.JS (All Logic) ====== -->
+<script type="module" src="dashboard.js"></script>
+
+</body>
+</html>

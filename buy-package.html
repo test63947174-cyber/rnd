@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Buy Package · RND Staking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #080e1a; color: #f0f4ff; min-height: 100vh; }
+        
+        .navbar-custom {
+            background: rgba(8,14,26,0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(46,204,113,0.15);
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1050;
+        }
+        .navbar-custom .navbar-brand { font-weight: 800; font-size: 1.2rem; color: #fff !important; }
+        .navbar-custom .navbar-brand i { color: #2ecc71; }
+        
+        .sidebar-toggle {
+            background: rgba(46,204,113,0.12);
+            border: 1px solid rgba(46,204,113,0.2);
+            color: #2ecc71;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-toggle:hover { background: rgba(46,204,113,0.2); }
+        
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1060;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.active { display: block; opacity: 1; }
+        
+        .sidebar-panel {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background: rgba(12,20,35,0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(46,204,113,0.15);
+            z-index: 1070;
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 25px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-panel.open { right: 0; }
+        
+        .sidebar-panel .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.1);
+            margin-bottom: 15px;
+        }
+        .sidebar-panel .sidebar-header h5 { color: #fff; font-weight: 700; margin: 0; font-size: 1.1rem; }
+        .sidebar-panel .sidebar-header h5 i { color: #2ecc71; }
+        .sidebar-close {
+            background: rgba(255,255,255,0.08);
+            border: none;
+            color: #8899bb;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        
+        .sidebar-panel .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 20px;
+            color: #8899bb;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            margin: 2px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .sidebar-panel .nav-item:hover { background: rgba(46,204,113,0.08); color: #fff; }
+        .sidebar-panel .nav-item.active { background: rgba(46,204,113,0.12); color: #2ecc71; }
+        .sidebar-panel .nav-item i { font-size: 1.2rem; width: 28px; text-align: center; }
+        .sidebar-panel .nav-item .badge {
+            margin-left: auto;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            font-weight: 600;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        
+        .sidebar-panel .sidebar-footer {
+            margin-top: auto;
+            padding: 20px;
+            border-top: 1px solid rgba(46,204,113,0.08);
+        }
+        .sidebar-panel .sidebar-footer .nav-item { color: #f87171; }
+        .sidebar-panel .sidebar-footer .nav-item:hover { background: rgba(239,68,68,0.08); color: #f87171; }
+        
+        .user-profile-sidebar {
+            padding: 10px 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.08);
+            margin-bottom: 10px;
+        }
+        .user-profile-sidebar .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2ecc71, #1a7a3a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+        .user-profile-sidebar .user-name { color: #fff; font-weight: 600; font-size: 0.95rem; }
+        .user-profile-sidebar .user-id { color: #8899bb; font-size: 0.75rem; }
+        
+        .dashboard-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        
+        .card-glass {
+            background: rgba(19,34,55,0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .card-glass:hover { border-color: rgba(46,204,113,0.3); transform: translateY(-3px); }
+        .card-glass .card-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 15px; }
+        .card-glass .card-title i { color: #2ecc71; margin-right: 8px; }
+        
+        .package-card {
+            background: rgba(8,14,26,0.6);
+            border: 1px solid rgba(46,204,113,0.12);
+            border-radius: 20px;
+            padding: 1.75rem 1.25rem 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: default;
+            height: 100%;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .package-card:hover { 
+            border-color: rgba(46,204,113,0.45); 
+            transform: translateY(-6px); 
+            box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+        }
+        .package-card.selected {
+            border-color: #2ecc71;
+            border-width: 2px;
+            background: rgba(46,204,113,0.08);
+            box-shadow: 0 0 0 1px #2ecc71, 0 12px 32px rgba(46,204,113,0.15);
+        }
+        .package-card .plan-name { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.3px; }
+        .package-card .price { font-size: 2.2rem; font-weight: 800; color: #2ecc71; line-height: 1.2; }
+        .package-card .price span { font-size: 1rem; color: #8899bb; font-weight: 400; }
+        .package-card .duration { color: #8899bb; font-size: 0.85rem; margin-top: 4px; }
+        .package-card .reward { color: #fbbf24; font-weight: 600; font-size: 1.1rem; margin-top: 8px; }
+        .package-card .you-will-receive { color: #60a5fa; font-size: 0.9rem; margin-top: 4px; }
+        .package-card .daily-release { color: #34d399; font-size: 0.85rem; }
+        .package-card .features { 
+            margin-top: 14px; 
+            text-align: left; 
+            color: #a0b8d0; 
+            font-size: 0.85rem;
+            width: 100%;
+            padding-left: 4px;
+        }
+        .package-card .features li { 
+            list-style: none; 
+            margin-bottom: 5px; 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .package-card .features li i { color: #2ecc71; font-size: 1rem; width: 18px; }
+        
+        .package-card .plan-cta {
+            margin-top: 18px;
+            width: 100%;
+            padding: 10px 0;
+            border: none;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            letter-spacing: 0.3px;
+            background: linear-gradient(145deg, #f59e0b, #d97706);
+            color: #0b111e;
+            box-shadow: 0 8px 18px rgba(245, 158, 11, 0.25);
+            transition: all 0.25s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .package-card .plan-cta:hover {
+            transform: scale(1.02);
+            box-shadow: 0 12px 28px rgba(245, 158, 11, 0.4);
+            background: linear-gradient(145deg, #fbbf24, #f59e0b);
+            color: #000;
+        }
+        .package-card .plan-cta i { font-size: 1.1rem; }
+        
+        .form-control-custom {
+            background: rgba(8,14,26,0.8) !important;
+            border: 1px solid rgba(46,204,113,0.15) !important;
+            color: #f0f4ff !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .form-control-custom:focus {
+            border-color: #2ecc71 !important;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
+        }
+        .form-control-custom::placeholder { color: #556688 !important; }
+        .form-control-custom:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .form-label { font-weight: 600; color: #a0b8d0; font-size: 0.9rem; margin-bottom: 6px; }
+        .form-label .required { color: #ef4444; }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            padding: 14px;
+            border-radius: 12px;
+            width: 100%;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+        .btn-primary-custom:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+        
+        .package-history { margin-top: 20px; max-height: 300px; overflow-y: auto; }
+        .package-history::-webkit-scrollbar { width: 4px; }
+        .package-history::-webkit-scrollbar-track { background: rgba(46,204,113,0.05); border-radius: 10px; }
+        .package-history::-webkit-scrollbar-thumb { background: rgba(46,204,113,0.3); border-radius: 10px; }
+        
+        .package-item {
+            background: rgba(8,14,26,0.4);
+            border-radius: 12px;
+            padding: 12px 16px;
+            border: 1px solid rgba(46,204,113,0.06);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .package-item .amount { font-weight: 700; color: #2ecc71; }
+        .package-item .total-rnd { font-weight: 600; color: #60a5fa; font-size: 0.85rem; }
+        .package-item .status-active { color: #2ecc71; font-size: 0.8rem; }
+        .package-item .status-completed { color: #60a5fa; font-size: 0.8rem; }
+        .package-item .date { color: #556688; font-size: 0.7rem; }
+        .package-item .plan { color: #fbbf24; font-weight: 600; font-size: 0.8rem; }
+        .package-item .daily { color: #34d399; font-size: 0.7rem; }
+        .package-item .released { color: #fbbf24; font-size: 0.7rem; }
+        .package-item .rate-badge { background: rgba(46,204,113,0.1); color: #2ecc71; padding: 2px 10px; border-radius: 12px; font-size: 0.6rem; }
+        .package-item .locked { color: #a78bfa; font-size: 0.7rem; }
+        .package-item .progress { background: rgba(46,204,113,0.1); border-radius: 4px; height: 4px; width: 120px; }
+        .package-item .progress-bar { background: #2ecc71; border-radius: 4px; height: 4px; }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .toast-custom {
+            background: rgba(19,34,55,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 16px;
+            padding: 16px 20px;
+            color: #f0f4ff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.4s ease;
+            margin-bottom: 10px;
+        }
+        .toast-custom.success { border-left: 4px solid #2ecc71; }
+        .toast-custom.error { border-left: 4px solid #ef4444; }
+        .toast-custom i { font-size: 1.5rem; }
+        .toast-custom .toast-msg { flex: 1; font-size: 0.9rem; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        .rnd-price-badge {
+            background: rgba(46,204,113,0.1);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 30px;
+            padding: 4px 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #2ecc71;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        
+        .release-info-box {
+            background: rgba(52,211,153,0.05);
+            border: 1px solid rgba(52,211,153,0.1);
+            border-radius: 12px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .release-info-box .label { color: #8899bb; font-size: 0.7rem; }
+        .release-info-box .value { color: #34d399; font-weight: 700; font-size: 0.9rem; }
+        
+        @media (max-width: 768px) {
+            .dashboard-container { padding: 15px; }
+            .sidebar-panel { width: 280px; right: -300px; }
+            .sidebar-panel .nav-item { padding: 10px 16px; font-size: 0.85rem; }
+            .package-card .price { font-size: 1.8rem; }
+            .package-card { padding: 1.25rem 1rem; }
+        }
+        @media (max-width: 480px) {
+            .sidebar-panel { width: 100%; right: -100%; }
+            .sidebar-panel.open { right: 0; }
+            .card-glass { padding: 1rem; }
+            .release-info-box { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ====== NAVBAR ====== -->
+<nav class="navbar navbar-custom">
+    <div class="container-fluid px-3">
+        <a class="navbar-brand fw-bold" href="dashboard.html">
+            <i class="bi bi-currency-bitcoin me-2"></i>RND Staking
+        </a>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Menu">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- ====== SIDEBAR ====== -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="sidebar-panel" id="sidebarPanel">
+    <div class="sidebar-header">
+        <h5><i class="bi bi-grid-1x2-fill me-2"></i>Menu</h5>
+        <button class="sidebar-close" id="sidebarClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="user-profile-sidebar">
+        <div class="d-flex align-items-center gap-3">
+            <div class="avatar" id="sidebarAvatar">U</div>
+            <div>
+                <div class="user-name" id="sidebarName">User</div>
+                <div class="user-id" id="sidebarUserId">ID: ---</div>
+            </div>
+        </div>
+    </div>
+    <a href="dashboard.html" class="nav-item"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a href="deposit.html" class="nav-item"><i class="bi bi-arrow-down-circle"></i> Deposit</a>
+    <a href="withdrawal.html" class="nav-item"><i class="bi bi-arrow-up-circle"></i> Withdraw</a>
+    <a href="referrals.html" class="nav-item"><i class="bi bi-people"></i> Referrals <span class="badge" id="referralBadge">0</span></a>
+    <a href="buy-package.html" class="nav-item active"><i class="bi bi-box-seam"></i> Buy Package</a>
+    <a href="transactions.html" class="nav-item"><i class="bi bi-receipt"></i> Transactions</a>
+    <a href="invoice.html" class="nav-item"><i class="bi bi-file-text"></i> Invoice</a>
+    <a href="profile.html" class="nav-item"><i class="bi bi-person"></i> Profile</a>
+    <div class="sidebar-footer">
+        <a href="#" class="nav-item" id="logoutBtnSidebar"><i class="bi bi-box-arrow-right"></i> Logout</a>
+    </div>
+</div>
+
+<!-- ====== MAIN CONTENT ====== -->
+<div class="dashboard-container" id="packageContent">
+    <div class="text-center py-5">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="text-muted mt-3">Loading packages...</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+    }
+}
+</script>
+<script type="module">
+import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { getDatabase, ref, get, update, set, runTransaction } from "firebase/database";
+
+// ============================================================
+// 🔥 NEW FIREBASE CONFIG (rwebsite-e031b)
+// ============================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+    authDomain: "rwebsite-e031b.firebaseapp.com",
+    databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "rwebsite-e031b",
+    storageBucket: "rwebsite-e031b.firebasestorage.app",
+    messagingSenderId: "376966041558",
+    appId: "1:376966041558:web:02bc9062ec182590275e77",
+    measurementId: "G-0T1FREXHD3"
+};
+
+console.log('✅ Firebase initialized with NEW config (rwebsite-e031b)');
+
+// 🔥 PLANS
+const PLANS = [
+    { 
+        id: '6months', 
+        name: '6 Months Plan', 
+        days: 180, 
+        bonus: 25, 
+        color: '#2ecc71',
+        bonusText: '+25% Bonus',
+        minAmount: 10
+    },
+    { 
+        id: '12months', 
+        name: '12 Months Plan', 
+        days: 365, 
+        bonus: 60, 
+        color: '#fbbf24',
+        bonusText: '+60% Bonus',
+        minAmount: 100
+    },
+    { 
+        id: '18months', 
+        name: '18 Months Plan', 
+        days: 540, 
+        bonus: 100, 
+        color: '#f472b6',
+        bonusText: '+100% Bonus',
+        minAmount: 200
+    }
+];
+
+// 🔥 FIX 4: Floating point precision
+function roundTo8(value) {
+    if (value === undefined || value === null || isNaN(value)) return 0;
+    return parseFloat(Math.round(value * 100000000) / 100000000);
+}
+
+function calculateStaking(usdtAmount, rndPrice, plan) {
+    if (!usdtAmount || usdtAmount <= 0 || !rndPrice || rndPrice <= 0) {
+        return {
+            baseRND: 0,
+            bonusRND: 0,
+            totalRND: 0,
+            dailyRelease: 0,
+            bonusPercent: plan ? plan.bonus : 0,
+            planDays: plan ? plan.days : 0
+        };
+    }
+    const baseRND = roundTo8(usdtAmount / rndPrice);
+    const bonusRND = roundTo8(baseRND * (plan.bonus / 100));
+    const totalRND = roundTo8(baseRND + bonusRND);
+    const dailyRelease = roundTo8(totalRND / plan.days);
+    return {
+        baseRND,
+        bonusRND,
+        totalRND,
+        dailyRelease,
+        bonusPercent: plan.bonus,
+        planDays: plan.days
+    };
+}
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+let rndPrice = 1.00;
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast-custom ${type}`;
+    const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
+    toast.innerHTML = `<i class="bi ${icon}"></i><span class="toast-msg">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+const sidebarPanel = document.getElementById('sidebarPanel');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarClose = document.getElementById('sidebarClose');
+
+function openSidebar() {
+    sidebarPanel.classList.add('open');
+    sidebarOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+    sidebarPanel.classList.remove('open');
+    sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+sidebarToggle.addEventListener('click', openSidebar);
+sidebarClose.addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+
+document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await signOut(auth);
+    window.location.href = 'login.html';
+});
+
+async function getUserData(uid) {
+    const snap = await get(ref(db, 'users/' + uid));
+    return snap.exists() ? snap.val() : null;
+}
+
+async function getRNDPrice() {
+    try {
+        const rateSnap = await get(ref(db, 'settings/rate'));
+        if (rateSnap.exists()) {
+            rndPrice = rateSnap.val();
+        } else {
+            await set(ref(db, 'settings/rate'), 1.00);
+            rndPrice = 1.00;
+        }
+    } catch (error) { console.error('Error fetching RND price:', error); rndPrice = 1.00; }
+    return rndPrice;
+}
+
+// ============================================================
+// 🔥 FIX 1: ATOMIC saveTransaction() with proper abort
+// ============================================================
+async function saveTransaction(uid, transactionData) {
+    try {
+        const userRef = ref(db, 'users/' + uid);
+        
+        const result = await runTransaction(userRef, (currentData) => {
+            if (!currentData) {
+                return { ...currentData };
+            }
+            
+            const transactions = currentData.transactions || {};
+            
+            // 🔥 Duplicate check - Daily Release
+            if (transactionData.type === 'daily_release') {
+                const today = new Date().toDateString();
+                for (let key in transactions) {
+                    if (transactions[key].type === 'daily_release' && 
+                        transactions[key].date === today) {
+                        return { ...currentData };
+                    }
+                }
+            }
+            
+            // 🔥 Duplicate check - Package (packageId se)
+            if (transactionData.type === 'package' && transactionData.packageId) {
+                for (let key in transactions) {
+                    const tx = transactions[key];
+                    if (tx.type === 'package' && tx.packageId === transactionData.packageId) {
+                        return { ...currentData };
+                    }
+                }
+            }
+            
+            // Generate unique ID
+            const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+            transactions[txId] = transactionData;
+            
+            return {
+                ...currentData,
+                transactions: transactions
+            };
+        });
+        
+        if (result.committed) {
+            console.log('✅ Transaction saved atomically:', transactionData.type);
+            return true;
+        } else {
+            console.log('⚠️ Transaction not committed (duplicate or no change)');
+            return false;
+        }
+    } catch (error) {
+        console.error('Error saving transaction:', error);
+        return false;
+    }
+}
+
+// ============================================================
+// 🔥 FIX 6: Check duplicate purchase
+// ============================================================
+async function checkDuplicatePurchase(uid, planId, amount, timestamp) {
+    const userSnap = await get(ref(db, 'users/' + uid));
+    if (!userSnap.exists()) return false;
+    
+    const userData = userSnap.val();
+    const packages = userData.packages || {};
+    const windowMs = 10000; // 10 seconds window
+    
+    for (let key in packages) {
+        const pkg = packages[key];
+        if (pkg.planId === planId && 
+            Math.abs((pkg.timestamp || 0) - timestamp) < windowMs &&
+            Math.abs((pkg.usdtAmount || 0) - amount) < 0.01) {
+            console.log('⚠️ Duplicate purchase detected for plan:', planId);
+            return true;
+        }
+    }
+    return false;
+}
+
+// ============================================================
+// 🔥 FIX 1: ENHANCED ATOMIC PURCHASE - Proper abort pattern
+// ============================================================
+async function processAtomicPurchase(uid, plan, payAmount, payFrom, result) {
+    const userRef = ref(db, 'users/' + uid);
+    const packageId = 'pkg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+    const timestamp = Date.now();
+    const date = new Date().toDateString();
+    
+    try {
+        // 🔥 LAYER 1: Pre-check balance before transaction
+        const userSnap = await get(userRef);
+        if (!userSnap.exists()) {
+            return { success: false, error: 'User not found' };
+        }
+        
+        const userData = userSnap.val();
+        const currentBalance = userData[payFrom] || 0;
+        
+        if (currentBalance < payAmount) {
+            return { 
+                success: false, 
+                error: 'Insufficient balance',
+                balance: currentBalance,
+                needed: payAmount
+            };
+        }
+        
+        // 🔥 FIX 6: Check for duplicate purchase
+        const isDuplicate = await checkDuplicatePurchase(uid, plan.id, payAmount, timestamp);
+        if (isDuplicate) {
+            return { 
+                success: false, 
+                error: 'Duplicate purchase detected. Please wait a moment.'
+            };
+        }
+        
+        // 🔥 LAYER 2: Run transaction with proper abort
+        const txResult = await runTransaction(userRef, (currentData) => {
+            if (!currentData) {
+                return { ...currentData };
+            }
+            
+            const balance = currentData[payFrom] || 0;
+            
+            // 🔥 PROPER ABORT: Return null to abort transaction
+            if (balance < payAmount) {
+                console.log('⚠️ Insufficient balance (transaction abort):', balance, 'needed:', payAmount);
+                return null; // 🔥 This aborts the transaction
+            }
+            
+            // 2. Prepare packages
+            const packages = currentData.packages || {};
+            packages[packageId] = {
+                planId: plan.id,
+                planName: plan.name,
+                usdtAmount: payAmount,
+                totalRND: result.totalRND,
+                remainingRND: result.totalRND,
+                releasedRND: 0,
+                dailyRelease: result.dailyRelease,
+                planDays: plan.days,
+                bonusPercent: plan.bonus,
+                status: 'active',
+                purchaseDate: timestamp,
+                rndPriceAtTime: rndPrice || 1,
+                timestamp: timestamp
+            };
+            
+            // 3. Update balances
+            const newBalance = roundTo8(balance - payAmount);
+            const currentLocked = currentData.lockedRND || 0;
+            const newLocked = roundTo8(currentLocked + result.totalRND);
+            const totalStake = roundTo8((currentData.totalStake || 0) + payAmount);
+            
+            // 4. Create transaction
+            const transactions = currentData.transactions || {};
+            const txId = 'tx_' + timestamp + '_' + Math.random().toString(36).substr(2, 8);
+            transactions[txId] = {
+                type: 'package',
+                packageId: packageId,
+                amount: payAmount,
+                currency: 'USDT',
+                rndReceived: result.totalRND,
+                planName: plan.name,
+                dailyRelease: result.dailyRelease,
+                planDays: plan.days,
+                bonusPercent: plan.bonus,
+                timestamp: timestamp,
+                date: date,
+                status: 'completed',
+                description: `Purchased ${plan.name} - ${result.totalRND.toFixed(2)} RND locked`
+            };
+            
+            // 5. Return updated data
+            return {
+                ...currentData,
+                [payFrom]: newBalance,
+                packages: packages,
+                lockedRND: newLocked,
+                totalStake: totalStake,
+                transactions: transactions
+            };
+        });
+        
+        // 🔥 Check if transaction was committed successfully
+        if (txResult.committed && txResult.snapshot && txResult.snapshot.exists()) {
+            const updatedData = txResult.snapshot.val();
+            const newBalance = updatedData[payFrom] || 0;
+            
+            if (newBalance <= currentBalance - payAmount + 0.001) {
+                console.log('✅ Atomic purchase completed:', packageId);
+                return { success: true, packageId: packageId };
+            } else {
+                return { success: false, error: 'Balance verification failed' };
+            }
+        } else {
+            return { 
+                success: false, 
+                error: txResult.error || 'Transaction aborted - insufficient balance'
+            };
+        }
+    } catch (error) {
+        console.error('Atomic purchase error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ============================================================
+// 🔥 FIX 2 & 5: ATOMIC REFERRAL COMMISSION - Single Transaction
+// ============================================================
+async function distributeReferralCommissionAtomic(userUid, amount, rndPriceAtTime, packageId) {
+    try {
+        const rates = [0.08, 0.04, 0.02, 0.01, 0.01];
+        const levelNames = ['Level 1 (8%)', 'Level 2 (4%)', 'Level 3 (2%)', 'Level 4 (1%)', 'Level 5 (1%)'];
+        const timestamp = Date.now();
+        const date = new Date().toDateString();
+        
+        const usersSnap = await get(ref(db, 'users'));
+        if (!usersSnap.exists()) return { totalCommission: 0, commissionCount: 0 };
+        const users = usersSnap.val();
+        const currentUser = users[userUid];
+        if (!currentUser) return { totalCommission: 0, commissionCount: 0 };
+        
+        let currentRefCode = currentUser.referredBy || '';
+        let totalCommission = 0;
+        let commissionCount = 0;
+        let sponsors = [];
+        
+        // 🔥 First, collect all sponsors and their commissions
+        for (let level = 0; level < 5; level++) {
+            if (!currentRefCode) break;
+            
+            let sponsorUid = null;
+            let sponsor = null;
+            for (const uid in users) {
+                if (users[uid].referralCode === currentRefCode) {
+                    sponsorUid = uid;
+                    sponsor = users[uid];
+                    break;
+                }
+            }
+            if (!sponsorUid || !sponsor) break;
+            
+            const commissionUSDT = roundTo8(amount * rates[level]);
+            totalCommission = roundTo8(totalCommission + commissionUSDT);
+            commissionCount++;
+            
+            sponsors.push({
+                uid: sponsorUid,
+                data: sponsor,
+                level: level + 1,
+                commission: commissionUSDT,
+                levelName: levelNames[level]
+            });
+            
+            currentRefCode = sponsor.referredBy || '';
+        }
+        
+        if (sponsors.length === 0) {
+            return { totalCommission: 0, commissionCount: 0 };
+        }
+        
+        // 🔥 ATOMIC: Update all sponsors
+        let successCount = 0;
+        let failedSponsors = [];
+        
+        for (const sponsor of sponsors) {
+            try {
+                const sponsorRef = ref(db, 'users/' + sponsor.uid);
+                const result = await runTransaction(sponsorRef, (currentData) => {
+                    if (!currentData) return { ...currentData };
+                    
+                    const newReferralEarnings = roundTo8((currentData.referralEarnings || 0) + sponsor.commission);
+                    const newReferralWallet = roundTo8((currentData.referralWallet || 0) + sponsor.commission);
+                    const newTeamBusiness = roundTo8((currentData.teamBusiness || 0) + amount);
+                    const newTotalReferralCommission = roundTo8((currentData.totalReferralCommission || 0) + sponsor.commission);
+                    const newLevelEarnings = roundTo8((currentData[`level${sponsor.level}Earnings`] || 0) + sponsor.commission);
+                    
+                    const transactions = currentData.transactions || {};
+                    const txId = 'tx_' + timestamp + '_' + Math.random().toString(36).substr(2, 8);
+                    transactions[txId] = {
+                        type: 'referral_commission',
+                        level: sponsor.level,
+                        amount: sponsor.commission,
+                        currency: 'USDT',
+                        fromUser: currentUser.username || userUid,
+                        packageId: packageId,
+                        rate: rndPriceAtTime,
+                        timestamp: timestamp,
+                        date: date,
+                        status: 'completed',
+                        description: `${sponsor.levelName} commission from package purchase`
+                    };
+                    
+                    return {
+                        ...currentData,
+                        referralEarnings: newReferralEarnings,
+                        referralWallet: newReferralWallet,
+                        teamBusiness: newTeamBusiness,
+                        totalReferralCommission: newTotalReferralCommission,
+                        [`level${sponsor.level}Earnings`]: newLevelEarnings,
+                        transactions: transactions
+                    };
+                });
+                
+                if (result.committed) {
+                    successCount++;
+                } else {
+                    failedSponsors.push(sponsor.level);
+                }
+            } catch (err) {
+                console.error(`❌ Error in level ${sponsor.level} commission:`, err);
+                failedSponsors.push(sponsor.level);
+            }
+        }
+        
+        return { 
+            totalCommission: roundTo8(totalCommission),
+            commissionCount, 
+            successCount,
+            failedCount: sponsors.length - successCount,
+            failedSponsors: failedSponsors
+        };
+    } catch (error) {
+        console.error('Error distributing referral commission:', error);
+        return { totalCommission: 0, commissionCount: 0, error: error.message };
+    }
+}
+
+// ============================================================
+// 🔥 MAIN
+// ============================================================
+onAuthStateChanged(auth, async (user) => {
+    if (!user) { window.location.href = 'login.html'; return; }
+
+    try {
+        await getRNDPrice();
+        let userData = await getUserData(user.uid);
+        if (!userData) { window.location.href = 'dashboard.html'; return; }
+
+        const finalSnap = await get(ref(db, 'users/' + user.uid));
+        const finalUserData = finalSnap.exists() ? finalSnap.val() : userData;
+
+        const username = finalUserData.username || finalUserData.referralCode || 'USER';
+        const name = finalUserData.name || 'User';
+        document.getElementById('sidebarName').textContent = name;
+        document.getElementById('sidebarUserId').textContent = 'ID: ' + username.substring(0, 20) + '...';
+        document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
+
+        const badge = document.getElementById('referralBadge');
+        if (badge) badge.textContent = finalUserData.totalReferrals || 0;
+
+        const packages = finalUserData.packages || {};
+        const userPackages = Object.keys(packages).map(key => ({ id: key, ...packages[key] }));
+        userPackages.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        const depositWallet = finalUserData.depositWallet || 0;
+        const referralWallet = finalUserData.referralWallet || 0;
+        const rndWallet = finalUserData.rndWallet || 0;
+        const lockedRND = finalUserData.lockedRND || 0;
+        const releaseWallet = finalUserData.releaseWallet || 0;
+
+        let packagesHtml = '';
+        userPackages.forEach((p) => {
+            const statusClass = p.status === 'active' ? 'status-active' : 'status-completed';
+            const statusText = p.status === 'active' ? '🟢 Active' : '🔵 Completed';
+            const released = p.releasedRND || 0;
+            const remaining = p.remainingRND || 0;
+            const total = p.totalRND || 0;
+            const progress = total > 0 ? (released / total * 100) : 0;
+            
+            packagesHtml += `
+                <div class="package-item">
+                    <div>
+                        <span class="plan">${p.planName || 'Package'}</span>
+                        <div class="date">${new Date(p.purchaseDate || p.timestamp).toLocaleString('hi-IN')}</div>
+                        ${p.rndPriceAtTime ? `<span class="rate-badge">Rate: $${p.rndPriceAtTime.toFixed(4)}/RND</span>` : ''}
+                        <div class="mt-1">
+                            <div class="progress"><div class="progress-bar" style="width:${Math.min(progress, 100)}%;"></div></div>
+                            <small class="text-muted">${progress.toFixed(1)}% Released</small>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="amount">$${(p.usdtAmount || 0).toFixed(2)}</span>
+                        <span class="total-rnd">→ ${(total || 0).toFixed(2)} RND</span>
+                        <span class="${statusClass} ms-2">${statusText}</span>
+                        ${p.dailyRelease ? `<div class="daily">📈 Daily: ${(p.dailyRelease || 0).toFixed(4)} RND</div>` : ''}
+                        ${released > 0 ? `<div class="released">✅ Released: ${released.toFixed(2)} RND</div>` : ''}
+                        ${remaining > 0 ? `<div class="locked">🔒 Remaining: ${remaining.toFixed(2)} RND</div>` : ''}
+                        ${p.planDays ? `<div class="daily">📅 ${p.planDays} Days</div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        document.getElementById('packageContent').innerHTML = `
+            <div class="row g-4">
+                <div class="col-12">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center">
+                        <h4 class="fw-bold"><i class="bi bi-box-seam text-success me-2"></i>Buy Package</h4>
+                        <span class="rnd-price-badge"><i class="bi bi-currency-dollar"></i> 1 RND = $${(rndPrice || 1).toFixed(4)}</span>
+                    </div>
+                    <hr class="border-secondary">
+                </div>
+
+                <div class="col-12">
+                    <div class="card-glass">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="background:rgba(46,204,113,0.05);border-radius:12px;border:1px solid rgba(46,204,113,0.1);">
+                                    <small class="text-muted">Deposit Wallet (USDT)</small>
+                                    <h3 class="text-success">$${(depositWallet || 0).toFixed(2)}</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="background:rgba(251,191,36,0.05);border-radius:12px;border:1px solid rgba(251,191,36,0.1);">
+                                    <small class="text-muted">Referral Wallet (USDT)</small>
+                                    <h3 style="color:#fbbf24;">${(referralWallet || 0).toFixed(2)} USDT</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="background:rgba(59,130,246,0.05);border-radius:12px;border:1px solid rgba(59,130,246,0.1);">
+                                    <small class="text-muted">RND Wallet</small>
+                                    <h3 style="color:#60a5fa;">${(rndWallet || 0).toFixed(4)} RND</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="background:rgba(139,92,246,0.05);border-radius:12px;border:1px solid rgba(139,92,246,0.1);">
+                                    <small class="text-muted">Locked RND</small>
+                                    <h3 style="color:#a78bfa;">${(lockedRND || 0).toFixed(2)} RND</h3>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="release-info-box mt-3">
+                            <span class="label"><i class="bi bi-info-circle me-1"></i> Package buy karte hi RND Locked wallet mein add ho jayega. Release next day se start hoga.</span>
+                            <span class="label">Today's Release:</span>
+                            <span class="value">${(releaseWallet || 0).toFixed(4)} RND</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="row g-4">
+                        ${PLANS.map((plan) => {
+                            const example = calculateStaking(plan.minAmount, rndPrice || 1, plan);
+                            return `
+                            <div class="col-md-4">
+                                <div class="package-card" data-plan="${plan.id}">
+                                    <h5 class="plan-name" style="color:${plan.color};">${plan.name}</h5>
+                                    <div class="price">$${plan.minAmount} <span>USDT</span></div>
+                                    <div class="reward">${plan.bonusText}</div>
+                                    <div class="duration">⏱ ${plan.days} Days</div>
+                                    <div class="you-will-receive">📊 You Will Receive: ${example.totalRND.toFixed(2)} RND</div>
+                                    <div class="daily-release">📈 Daily: ${example.dailyRelease.toFixed(4)} RND</div>
+                                    <div class="features">
+                                        <li><i class="bi bi-check-circle"></i> ${plan.bonus}% Bonus</li>
+                                        <li><i class="bi bi-check-circle"></i> Fixed Daily Release</li>
+                                        <li><i class="bi bi-check-circle"></i> ${plan.days} Days Lock</li>
+                                        <li><i class="bi bi-check-circle"></i> Min: $${plan.minAmount}</li>
+                                    </div>
+                                    <button class="plan-cta" data-plan-id="${plan.id}">
+                                        <i class="bi bi-lightning-charge-fill"></i> Select ${plan.name}
+                                    </button>
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card-glass">
+                        <div class="card-title"><i class="bi bi-cart-check text-success me-2"></i>Confirm Purchase</div>
+                        <form id="buyForm">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Selected Plan</label>
+                                    <input type="text" id="selectedPlan" class="form-control form-control-custom" value="None" readonly>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Amount (USDT)</label>
+                                    <input type="number" id="payAmount" class="form-control form-control-custom" placeholder="Enter amount" min="10" step="1" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">You Will Receive</label>
+                                    <input type="text" id="totalRNDDisplay" class="form-control form-control-custom" value="0 RND" readonly>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Daily Release</label>
+                                    <input type="text" id="dailyReleaseDisplay" class="form-control form-control-custom" value="0 RND" readonly>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Pay From</label>
+                                    <select id="payFrom" class="form-select form-control-custom">
+                                        <option value="depositWallet">💰 Deposit Wallet (USDT)</option>
+                                        <option value="referralWallet">💳 Referral Wallet (USDT)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <button type="submit" class="btn-primary-custom" id="buyBtn"><i class="bi bi-check-circle me-1"></i>Buy Now</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card-glass">
+                        <div class="card-title"><i class="bi bi-clock-history text-success me-2"></i>Package History</div>
+                        ${userPackages.length === 0 ? `
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
+                                <p>No packages purchased yet.</p>
+                            </div>
+                        ` : `<div class="package-history">${packagesHtml}</div>`}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // ---- attach CTA button listeners ----
+        document.querySelectorAll('.plan-cta').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const planId = this.dataset.planId;
+                const plan = PLANS.find(p => p.id === planId);
+                if (!plan) return;
+                
+                document.querySelectorAll('.package-card').forEach(c => c.classList.remove('selected'));
+                const parentCard = this.closest('.package-card');
+                if (parentCard) parentCard.classList.add('selected');
+                
+                document.getElementById('selectedPlan').value = plan.name;
+                document.getElementById('payAmount').value = plan.minAmount;
+                document.getElementById('payAmount').min = plan.minAmount;
+                const result = calculateStaking(plan.minAmount, rndPrice || 1, plan);
+                document.getElementById('totalRNDDisplay').value = result.totalRND.toFixed(2) + ' RND';
+                document.getElementById('dailyReleaseDisplay').value = result.dailyRelease.toFixed(4) + ' RND';
+                document.getElementById('buyBtn').innerHTML = `<i class="bi bi-check-circle me-1"></i>Buy ${plan.name}`;
+            });
+        });
+
+        // ---- input realtime calculation ----
+        const payAmountInput = document.getElementById('payAmount');
+        if (payAmountInput) {
+            payAmountInput.addEventListener('input', function() {
+                const planName = document.getElementById('selectedPlan').value;
+                if (planName === 'None') {
+                    document.getElementById('totalRNDDisplay').value = '0 RND';
+                    document.getElementById('dailyReleaseDisplay').value = '0 RND';
+                    return;
+                }
+                const plan = PLANS.find(p => p.name === planName);
+                if (!plan) return;
+                const amount = parseFloat(this.value);
+                if (!amount || amount < plan.minAmount) {
+                    document.getElementById('totalRNDDisplay').value = '0 RND';
+                    document.getElementById('dailyReleaseDisplay').value = '0 RND';
+                    return;
+                }
+                const result = calculateStaking(amount, rndPrice || 1, plan);
+                document.getElementById('totalRNDDisplay').value = result.totalRND.toFixed(2) + ' RND';
+                document.getElementById('dailyReleaseDisplay').value = result.dailyRelease.toFixed(4) + ' RND';
+            });
+        }
+
+        // ---- buy form submission ----
+        const buyForm = document.getElementById('buyForm');
+        if (buyForm) {
+            buyForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const planName = document.getElementById('selectedPlan').value;
+                let payAmount = parseFloat(document.getElementById('payAmount').value);
+                const payFrom = document.getElementById('payFrom').value;
+                const buyBtn = document.getElementById('buyBtn');
+
+                if (!planName || planName === 'None') { 
+                    showToast('❌ Please select a plan first!', 'error'); 
+                    return; 
+                }
+
+                const plan = PLANS.find(p => p.name === planName);
+                if (!plan) { 
+                    showToast('❌ Invalid plan selected!', 'error'); 
+                    return; 
+                }
+                
+                if (!payAmount || payAmount < plan.minAmount) { 
+                    showToast(`❌ Minimum investment for ${plan.name} is $${plan.minAmount} USDT!`, 'error'); 
+                    return; 
+                }
+
+                // Disable button
+                buyBtn.disabled = true;
+                buyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+
+                try {
+                    // 🔥 Calculate RND
+                    const result = calculateStaking(payAmount, rndPrice || 1, plan);
+                    
+                    // 🔥 STEP 1: ATOMIC PURCHASE with proper abort
+                    const purchaseResult = await processAtomicPurchase(
+                        auth.currentUser.uid, 
+                        plan, 
+                        payAmount, 
+                        payFrom, 
+                        result
+                    );
+                    
+                    // 🔥 CRITICAL: Agar purchase fail hai toh referral commission mat chalao
+                    if (!purchaseResult.success) {
+                        let errorMsg = '❌ Purchase failed!';
+                        if (purchaseResult.error === 'Insufficient balance') {
+                            errorMsg = `❌ Insufficient balance! You have $${(purchaseResult.balance || 0).toFixed(2)}, need $${(purchaseResult.needed || payAmount).toFixed(2)}`;
+                        } else if (purchaseResult.error === 'Duplicate purchase detected. Please wait a moment.') {
+                            errorMsg = '⚠️ ' + purchaseResult.error;
+                        } else {
+                            errorMsg = '❌ ' + purchaseResult.error;
+                        }
+                        showToast(errorMsg, 'error');
+                        buyBtn.disabled = false;
+                        buyBtn.innerHTML = `<i class="bi bi-check-circle me-1"></i>Buy ${planName}`;
+                        return;
+                    }
+                    
+                    // 🔥 STEP 2: ATOMIC REFERRAL COMMISSION - ONLY IF PURCHASE SUCCESSFUL
+                    try {
+                        const commissionResult = await distributeReferralCommissionAtomic(
+                            auth.currentUser.uid, 
+                            payAmount, 
+                            rndPrice || 1,
+                            purchaseResult.packageId
+                        );
+                        
+                        if (commissionResult.failedCount > 0) {
+                            console.warn(`⚠️ ${commissionResult.failedCount} referral commissions failed for levels:`, commissionResult.failedSponsors);
+                        }
+                    } catch (commissionError) {
+                        console.warn('Referral commission error (non-critical):', commissionError);
+                    }
+
+                    showToast(`✅ ${plan.name} purchased! ${result.totalRND.toFixed(2)} RND locked. Daily release: ${result.dailyRelease.toFixed(4)} RND from tomorrow.`, 'success');
+                    
+                    setTimeout(() => { 
+                        window.location.reload(); 
+                    }, 2500);
+
+                } catch (error) {
+                    console.error('Purchase error:', error);
+                    showToast(`❌ Error purchasing plan: ${error.message || 'Please try again.'}`, 'error');
+                    buyBtn.disabled = false;
+                    buyBtn.innerHTML = `<i class="bi bi-check-circle me-1"></i>Buy ${planName}`;
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error('Error loading packages:', error);
+        document.getElementById('packageContent').innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+                <h4>Error Loading Page</h4>
+                <p class="text-muted">${error.message || 'Please check your internet connection.'}</p>
+                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
+            </div>
+        `;
+    }
+});
+</script>
+</body>
+</html>

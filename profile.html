@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Profile - RND Staking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #080e1a; color: #f0f4ff; min-height: 100vh; }
+        
+        .navbar-custom {
+            background: rgba(8,14,26,0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(46,204,113,0.15);
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1050;
+        }
+        .navbar-custom .navbar-brand { font-weight: 800; font-size: 1.2rem; color: #fff !important; }
+        .navbar-custom .navbar-brand i { color: #2ecc71; }
+        .domain-badge {
+            background: rgba(46,204,113,0.12);
+            border: 1px solid rgba(46,204,113,0.15);
+            border-radius: 30px;
+            padding: 4px 14px;
+            font-size: 0.65rem;
+            color: #2ecc71;
+        }
+        
+        .sidebar-toggle {
+            background: rgba(46,204,113,0.12);
+            border: 1px solid rgba(46,204,113,0.2);
+            color: #2ecc71;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-toggle:hover { background: rgba(46,204,113,0.2); }
+        
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1060;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.active { display: block; opacity: 1; }
+        
+        .sidebar-panel {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background: rgba(12,20,35,0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(46,204,113,0.15);
+            z-index: 1070;
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 25px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-panel.open { right: 0; }
+        
+        .sidebar-panel .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.1);
+            margin-bottom: 15px;
+        }
+        .sidebar-panel .sidebar-header h5 { color: #fff; font-weight: 700; margin: 0; font-size: 1.1rem; }
+        .sidebar-panel .sidebar-header h5 i { color: #2ecc71; }
+        .sidebar-close {
+            background: rgba(255,255,255,0.08);
+            border: none;
+            color: #8899bb;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        
+        .sidebar-panel .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 20px;
+            color: #8899bb;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            margin: 2px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .sidebar-panel .nav-item:hover { background: rgba(46,204,113,0.08); color: #fff; }
+        .sidebar-panel .nav-item.active { background: rgba(46,204,113,0.12); color: #2ecc71; }
+        .sidebar-panel .nav-item i { font-size: 1.2rem; width: 28px; text-align: center; }
+        .sidebar-panel .nav-item .badge {
+            margin-left: auto;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            font-weight: 600;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        
+        .sidebar-panel .sidebar-footer {
+            margin-top: auto;
+            padding: 20px;
+            border-top: 1px solid rgba(46,204,113,0.08);
+        }
+        .sidebar-panel .sidebar-footer .nav-item { color: #f87171; }
+        .sidebar-panel .sidebar-footer .nav-item:hover { background: rgba(239,68,68,0.08); color: #f87171; }
+        
+        .user-profile-sidebar {
+            padding: 10px 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.08);
+            margin-bottom: 10px;
+        }
+        .user-profile-sidebar .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2ecc71, #1a7a3a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+        .user-profile-sidebar .user-name { color: #fff; font-weight: 600; font-size: 0.95rem; }
+        .user-profile-sidebar .user-id { color: #8899bb; font-size: 0.75rem; }
+        
+        .dashboard-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        
+        .card-glass {
+            background: rgba(19,34,55,0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .card-glass:hover { border-color: rgba(46,204,113,0.3); transform: translateY(-3px); }
+        .card-glass .card-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 15px; }
+        .card-glass .card-title i { color: #2ecc71; margin-right: 8px; }
+        
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2ecc71, #1a7a3a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 3rem;
+            color: #fff;
+            margin: 0 auto 15px;
+            border: 3px solid rgba(46,204,113,0.3);
+        }
+        
+        .form-control-custom {
+            background: rgba(8,14,26,0.8) !important;
+            border: 1px solid rgba(46,204,113,0.15) !important;
+            color: #f0f4ff !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .form-control-custom:focus {
+            border-color: #2ecc71 !important;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
+            background: rgba(8,14,26,0.9) !important;
+        }
+        .form-control-custom::placeholder { color: #556688 !important; }
+        .form-control-custom:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: rgba(8,14,26,0.4) !important;
+        }
+        
+        .form-label { font-weight: 600; color: #a0b8d0; font-size: 0.9rem; margin-bottom: 6px; }
+        .form-label .required { color: #ef4444; }
+        .form-label .readonly-badge {
+            font-size: 0.65rem;
+            background: rgba(239,68,68,0.12);
+            color: #f87171;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+            margin-left: 6px;
+        }
+        .form-label .editable-badge {
+            font-size: 0.65rem;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+            margin-left: 6px;
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            padding: 14px;
+            border-radius: 12px;
+            width: 100%;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+        .btn-primary-custom:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+        
+        .btn-outline-custom {
+            border: 2px solid rgba(46,204,113,0.3);
+            color: #a0b8d0;
+            padding: 10px 24px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 500;
+            background: transparent;
+            font-size: 0.9rem;
+        }
+        .btn-outline-custom:hover { border-color: #2ecc71; color: #2ecc71; }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(46,204,113,0.06);
+        }
+        .info-row .label { color: #8899bb; font-size: 0.85rem; }
+        .info-row .value { color: #f0f4ff; font-weight: 500; font-size: 0.95rem; }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .toast-custom {
+            background: rgba(19,34,55,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 16px;
+            padding: 16px 20px;
+            color: #f0f4ff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.4s ease;
+            margin-bottom: 10px;
+        }
+        .toast-custom.success { border-left: 4px solid #2ecc71; }
+        .toast-custom.error { border-left: 4px solid #ef4444; }
+        .toast-custom i { font-size: 1.5rem; }
+        .toast-custom .toast-msg { flex: 1; font-size: 0.9rem; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        @media (max-width: 768px) {
+            .dashboard-container { padding: 15px; }
+            .sidebar-panel { width: 280px; right: -300px; }
+            .sidebar-panel .nav-item { padding: 10px 16px; font-size: 0.85rem; }
+            .profile-avatar { width: 90px; height: 90px; font-size: 2.2rem; }
+        }
+        @media (max-width: 480px) {
+            .sidebar-panel { width: 100%; right: -100%; }
+            .sidebar-panel.open { right: 0; }
+            .card-glass { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ====== NAVBAR ====== -->
+<nav class="navbar navbar-custom">
+    <div class="container-fluid px-3">
+        <a class="navbar-brand fw-bold" href="dashboard.html">
+            <i class="bi bi-currency-bitcoin me-2"></i>RND Staking
+            <span class="domain-badge ms-2">staking.randigital.in</span>
+        </a>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Menu">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- ====== SIDEBAR OVERLAY ====== -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ====== SIDEBAR PANEL ====== -->
+<div class="sidebar-panel" id="sidebarPanel">
+    <div class="sidebar-header">
+        <h5><i class="bi bi-grid-1x2-fill me-2"></i>Menu</h5>
+        <button class="sidebar-close" id="sidebarClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    
+    <div class="user-profile-sidebar">
+        <div class="d-flex align-items-center gap-3">
+            <div class="avatar" id="sidebarAvatar">U</div>
+            <div>
+                <div class="user-name" id="sidebarName">User</div>
+                <div class="user-id" id="sidebarUserId">ID: ---</div>
+            </div>
+        </div>
+    </div>
+    
+    <a href="dashboard.html" class="nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </a>
+    <a href="deposit.html" class="nav-item">
+        <i class="bi bi-arrow-down-circle"></i> Deposit
+    </a>
+    <a href="withdrawal.html" class="nav-item">
+        <i class="bi bi-arrow-up-circle"></i> Withdraw
+    </a>
+    <a href="referrals.html" class="nav-item">
+        <i class="bi bi-people"></i> Referrals
+        <span class="badge" id="referralBadge">0</span>
+    </a>
+    <a href="buy-package.html" class="nav-item">
+        <i class="bi bi-box-seam"></i> Buy Package
+    </a>
+    <a href="transactions.html" class="nav-item">
+        <i class="bi bi-receipt"></i> Transactions
+    </a>
+    <a href="profile.html" class="nav-item active">
+        <i class="bi bi-person"></i> Profile
+    </a>
+    
+    <div class="sidebar-footer">
+        <a href="#" class="nav-item" id="logoutBtnSidebar">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </div>
+</div>
+
+<!-- ====== PROFILE CONTENT ====== -->
+<div class="dashboard-container" id="profileContent">
+    <div class="text-center py-5">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="text-muted mt-3">Loading profile...</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+    }
+}
+</script>
+<script type="module">
+// ============================================================
+// 🔥 NEW FIREBASE CONFIG (rwebsite-e031b)
+// ============================================================
+import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged, signOut, updateProfile, updateEmail, sendEmailVerification, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { getDatabase, ref, get, update } from "firebase/database";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+    authDomain: "rwebsite-e031b.firebaseapp.com",
+    databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "rwebsite-e031b",
+    storageBucket: "rwebsite-e031b.firebasestorage.app",
+    messagingSenderId: "376966041558",
+    appId: "1:376966041558:web:02bc9062ec182590275e77",
+    measurementId: "G-0T1FREXHD3"
+};
+
+console.log('✅ Firebase initialized with NEW config (rwebsite-e031b)');
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+// ============================================================
+// 🔥 TOAST SYSTEM
+// ============================================================
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast-custom ${type}`;
+    const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
+    toast.innerHTML = `<i class="bi ${icon}"></i><span class="toast-msg">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+// ============================================================
+// 🔥 SIDEBAR CONTROLS
+// ============================================================
+const sidebarPanel = document.getElementById('sidebarPanel');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarClose = document.getElementById('sidebarClose');
+
+function openSidebar() {
+    sidebarPanel.classList.add('open');
+    sidebarOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+    sidebarPanel.classList.remove('open');
+    sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+sidebarToggle.addEventListener('click', openSidebar);
+sidebarClose.addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+
+// ============================================================
+// 🔥 LOGOUT
+// ============================================================
+document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await signOut(auth);
+    window.location.href = 'login.html';
+});
+
+// ============================================================
+// 🔥 GET USER DATA
+// ============================================================
+async function getUserData(uid) {
+    const snap = await get(ref(db, 'users/' + uid));
+    return snap.exists() ? snap.val() : null;
+}
+
+// ============================================================
+// 🔥 CHECK AUTH & LOAD PROFILE
+// ============================================================
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    try {
+        const userData = await getUserData(user.uid);
+        if (!userData) {
+            window.location.href = 'dashboard.html';
+            return;
+        }
+
+        const username = userData.username || userData.referralCode || 'USER';
+        const name = userData.name || 'User';
+        const email = userData.email || user.email || 'No email';
+        const referralCode = userData.referralCode || 'N/A';
+        const rank = userData.rank || 'Member';
+        const joinedDate = userData.createdAt ? new Date(userData.createdAt).toLocaleDateString('hi-IN') : 'N/A';
+        const totalReferrals = userData.totalReferrals || 0;
+        const totalStake = userData.totalStake || 0;
+        const totalReward = userData.totalReward || 0;
+
+        // Update sidebar
+        document.getElementById('sidebarName').textContent = name;
+        document.getElementById('sidebarUserId').textContent = 'ID: ' + username;
+        document.getElementById('sidebarAvatar').textContent = username.charAt(0).toUpperCase();
+        
+        const badge = document.getElementById('referralBadge');
+        if (badge) badge.textContent = totalReferrals;
+
+        const avatarLetter = name.charAt(0).toUpperCase();
+
+        // Render Profile
+        document.getElementById('profileContent').innerHTML = `
+            <div class="row g-4">
+                <div class="col-12">
+                    <h4 class="fw-bold"><i class="bi bi-person text-success me-2"></i>My Profile</h4>
+                    <hr class="border-secondary">
+                </div>
+
+                <!-- Profile Avatar & Basic Info -->
+                <div class="col-lg-4">
+                    <div class="card-glass text-center">
+                        <div class="profile-avatar">${avatarLetter}</div>
+                        <h5 class="fw-bold">${name}</h5>
+                        <p class="text-muted small"><i class="bi bi-person-badge me-1"></i> ${username}</p>
+                        <span class="badge" style="background:rgba(46,204,113,0.15);color:#2ecc71;padding:6px 16px;border-radius:30px;font-weight:500;">
+                            <i class="bi bi-award me-1"></i> ${rank}
+                        </span>
+                        <div class="mt-3 d-flex justify-content-center gap-3">
+                            <div>
+                                <div class="text-success fw-bold">${totalReferrals}</div>
+                                <small class="text-muted">Referrals</small>
+                            </div>
+                            <div>
+                                <div class="text-success fw-bold">$${totalStake}</div>
+                                <small class="text-muted">Total Stake</small>
+                            </div>
+                            <div>
+                                <div class="text-success fw-bold">$${totalReward}</div>
+                                <small class="text-muted">Total Reward</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Profile Form -->
+                <div class="col-lg-8">
+                    <div class="card-glass">
+                        <div class="card-title"><i class="bi bi-pencil-square text-success me-2"></i>Edit Profile</div>
+                        
+                        <form id="profileForm">
+                            <!-- Name - EDITABLE -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Full Name 
+                                    <span class="editable-badge"><i class="bi bi-pencil"></i> Editable</span>
+                                </label>
+                                <input type="text" id="profileName" class="form-control form-control-custom" 
+                                       value="${name}" placeholder="Enter your full name" required>
+                                <small class="text-muted" style="font-size:0.7rem;">
+                                    <i class="bi bi-info-circle"></i> You can change your name anytime
+                                </small>
+                            </div>
+
+                            <!-- Email - EDITABLE -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Email Address 
+                                    <span class="editable-badge"><i class="bi bi-pencil"></i> Editable</span>
+                                </label>
+                                <input type="email" id="profileEmail" class="form-control form-control-custom" 
+                                       value="${email}" placeholder="Enter your email" required>
+                                <small class="text-muted" style="font-size:0.7rem;">
+                                    <i class="bi bi-info-circle"></i> You can change your email. A verification link will be sent.
+                                </small>
+                            </div>
+
+                            <!-- Username - READONLY -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Username / User ID 
+                                    <span class="readonly-badge"><i class="bi bi-lock"></i> Read Only</span>
+                                </label>
+                                <input type="text" id="profileUsername" class="form-control form-control-custom" 
+                                       value="${username}" disabled>
+                                <small class="text-muted" style="font-size:0.7rem;">
+                                    <i class="bi bi-info-circle"></i> Username cannot be changed
+                                </small>
+                            </div>
+
+                            <!-- Referral Code - READONLY -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Referral Code 
+                                    <span class="readonly-badge"><i class="bi bi-lock"></i> Read Only</span>
+                                </label>
+                                <input type="text" id="profileReferral" class="form-control form-control-custom" 
+                                       value="${referralCode}" disabled>
+                                <small class="text-muted" style="font-size:0.7rem;">
+                                    <i class="bi bi-info-circle"></i> Referral code cannot be changed
+                                </small>
+                            </div>
+
+                            <!-- Rank - READONLY -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Rank / Level 
+                                    <span class="readonly-badge"><i class="bi bi-lock"></i> Read Only</span>
+                                </label>
+                                <input type="text" id="profileRank" class="form-control form-control-custom" 
+                                       value="${rank}" disabled>
+                                <small class="text-muted" style="font-size:0.7rem;">
+                                    <i class="bi bi-info-circle"></i> Rank is automatically updated based on your activity
+                                </small>
+                            </div>
+
+                            <!-- Joined Date - READONLY -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Joined Date 
+                                    <span class="readonly-badge"><i class="bi bi-lock"></i> Read Only</span>
+                                </label>
+                                <input type="text" id="profileJoined" class="form-control form-control-custom" 
+                                       value="${joinedDate}" disabled>
+                            </div>
+
+                            <!-- Password Field for Email Change -->
+                            <div class="mb-3" id="passwordField" style="display:none;">
+                                <label class="form-label">
+                                    Current Password <span class="required">*</span>
+                                    <span style="font-size:0.65rem;background:rgba(239,68,68,0.12);color:#f87171;padding:2px 10px;border-radius:20px;font-weight:500;margin-left:6px;">
+                                        Required for Email Change
+                                    </span>
+                                </label>
+                                <input type="password" id="profilePassword" class="form-control form-control-custom" 
+                                       placeholder="Enter your current password to change email">
+                                <small class="text-muted" style="font-size:0.7rem;">
+                                    <i class="bi bi-shield-lock"></i> Password is required to change email address
+                                </small>
+                            </div>
+
+                            <button type="submit" class="btn-primary-custom" id="saveProfileBtn">
+                                <i class="bi bi-save me-2"></i>Save Changes
+                            </button>
+                        </form>
+
+                        <div class="mt-3">
+                            <a href="dashboard.html" class="btn-outline-custom w-100 text-center">
+                                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // ============================================================
+        // 🔥 SHOW PASSWORD FIELD WHEN EMAIL IS CHANGED
+        // ============================================================
+        const emailInput = document.getElementById('profileEmail');
+        const passwordField = document.getElementById('passwordField');
+        const originalEmail = email;
+
+        emailInput.addEventListener('input', function() {
+            if (this.value.trim() !== originalEmail) {
+                passwordField.style.display = 'block';
+            } else {
+                passwordField.style.display = 'none';
+                document.getElementById('profilePassword').value = '';
+            }
+        });
+
+        // ============================================================
+        // 🔥 PROFILE FORM SUBMIT
+        // ============================================================
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const newName = document.getElementById('profileName').value.trim();
+            const newEmail = document.getElementById('profileEmail').value.trim();
+            const password = document.getElementById('profilePassword').value;
+            const saveBtn = document.getElementById('saveProfileBtn');
+
+            if (!newName || newName.length < 2) {
+                showToast('❌ Please enter a valid name (at least 2 characters)', 'error');
+                return;
+            }
+
+            if (!newEmail || !newEmail.includes('@')) {
+                showToast('❌ Please enter a valid email address', 'error');
+                return;
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+            try {
+                const currentUser = auth.currentUser;
+                let emailChanged = false;
+
+                // Check if email is being changed
+                if (newEmail !== currentUser.email) {
+                    if (!password || password.length < 6) {
+                        showToast('❌ Please enter your current password to change email', 'error');
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Save Changes';
+                        return;
+                    }
+
+                    // Re-authenticate user
+                    try {
+                        const credential = EmailAuthProvider.credential(currentUser.email, password);
+                        await reauthenticateWithCredential(currentUser, credential);
+                        console.log('✅ Re-authentication successful');
+                    } catch (reAuthError) {
+                        console.error('Re-authentication error:', reAuthError);
+                        if (reAuthError.code === 'auth/wrong-password') {
+                            showToast('❌ Incorrect password. Please try again.', 'error');
+                        } else if (reAuthError.code === 'auth/too-many-requests') {
+                            showToast('❌ Too many failed attempts. Please try again later.', 'error');
+                        } else {
+                            showToast('❌ Authentication failed. Please try again.', 'error');
+                        }
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Save Changes';
+                        return;
+                    }
+
+                    // Update email in Firebase Auth
+                    try {
+                        await updateEmail(currentUser, newEmail);
+                        console.log('✅ Email updated in Auth');
+                        
+                        // Send verification email
+                        await sendEmailVerification(currentUser);
+                        showToast('📧 Verification email sent to ' + newEmail + '. Please verify your new email.', 'success');
+                        emailChanged = true;
+                    } catch (emailError) {
+                        console.error('Email update error:', emailError);
+                        if (emailError.code === 'auth/email-already-in-use') {
+                            showToast('❌ This email is already registered with another account', 'error');
+                        } else if (emailError.code === 'auth/invalid-email') {
+                            showToast('❌ Invalid email address', 'error');
+                        } else {
+                            showToast('❌ Failed to update email: ' + (emailError.message || 'Please try again'), 'error');
+                        }
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Save Changes';
+                        return;
+                    }
+                }
+
+                // Update name in Firebase Auth
+                try {
+                    await updateProfile(currentUser, {
+                        displayName: newName
+                    });
+                    console.log('✅ Name updated in Auth');
+                } catch (nameError) {
+                    console.error('Name update error:', nameError);
+                    showToast('❌ Failed to update name in profile', 'error');
+                }
+
+                // Update name in Firebase Database
+                const updates = {
+                    name: newName
+                };
+                
+                if (emailChanged) {
+                    updates.email = newEmail;
+                }
+
+                await update(ref(db, 'users/' + currentUser.uid), updates);
+                console.log('✅ User data updated in database');
+
+                showToast('✅ Profile updated successfully!' + (emailChanged ? ' Please verify your new email.' : ''), 'success');
+
+                // Reload after 2 seconds
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+
+            } catch (error) {
+                console.error('Profile update error:', error);
+                showToast('❌ Failed to update profile: ' + (error.message || 'Please try again'), 'error');
+            }
+
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Save Changes';
+        });
+
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        document.getElementById('profileContent').innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+                <h4>Error Loading Page</h4>
+                <p class="text-muted">${error.message || 'Please check your internet connection.'}</p>
+                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
+            </div>
+        `;
+    }
+});
+</script>
+</body>
+</html>

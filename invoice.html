@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Invoice · RND Staking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #080e1a; color: #f0f4ff; min-height: 100vh; }
+        
+        .navbar-custom {
+            background: rgba(8,14,26,0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(46,204,113,0.15);
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1050;
+        }
+        .navbar-custom .navbar-brand { font-weight: 800; font-size: 1.2rem; color: #fff !important; }
+        .navbar-custom .navbar-brand i { color: #2ecc71; }
+        
+        .sidebar-toggle {
+            background: rgba(46,204,113,0.12);
+            border: 1px solid rgba(46,204,113,0.2);
+            color: #2ecc71;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-toggle:hover { background: rgba(46,204,113,0.2); }
+        
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1060;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.active { display: block; opacity: 1; }
+        
+        .sidebar-panel {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background: rgba(12,20,35,0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(46,204,113,0.15);
+            z-index: 1070;
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 25px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-panel.open { right: 0; }
+        
+        .sidebar-panel .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.1);
+            margin-bottom: 15px;
+        }
+        .sidebar-panel .sidebar-header h5 { color: #fff; font-weight: 700; margin: 0; font-size: 1.1rem; }
+        .sidebar-panel .sidebar-header h5 i { color: #2ecc71; }
+        .sidebar-close {
+            background: rgba(255,255,255,0.08);
+            border: none;
+            color: #8899bb;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        
+        .sidebar-panel .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 20px;
+            color: #8899bb;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            margin: 2px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .sidebar-panel .nav-item:hover { background: rgba(46,204,113,0.08); color: #fff; }
+        .sidebar-panel .nav-item.active { background: rgba(46,204,113,0.12); color: #2ecc71; }
+        .sidebar-panel .nav-item i { font-size: 1.2rem; width: 28px; text-align: center; }
+        .sidebar-panel .nav-item .badge {
+            margin-left: auto;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            font-weight: 600;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        
+        .sidebar-panel .sidebar-footer {
+            margin-top: auto;
+            padding: 20px;
+            border-top: 1px solid rgba(46,204,113,0.08);
+        }
+        .sidebar-panel .sidebar-footer .nav-item { color: #f87171; }
+        .sidebar-panel .sidebar-footer .nav-item:hover { background: rgba(239,68,68,0.08); color: #f87171; }
+        
+        .user-profile-sidebar {
+            padding: 10px 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.08);
+            margin-bottom: 10px;
+        }
+        .user-profile-sidebar .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2ecc71, #1a7a3a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+        .user-profile-sidebar .user-name { color: #fff; font-weight: 600; font-size: 0.95rem; }
+        .user-profile-sidebar .user-id { color: #8899bb; font-size: 0.75rem; }
+        
+        .dashboard-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        
+        .invoice-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .invoice-card {
+            background: rgba(19,34,55,0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(46,204,113,0.15);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        .invoice-card:hover { border-color: rgba(46,204,113,0.3); }
+        
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(46,204,113,0.1);
+            padding-bottom: 1.2rem;
+            margin-bottom: 1.8rem;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .invoice-header .brand {
+            font-weight: 800;
+            font-size: 1.4rem;
+            color: #fff;
+        }
+        .invoice-header .brand i { color: #2ecc71; margin-right: 8px; }
+        .invoice-header .badge-domain {
+            background: rgba(46,204,113,0.1);
+            border: 1px solid rgba(46,204,113,0.15);
+            border-radius: 30px;
+            padding: 4px 16px;
+            font-size: 0.7rem;
+            color: #2ecc71;
+        }
+        .invoice-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.2rem;
+        }
+        .invoice-sub {
+            color: #8899bb;
+            font-size: 0.9rem;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .summary-item {
+            background: rgba(8,14,26,0.5);
+            border-radius: 16px;
+            padding: 16px 12px;
+            text-align: center;
+            border: 1px solid rgba(46,204,113,0.06);
+            transition: all 0.3s ease;
+        }
+        .summary-item:hover { border-color: rgba(46,204,113,0.2); }
+        .summary-item .num {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #fff;
+        }
+        .summary-item .num.green { color: #2ecc71; }
+        .summary-item .num.gold { color: #fbbf24; }
+        .summary-item .num.blue { color: #60a5fa; }
+        .summary-item .num.pink { color: #f472b6; }
+        .summary-item .num.purple { color: #a78bfa; }
+        .summary-item .label { font-size: 0.7rem; color: #8899bb; margin-top: 4px; }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(46,204,113,0.05);
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label { color: #8899bb; font-weight: 500; font-size: 0.85rem; }
+        .detail-value { color: #f0f4ff; font-weight: 600; font-size: 0.9rem; }
+        .detail-value.highlight { color: #2ecc71; }
+        .detail-value.gold { color: #fbbf24; }
+        .detail-value.blue { color: #60a5fa; }
+        .detail-value.pink { color: #f472b6; }
+        
+        .timeline-bar {
+            margin: 16px 0 10px;
+            background: rgba(8,14,26,0.5);
+            border-radius: 40px;
+            padding: 4px;
+            border: 1px solid rgba(46,204,113,0.06);
+            display: flex;
+            overflow: hidden;
+        }
+        .timeline-bar .segment {
+            padding: 8px 0;
+            text-align: center;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #fff;
+            flex: 1;
+        }
+        .timeline-bar .segment.lock { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .timeline-bar .segment.release { background: rgba(46,204,113,0.15); color: #2ecc71; }
+        .timeline-bar .segment.completed { background: rgba(46,204,113,0.25); color: #2ecc71; }
+        
+        .plan-badge {
+            display: inline-block;
+            background: rgba(46,204,113,0.1);
+            border-radius: 40px;
+            padding: 4px 18px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #2ecc71;
+            border: 1px solid rgba(46,204,113,0.15);
+        }
+        .plan-badge.completed {
+            background: rgba(96,165,250,0.1);
+            color: #60a5fa;
+            border-color: rgba(96,165,250,0.15);
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-badge.active {
+            background: rgba(46,204,113,0.12);
+            color: #2ecc71;
+            border: 1px solid rgba(46,204,113,0.15);
+        }
+        .status-badge.completed {
+            background: rgba(96,165,250,0.12);
+            color: #60a5fa;
+            border: 1px solid rgba(96,165,250,0.15);
+        }
+        
+        .btn-print {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            padding: 12px 28px;
+            border-radius: 60px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-print:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+        .btn-outline-print {
+            background: transparent;
+            border: 1px solid rgba(46,204,113,0.2);
+            color: #8899bb;
+            padding: 12px 28px;
+            border-radius: 60px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+        .btn-outline-print:hover { border-color: #2ecc71; color: #2ecc71; }
+        
+        .footer-note {
+            font-size: 0.7rem;
+            color: #556688;
+            margin-top: 20px;
+            text-align: center;
+            border-top: 1px solid rgba(46,204,113,0.06);
+            padding-top: 16px;
+        }
+        
+        .package-list {
+            margin-top: 20px;
+        }
+        .package-list .package-item {
+            background: rgba(8,14,26,0.4);
+            border-radius: 16px;
+            padding: 16px 20px;
+            border: 1px solid rgba(46,204,113,0.06);
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+        .package-list .package-item:hover {
+            border-color: rgba(46,204,113,0.15);
+            background: rgba(8,14,26,0.6);
+        }
+        .package-list .package-item .pkg-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .package-list .package-item .pkg-header .pkg-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+        .package-list .package-item .pkg-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .package-list .package-item .pkg-details .detail {
+            background: rgba(19,34,55,0.5);
+            border-radius: 10px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        .package-list .package-item .pkg-details .detail .val {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+        .package-list .package-item .pkg-details .detail .lbl {
+            font-size: 0.6rem;
+            color: #8899bb;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+        }
+        .empty-state i {
+            font-size: 4rem;
+            color: #556688;
+            margin-bottom: 15px;
+            display: block;
+        }
+        .empty-state h4 { color: #fff; }
+        .empty-state p { color: #8899bb; }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            padding: 10px 24px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.9rem;
+        }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .toast-custom {
+            background: rgba(19,34,55,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 16px;
+            padding: 16px 20px;
+            color: #f0f4ff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.4s ease;
+            margin-bottom: 10px;
+        }
+        .toast-custom.success { border-left: 4px solid #2ecc71; }
+        .toast-custom.error { border-left: 4px solid #ef4444; }
+        .toast-custom i { font-size: 1.5rem; }
+        .toast-custom .toast-msg { flex: 1; font-size: 0.9rem; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        @media (max-width: 768px) {
+            .dashboard-container { padding: 15px; }
+            .sidebar-panel { width: 280px; right: -300px; }
+            .sidebar-panel .nav-item { padding: 10px 16px; font-size: 0.85rem; }
+            .invoice-card { padding: 1.2rem; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .summary-item .num { font-size: 1.2rem; }
+            .package-list .package-item .pkg-details {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 480px) {
+            .sidebar-panel { width: 100%; right: -100%; }
+            .sidebar-panel.open { right: 0; }
+            .invoice-card { padding: 1rem; }
+            .summary-grid { grid-template-columns: 1fr 1fr; }
+            .package-list .package-item .pkg-details {
+                grid-template-columns: 1fr 1fr;
+            }
+            .invoice-header { flex-direction: column; align-items: flex-start; }
+        }
+        
+        /* ============================================================
+           🔥 PRINT CSS - A4 COMPACT
+           ============================================================ */
+        @media print {
+            body {
+                background: #fff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                color: #000 !important;
+            }
+            
+            .navbar-custom,
+            .sidebar-toggle,
+            .sidebar-panel,
+            .sidebar-overlay,
+            .btn-print,
+            .btn-outline-print,
+            .toast-container {
+                display: none !important;
+            }
+            
+            .dashboard-container {
+                padding: 0 !important;
+                margin: 0 auto !important;
+                max-width: 210mm !important;
+            }
+            
+            .invoice-container {
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            .invoice-card {
+                background: #fff !important;
+                border: none !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                padding: 15px 20px !important;
+                margin: 0 !important;
+                backdrop-filter: none !important;
+                transition: none !important;
+            }
+            
+            .invoice-card:hover {
+                transform: none !important;
+                border: none !important;
+            }
+            
+            .invoice-title,
+            .brand,
+            .pkg-name,
+            .detail-value,
+            .summary-item .num,
+            .invoice-header .brand,
+            .detail-row .detail-value {
+                color: #000 !important;
+            }
+            
+            .invoice-sub,
+            .detail-label,
+            .label,
+            .footer-note,
+            .lbl,
+            .from-to,
+            .date,
+            .sub-detail {
+                color: #555 !important;
+            }
+            
+            .summary-item {
+                background: #f5f5f5 !important;
+                border-color: #ddd !important;
+                border-radius: 8px !important;
+            }
+            .summary-item .num.green { color: #065f46 !important; }
+            .summary-item .num.gold { color: #92400e !important; }
+            .summary-item .num.blue { color: #1e40af !important; }
+            .summary-item .num.purple { color: #5b21b6 !important; }
+            .summary-item .num.pink { color: #9d174d !important; }
+            
+            .package-list .package-item {
+                background: #f8f9fa !important;
+                border-color: #e5e7eb !important;
+                border-radius: 8px !important;
+                padding: 12px 16px !important;
+                margin-bottom: 8px !important;
+            }
+            .package-list .package-item:hover {
+                background: #f8f9fa !important;
+                border-color: #e5e7eb !important;
+            }
+            
+            .package-list .package-item .pkg-details .detail {
+                background: #f0f0f0 !important;
+                border-radius: 6px !important;
+            }
+            
+            .timeline-bar .segment.lock {
+                background: #fef3c7 !important;
+                color: #b45309 !important;
+            }
+            .timeline-bar .segment.release {
+                background: #d1fae5 !important;
+                color: #065f46 !important;
+            }
+            .timeline-bar .segment.completed {
+                background: #dbeafe !important;
+                color: #1e40af !important;
+            }
+            
+            .plan-badge {
+                border-color: #ccc !important;
+                background: #f0f0f0 !important;
+                color: #000 !important;
+            }
+            .plan-badge.completed {
+                background: #e5e7eb !important;
+                color: #000 !important;
+            }
+            .status-badge.active {
+                background: #d1fae5 !important;
+                color: #065f46 !important;
+                border-color: #6ee7b7 !important;
+            }
+            .status-badge.completed {
+                background: #dbeafe !important;
+                color: #1e40af !important;
+                border-color: #93c5fd !important;
+            }
+            
+            .invoice-header {
+                border-bottom-color: #ddd !important;
+                padding-bottom: 10px !important;
+                margin-bottom: 15px !important;
+            }
+            .invoice-header .badge-domain {
+                background: #f0f0f0 !important;
+                border-color: #ddd !important;
+                color: #333 !important;
+            }
+            
+            .detail-row {
+                border-bottom-color: #eee !important;
+            }
+            .detail-value.highlight { color: #065f46 !important; }
+            .detail-value.gold { color: #92400e !important; }
+            .detail-value.blue { color: #1e40af !important; }
+            .detail-value.pink { color: #9d174d !important; }
+            
+            .detail-row:last-child {
+                border-bottom: none !important;
+            }
+            
+            .footer-note {
+                border-top-color: #ddd !important;
+                color: #666 !important;
+                margin-top: 12px !important;
+                padding-top: 10px !important;
+            }
+            
+            .summary-grid {
+                gap: 8px !important;
+                margin: 12px 0 !important;
+            }
+            
+            .invoice-card:hover,
+            .package-list .package-item:hover,
+            .summary-item:hover {
+                transform: none !important;
+                border-color: initial !important;
+                box-shadow: none !important;
+            }
+            
+            .package-list .package-item .pkg-details {
+                gap: 6px !important;
+                margin-top: 8px !important;
+            }
+            .package-list .package-item .pkg-details .detail {
+                padding: 4px 8px !important;
+            }
+            .package-list .package-item .pkg-details .detail .val {
+                font-size: 0.85rem !important;
+            }
+            
+            .timeline-bar {
+                margin: 8px 0 6px !important;
+                padding: 2px !important;
+                border-color: #ddd !important;
+            }
+            .timeline-bar .segment {
+                padding: 4px 0 !important;
+                font-size: 0.55rem !important;
+            }
+            
+            .package-list .package-item .pkg-header .pkg-name {
+                font-size: 0.95rem !important;
+            }
+            
+            .real-time-badge,
+            .btn-print,
+            .btn-outline-print {
+                display: none !important;
+            }
+            
+            .invoice-card .row {
+                margin: 0 !important;
+            }
+            
+            .package-list .package-item {
+                page-break-inside: avoid !important;
+            }
+            
+            .invoice-number-print {
+                display: inline !important;
+            }
+        }
+        
+        .invoice-number-print {
+            display: none;
+        }
+        @media print {
+            .invoice-number-print {
+                display: inline;
+            }
+            .invoice-number-screen {
+                display: none;
+            }
+        }
+        
+        .invoice-number-badge {
+            background: rgba(46,204,113,0.08);
+            border: 1px solid rgba(46,204,113,0.12);
+            border-radius: 30px;
+            padding: 4px 14px;
+            font-size: 0.7rem;
+            color: #2ecc71;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ====== NAVBAR ====== -->
+<nav class="navbar navbar-custom">
+    <div class="container-fluid px-3">
+        <a class="navbar-brand fw-bold" href="dashboard.html">
+            <i class="bi bi-currency-bitcoin me-2"></i>RND Staking
+        </a>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Menu">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- ====== SIDEBAR OVERLAY ====== -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ====== SIDEBAR PANEL ====== -->
+<div class="sidebar-panel" id="sidebarPanel">
+    <div class="sidebar-header">
+        <h5><i class="bi bi-grid-1x2-fill me-2"></i>Menu</h5>
+        <button class="sidebar-close" id="sidebarClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    
+    <div class="user-profile-sidebar">
+        <div class="d-flex align-items-center gap-3">
+            <div class="avatar" id="sidebarAvatar">U</div>
+            <div>
+                <div class="user-name" id="sidebarName">User</div>
+                <div class="user-id" id="sidebarUserId">ID: ---</div>
+            </div>
+        </div>
+    </div>
+    
+    <a href="dashboard.html" class="nav-item">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </a>
+    <a href="deposit.html" class="nav-item">
+        <i class="bi bi-arrow-down-circle"></i> Deposit
+    </a>
+    <a href="withdrawal.html" class="nav-item">
+        <i class="bi bi-arrow-up-circle"></i> Withdraw
+    </a>
+    <a href="referrals.html" class="nav-item">
+        <i class="bi bi-people"></i> Referrals
+        <span class="badge" id="referralBadge">0</span>
+    </a>
+    <a href="buy-package.html" class="nav-item">
+        <i class="bi bi-box-seam"></i> Buy Package
+    </a>
+    <a href="transactions.html" class="nav-item">
+        <i class="bi bi-receipt"></i> Transactions
+    </a>
+    <a href="invoice.html" class="nav-item active">
+        <i class="bi bi-file-text"></i> Invoice
+    </a>
+    <a href="profile.html" class="nav-item">
+        <i class="bi bi-person"></i> Profile
+    </a>
+    
+    <div class="sidebar-footer">
+        <a href="#" class="nav-item" id="logoutBtnSidebar">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </div>
+</div>
+
+<!-- ====== INVOICE CONTENT ====== -->
+<div class="dashboard-container" id="invoiceContent">
+    <div class="text-center py-5">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="text-muted mt-3">Loading invoice data...</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+    }
+}
+</script>
+<script type="module">
+// ============================================================
+// 🔥 NEW FIREBASE CONFIG (rwebsite-e031b)
+// ============================================================
+import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { getDatabase, ref, get } from "firebase/database";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+    authDomain: "rwebsite-e031b.firebaseapp.com",
+    databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "rwebsite-e031b",
+    storageBucket: "rwebsite-e031b.firebasestorage.app",
+    messagingSenderId: "376966041558",
+    appId: "1:376966041558:web:02bc9062ec182590275e77",
+    measurementId: "G-0T1FREXHD3"
+};
+
+console.log('✅ Firebase initialized with NEW config (rwebsite-e031b)');
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast-custom ${type}`;
+    const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
+    toast.innerHTML = `<i class="bi ${icon}"></i><span class="toast-msg">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+const sidebarPanel = document.getElementById('sidebarPanel');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarClose = document.getElementById('sidebarClose');
+
+function openSidebar() {
+    sidebarPanel.classList.add('open');
+    sidebarOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+    sidebarPanel.classList.remove('open');
+    sidebarOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+sidebarToggle.addEventListener('click', openSidebar);
+sidebarClose.addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+
+document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await signOut(auth);
+    window.location.href = 'login.html';
+});
+
+// ============================================================
+// 🔥 HELPERS
+// ============================================================
+function formatDate(timestamp) {
+    if (!timestamp) return 'N/A';
+    const d = new Date(timestamp);
+    return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function formatDateShort(timestamp) {
+    if (!timestamp) return 'N/A';
+    const d = new Date(timestamp);
+    return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
+// ============================================================
+// 🔥 FIXED: PERMANENT INVOICE NUMBER FROM DATABASE
+// ============================================================
+function getInvoiceNumber(pkg, userId, index) {
+    // Check if package has a stored invoice number
+    if (pkg.invoiceNumber) {
+        return pkg.invoiceNumber;
+    }
+    
+    // If not, generate one (this will be consistent for this session)
+    // Format: INV-USERID-XXXX where XXXX is incremental
+    const shortId = (userId || "USER").substring(0, 8).toUpperCase();
+    const count = String(index + 1).padStart(4, '0');
+    return `INV-${shortId}-${count}`;
+}
+
+// ============================================================
+// 🔥 GET MEMBER SINCE - MULTIPLE FIELDS
+// ============================================================
+function getMemberSince(userData) {
+    return userData.createdAt || 
+           userData.registrationDate || 
+           userData.joinDate || 
+           userData.timestamp || 
+           Date.now();
+}
+
+// ============================================================
+// 🔥 GET COMPLETION DATE WITH CALCULATED FALLBACK
+// ============================================================
+function getCompletionDate(pkg) {
+    if (pkg.completedDate) return pkg.completedDate;
+    if (pkg.completedAt) return pkg.completedAt;
+    if (pkg.completionDate) return pkg.completionDate;
+    
+    const purchaseDate = pkg.purchaseDate || pkg.timestamp;
+    const planDays = pkg.planDays || 0;
+    if (purchaseDate && planDays > 0) {
+        return purchaseDate + (planDays * 24 * 60 * 60 * 1000);
+    }
+    return null;
+}
+
+// ============================================================
+// 🔥 RELEASED % - CORRECTED
+// ============================================================
+function getReleasedPercent(released, total) {
+    if (!total || total === 0) return 0;
+    return (released / total) * 100;
+}
+
+// ============================================================
+// 🔥 DYNAMIC TIMELINE TEXT
+// ============================================================
+function getTimelineText(daysRemaining, progress) {
+    if (daysRemaining === 0) return '⏳ Completing today!';
+    if (daysRemaining <= 3) return `⏳ ${daysRemaining} day${daysRemaining > 1 ? 's' : ''} remaining`;
+    if (daysRemaining <= 7) return `📅 ${daysRemaining} days to go`;
+    if (progress > 75) return `🔥 ${progress.toFixed(0)}% completed`;
+    if (progress > 50) return `📈 ${progress.toFixed(0)}% released`;
+    return `🔒 ${daysRemaining} days remaining`;
+}
+
+// ============================================================
+// 🔥 MAIN
+// ============================================================
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    try {
+        const userSnap = await get(ref(db, 'users/' + user.uid));
+        if (!userSnap.exists()) {
+            window.location.href = 'dashboard.html';
+            return;
+        }
+        
+        const userData = userSnap.val();
+        const username = userData.username || userData.referralCode || 'USER';
+        const name = userData.name || 'User';
+        const uid = user.uid;
+        
+        document.getElementById('sidebarName').textContent = name;
+        document.getElementById('sidebarUserId').textContent = 'ID: ' + username.substring(0, 20) + '...';
+        document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
+        
+        const badge = document.getElementById('referralBadge');
+        if (badge) badge.textContent = userData.totalReferrals || 0;
+
+        const packages = userData.packages || {};
+        const packageKeys = Object.keys(packages);
+        
+        if (packageKeys.length === 0) {
+            document.getElementById('invoiceContent').innerHTML = `
+                <div class="invoice-container">
+                    <div class="invoice-card">
+                        <div class="empty-state">
+                            <i class="bi bi-box-seam"></i>
+                            <h4>No Packages Found</h4>
+                            <p>You haven't purchased any staking packages yet.</p>
+                            <a href="buy-package.html" class="btn btn-primary-custom mt-3">
+                                <i class="bi bi-plus-circle me-1"></i> Buy Your First Package
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let totalInvested = 0;
+        let totalRNDReceived = 0;
+        let totalReleased = 0;
+        let totalLocked = 0;
+        let activePackages = 0;
+        let completedPackages = 0;
+
+        packageKeys.forEach(key => {
+            const pkg = packages[key];
+            if (pkg.status === 'active' || pkg.status === 'completed') {
+                totalInvested += (pkg.usdtAmount || 0);
+                totalRNDReceived += (pkg.totalRND || 0);
+                totalReleased += (pkg.releasedRND || 0);
+                const locked = (pkg.totalRND || 0) - (pkg.releasedRND || 0);
+                totalLocked += Math.max(0, locked);
+                if (pkg.status === 'active') activePackages++;
+                else completedPackages++;
+            }
+        });
+
+        const releasedPercent = getReleasedPercent(totalReleased, totalRNDReceived);
+        const memberSince = getMemberSince(userData);
+
+        let packagesHtml = '';
+        packageKeys.forEach((key, index) => {
+            const pkg = packages[key];
+            
+            const isActive = pkg.status === 'active';
+            const totalRND = pkg.totalRND || 0;
+            const releasedRND = pkg.releasedRND || 0;
+            const remainingRND = pkg.remainingRND || 0;
+            const dailyRelease = pkg.dailyRelease || 0;
+            const planDays = pkg.planDays || 0;
+            const purchaseDate = pkg.purchaseDate || pkg.timestamp || Date.now();
+            const endDate = calculateEndDate(purchaseDate, planDays);
+            const daysRemaining = isActive ? getDaysRemaining(endDate) : 0;
+            const daysPassed = getDaysPassed(purchaseDate);
+            const progress = getReleasedPercent(releasedRND, totalRND);
+            const planColor = getPlanColor(pkg.planName);
+            
+            const invoiceNumber = getInvoiceNumber(pkg, uid, index);
+            
+            const completionDate = getCompletionDate(pkg);
+            const completionDateStr = completionDate ? formatDateShort(completionDate) : 'Completed';
+            
+            const timelineText = isActive ? getTimelineText(daysRemaining, progress) : '✅ Package completed successfully';
+            
+            let timelineHtml = '';
+            if (isActive) {
+                const progressPercent = progress / 100;
+                const lockPercent = 1 - progressPercent;
+                timelineHtml = `
+                    <div class="timeline-bar">
+                        <div class="segment lock" style="flex:${Math.max(lockPercent * 10, 0.5)};">
+                            🔒 ${timelineText}
+                        </div>
+                        <div class="segment release" style="flex:${Math.max(progressPercent * 10, 0.5)};">
+                            📈 ${progress.toFixed(1)}% Released
+                        </div>
+                    </div>
+                `;
+            } else {
+                timelineHtml = `
+                    <div class="timeline-bar">
+                        <div class="segment completed" style="flex:10;">
+                            ✅ ${completionDateStr}
+                        </div>
+                    </div>
+                `;
+            }
+
+            packagesHtml += `
+                <div class="package-item">
+                    <div class="pkg-header">
+                        <div>
+                            <span class="pkg-name" style="color:${planColor};">${pkg.planName || 'Package'}</span>
+                            <span class="plan-badge ${!isActive ? 'completed' : ''} ms-2">
+                                ${isActive ? '🟢 Active' : '🔵 Completed'}
+                            </span>
+                            <span class="status-badge ${isActive ? 'active' : 'completed'} ms-1">
+                                <i class="bi ${isActive ? 'bi-clock' : 'bi-check-circle'}"></i>
+                                ${isActive ? 'In Progress' : 'Completed'}
+                            </span>
+                            <span class="invoice-number-badge ms-2">
+                                <i class="bi bi-receipt me-1"></i>${invoiceNumber}
+                            </span>
+                        </div>
+                        <div>
+                            <span style="font-size:0.7rem;color:#556688;">#${key.substring(0, 8)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="pkg-details">
+                        <div class="detail">
+                            <div class="val" style="color:#2ecc71;">$${(pkg.usdtAmount || 0).toFixed(2)}</div>
+                            <div class="lbl">Investment (USDT)</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#60a5fa;">${totalRND.toFixed(2)}</div>
+                            <div class="lbl">Total RND</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#fbbf24;">${releasedRND.toFixed(2)}</div>
+                            <div class="lbl">Released RND</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#a78bfa;">${remainingRND.toFixed(2)}</div>
+                            <div class="lbl">Remaining RND</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#34d399;">${dailyRelease.toFixed(4)}</div>
+                            <div class="lbl">Daily Release</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#f472b6;">${pkg.bonusPercent || 0}%</div>
+                            <div class="lbl">Bonus</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#8899bb;font-size:0.8rem;">${formatDateShort(purchaseDate)}</div>
+                            <div class="lbl">Start Date</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:${isActive ? '#fbbf24' : '#60a5fa'};font-size:0.8rem;">
+                                ${isActive ? formatDateShort(endDate) : completionDateStr}
+                            </div>
+                            <div class="lbl">${isActive ? 'End Date' : 'Completion Date'}</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#34d399;font-size:0.8rem;">
+                                ${isActive ? daysPassed + ' days' : 'Done'}
+                            </div>
+                            <div class="lbl">Days Passed</div>
+                        </div>
+                        <div class="detail">
+                            <div class="val" style="color:#fbbf24;font-size:0.8rem;">
+                                ${isActive ? daysRemaining + ' days' : '0'}
+                            </div>
+                            <div class="lbl">Days Remaining</div>
+                        </div>
+                    </div>
+                    
+                    ${timelineHtml}
+                    
+                    <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#556688;margin-top:4px;flex-wrap:wrap;gap:4px;">
+                        <span>📊 ${progress.toFixed(1)}% Released</span>
+                        <span>${isActive ? '⏳ ' + daysRemaining + ' days remaining' : '✅ All released'}</span>
+                        <span>💰 RND Rate: $${(pkg.rndPriceAtTime || 1).toFixed(4)}</span>
+                        <span>📅 ${planDays} Days Plan</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        document.getElementById('invoiceContent').innerHTML = `
+            <div class="invoice-container">
+                <div class="invoice-card">
+                    <div class="invoice-header">
+                        <div>
+                            <div class="brand"><i class="bi bi-currency-bitcoin"></i>RND Staking</div>
+                            <div style="font-size:0.7rem;color:#556688;margin-top:4px;">
+                                <span class="invoice-number-screen">
+                                    <span class="invoice-number-badge">
+                                        <i class="bi bi-receipt me-1"></i>Statement #${packageKeys.length > 0 ? getInvoiceNumber(packages[packageKeys[0]], uid, 0) : 'N/A'}
+                                    </span>
+                                </span>
+                                <span class="invoice-number-print">
+                                    <span class="invoice-number-badge">
+                                        <i class="bi bi-receipt me-1"></i>Statement #${packageKeys.length > 0 ? getInvoiceNumber(packages[packageKeys[0]], uid, 0) : 'N/A'}
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="badge-domain"><i class="bi bi-check-circle-fill me-1"></i> staking.randigital.in</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-start flex-wrap mb-3">
+                        <div>
+                            <div class="invoice-title">📄 Package Statement</div>
+                            <div class="invoice-sub">Complete history of all your staking packages</div>
+                        </div>
+                        <div class="text-end">
+                            <span style="font-size:0.85rem;color:#fff;font-weight:600;">
+                                <i class="bi bi-person me-1"></i> ${name}
+                            </span>
+                            <div style="font-size:0.7rem;color:#556688;margin-top:2px;">
+                                <i class="bi bi-calendar me-1"></i> Generated: ${formatDate(Date.now())}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background:rgba(8,14,26,0.3);border-radius:12px;padding:12px 16px;margin-bottom:15px;">
+                        <div class="detail-row">
+                            <span class="detail-label">User Name</span>
+                            <span class="detail-value highlight">${name}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">User ID</span>
+                            <span class="detail-value" style="font-family:monospace;color:#60a5fa;">${username}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Email</span>
+                            <span class="detail-value">${userData.email || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Member Since</span>
+                            <span class="detail-value">${formatDate(memberSince)}</span>
+                        </div>
+                    </div>
+
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="num green">${packageKeys.length}</div>
+                            <div class="label">Total Packages</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="num gold">$${totalInvested.toFixed(2)}</div>
+                            <div class="label">Total Invested</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="num blue">${totalRNDReceived.toFixed(2)}</div>
+                            <div class="label">Total RND</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="num purple">${totalReleased.toFixed(2)}</div>
+                            <div class="label">Total Released</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:10px 0 20px;">
+                        <div style="background:rgba(8,14,26,0.3);border-radius:10px;padding:10px;text-align:center;">
+                            <div style="font-size:1.2rem;font-weight:700;color:#2ecc71;">${activePackages}</div>
+                            <div style="font-size:0.6rem;color:#8899bb;">🟢 Active</div>
+                        </div>
+                        <div style="background:rgba(8,14,26,0.3);border-radius:10px;padding:10px;text-align:center;">
+                            <div style="font-size:1.2rem;font-weight:700;color:#60a5fa;">${completedPackages}</div>
+                            <div style="font-size:0.6rem;color:#8899bb;">🔵 Completed</div>
+                        </div>
+                        <div style="background:rgba(8,14,26,0.3);border-radius:10px;padding:10px;text-align:center;">
+                            <div style="font-size:1.2rem;font-weight:700;color:#a78bfa;">${totalLocked.toFixed(2)}</div>
+                            <div style="font-size:0.6rem;color:#8899bb;">🔒 Still Locked</div>
+                        </div>
+                        <div style="background:rgba(8,14,26,0.3);border-radius:10px;padding:10px;text-align:center;">
+                            <div style="font-size:1.2rem;font-weight:700;color:#34d399;">${releasedPercent.toFixed(1)}%</div>
+                            <div style="font-size:0.6rem;color:#8899bb;">✅ Released %</div>
+                        </div>
+                    </div>
+
+                    <div class="package-list">
+                        <h6 style="font-weight:700;color:#fff;margin-bottom:15px;">
+                            <i class="bi bi-box-seam text-success me-2"></i>Package Details (${packageKeys.length} packages)
+                        </h6>
+                        ${packagesHtml}
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mt-4">
+                        <div>
+                            <span style="font-size:0.7rem;color:#556688;">
+                                <i class="bi bi-shield-check me-1"></i> All data is secured and stored on Firebase
+                            </span>
+                        </div>
+                        <div>
+                            <button class="btn-print" onclick="window.print()">
+                                <i class="bi bi-printer"></i> Print / PDF
+                            </button>
+                            <a href="dashboard.html" class="btn-outline-print ms-2">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="footer-note">
+                        <i class="bi bi-info-circle me-1"></i> 
+                        This is a system-generated statement of all your staking packages. 
+                        Each package releases a fixed amount daily (totalRND / planDays).
+                        Release starts from the day after purchase.
+                        For any queries, please contact support.
+                    </div>
+                </div>
+            </div>
+        `;
+
+    } catch (error) {
+        console.error('Error loading invoice:', error);
+        document.getElementById('invoiceContent').innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+                <h4>Error Loading Page</h4>
+                <p class="text-muted">${error.message || 'Please check your internet connection.'}</p>
+                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
+            </div>
+        `;
+    }
+});
+
+// ============================================================
+// 🔥 HELPERS - AVAILABLE GLOBALLY
+// ============================================================
+function calculateEndDate(startDate, planDays) {
+    if (!startDate || !planDays) return null;
+    return startDate + (planDays * 24 * 60 * 60 * 1000);
+}
+
+function getDaysRemaining(endDate) {
+    if (!endDate) return 0;
+    const now = Date.now();
+    const diff = endDate - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (24 * 60 * 60 * 1000));
+}
+
+function getDaysPassed(startDate) {
+    if (!startDate) return 0;
+    const diff = Date.now() - startDate;
+    if (diff <= 0) return 0;
+    return Math.floor(diff / (24 * 60 * 60 * 1000));
+}
+
+function getPlanColor(planName) {
+    const colors = {
+        '6 Months Plan': '#2ecc71',
+        '12 Months Plan': '#fbbf24',
+        '18 Months Plan': '#f472b6'
+    };
+    return colors[planName] || '#2ecc71';
+}
+</script>
+</body>
+</html>

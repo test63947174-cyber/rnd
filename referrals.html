@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Referrals - RND Staking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #080e1a; color: #f0f4ff; min-height: 100vh; }
+        
+        .navbar-custom {
+            background: rgba(8,14,26,0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(46,204,113,0.15);
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1050;
+        }
+        .navbar-custom .navbar-brand { font-weight: 800; font-size: 1.2rem; color: #fff !important; }
+        .navbar-custom .navbar-brand i { color: #2ecc71; }
+        
+        .sidebar-toggle {
+            background: rgba(46,204,113,0.12);
+            border: 1px solid rgba(46,204,113,0.2);
+            color: #2ecc71;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-toggle:hover { background: rgba(46,204,113,0.2); }
+        
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1060;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.active { display: block; opacity: 1; }
+        
+        .sidebar-panel {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background: rgba(12,20,35,0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(46,204,113,0.15);
+            z-index: 1070;
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 25px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-panel.open { right: 0; }
+        
+        .sidebar-panel .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.1);
+            margin-bottom: 15px;
+        }
+        .sidebar-panel .sidebar-header h5 { color: #fff; font-weight: 700; margin: 0; font-size: 1.1rem; }
+        .sidebar-panel .sidebar-header h5 i { color: #2ecc71; }
+        
+        .sidebar-close {
+            background: rgba(255,255,255,0.08);
+            border: none;
+            color: #8899bb;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        .sidebar-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        
+        .sidebar-panel .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 20px;
+            color: #8899bb;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            margin: 2px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .sidebar-panel .nav-item:hover { background: rgba(46,204,113,0.08); color: #fff; }
+        .sidebar-panel .nav-item.active { background: rgba(46,204,113,0.12); color: #2ecc71; }
+        .sidebar-panel .nav-item i { font-size: 1.2rem; width: 28px; text-align: center; }
+        .sidebar-panel .nav-item .badge {
+            margin-left: auto;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            font-weight: 600;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        
+        .sidebar-panel .sidebar-footer {
+            margin-top: auto;
+            padding: 20px;
+            border-top: 1px solid rgba(46,204,113,0.08);
+        }
+        .sidebar-panel .sidebar-footer .nav-item { color: #f87171; }
+        .sidebar-panel .sidebar-footer .nav-item:hover { background: rgba(239,68,68,0.08); color: #f87171; }
+        
+        .user-profile-sidebar {
+            padding: 10px 20px 20px;
+            border-bottom: 1px solid rgba(46,204,113,0.08);
+            margin-bottom: 10px;
+        }
+        .user-profile-sidebar .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2ecc71, #1a7a3a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+        .user-profile-sidebar .user-name { color: #fff; font-weight: 600; font-size: 0.95rem; }
+        .user-profile-sidebar .user-id { color: #8899bb; font-size: 0.75rem; }
+        
+        .dashboard-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        
+        .card-glass {
+            background: rgba(19,34,55,0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .card-glass:hover { border-color: rgba(46,204,113,0.3); transform: translateY(-3px); }
+        .card-glass .card-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 15px; }
+        .card-glass .card-title i { color: #2ecc71; margin-right: 8px; }
+        
+        .referral-box {
+            background: rgba(8,14,26,0.6);
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            border: 1px dashed rgba(46,204,113,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .referral-box code { color: #a0b8d0; font-size: 0.8rem; word-break: break-all; flex: 1; }
+        .copy-btn {
+            cursor: pointer;
+            padding: 4px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(46,204,113,0.2);
+            background: transparent;
+            color: #a0b8d0;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+        }
+        .copy-btn:hover { background: rgba(46,204,113,0.1); color: #2ecc71; }
+        
+        .table-custom { color: #f0f4ff; border-color: #1f334f; }
+        .table-custom th { border-bottom: 2px solid #2a3a5a; color: #a0b8d0; }
+        .table-custom td { border-color: #1f334f; }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            padding: 10px 24px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.9rem;
+        }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .toast-custom {
+            background: rgba(19,34,55,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 16px;
+            padding: 16px 20px;
+            color: #f0f4ff;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.4s ease;
+            margin-bottom: 10px;
+        }
+        .toast-custom.success { border-left: 4px solid #2ecc71; }
+        .toast-custom.error { border-left: 4px solid #ef4444; }
+        .toast-custom i { font-size: 1.5rem; }
+        .toast-custom .toast-msg { flex: 1; font-size: 0.9rem; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        .earnings-box {
+            background: rgba(251,191,36,0.05);
+            border: 1px solid rgba(251,191,36,0.15);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .earnings-box .label { color: #8899bb; font-size: 0.85rem; }
+        .earnings-box .value { color: #fbbf24; font-weight: 700; font-size: 1.1rem; }
+        
+        .level-badge {
+            display: inline-block;
+            background: rgba(46,204,113,0.08);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.65rem;
+            color: #2ecc71;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stats-grid .stat-item {
+            background: rgba(19,34,55,0.6);
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 16px;
+            padding: 18px;
+            text-align: center;
+        }
+        .stats-grid .stat-item .number { font-size: 1.8rem; font-weight: 800; color: #2ecc71; }
+        .stats-grid .stat-item .label { color: #8899bb; font-size: 0.75rem; font-weight: 500; }
+        .stats-grid .stat-item .earnings { color: #fbbf24; font-size: 0.85rem; font-weight: 600; margin-top: 4px; }
+        
+        .commission-history-item {
+            background: rgba(8,14,26,0.4);
+            border-radius: 10px;
+            padding: 10px 14px;
+            border: 1px solid rgba(46,204,113,0.06);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+        .commission-history-item .amount { color: #fbbf24; font-weight: 700; }
+        .commission-history-item .level-tag { 
+            background: rgba(46,204,113,0.08); 
+            padding: 2px 10px; 
+            border-radius: 12px; 
+            font-size: 0.65rem; 
+            color: #2ecc71; 
+        }
+        .commission-history-item .date { color: #556688; font-size: 0.65rem; }
+        .commission-history-item .user { color: #a78bfa; font-weight: 500; }
+        
+        .history-scroll {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .level-members-table {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .history-scroll::-webkit-scrollbar,
+        .level-members-table::-webkit-scrollbar {
+            width: 4px;
+        }
+        .history-scroll::-webkit-scrollbar-track,
+        .level-members-table::-webkit-scrollbar-track {
+            background: rgba(46,204,113,0.05);
+            border-radius: 10px;
+        }
+        .history-scroll::-webkit-scrollbar-thumb,
+        .level-members-table::-webkit-scrollbar-thumb {
+            background: rgba(46,204,113,0.3);
+            border-radius: 10px;
+        }
+        
+        .load-more-btn {
+            background: rgba(46,204,113,0.08);
+            border: 1px solid rgba(46,204,113,0.15);
+            color: #2ecc71;
+            padding: 6px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+        }
+        .load-more-btn:hover { background: rgba(46,204,113,0.15); }
+        
+        .warning-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            background: rgba(251,191,36,0.15);
+            color: #fbbf24;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-container { padding: 15px; }
+            .sidebar-panel { width: 280px; right: -300px; }
+            .sidebar-panel .nav-item { padding: 10px 16px; font-size: 0.85rem; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .stats-grid .stat-item .number { font-size: 1.3rem; }
+            .level-members-table { max-height: 200px; }
+            .level-members-table table { font-size: 0.75rem; }
+            .level-members-table td, .level-members-table th { padding: 4px 6px; }
+        }
+        @media (max-width: 480px) { 
+            .sidebar-panel { width: 100%; right: -100%; } 
+            .sidebar-panel.open { right: 0; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .stats-grid .stat-item { padding: 12px; }
+            .stats-grid .stat-item .number { font-size: 1.1rem; }
+            .earnings-box { padding: 8px 12px; }
+            .earnings-box .label { font-size: 0.7rem; }
+            .earnings-box .value { font-size: 0.9rem; }
+            .commission-history-item { font-size: 0.7rem; padding: 8px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ====== NAVBAR ====== -->
+<nav class="navbar navbar-custom">
+    <div class="container-fluid px-3">
+        <a class="navbar-brand fw-bold" href="dashboard.html">
+            <i class="bi bi-currency-bitcoin me-2"></i>RND Staking
+        </a>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Menu">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- ====== SIDEBAR ====== -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="sidebar-panel" id="sidebarPanel">
+    <div class="sidebar-header">
+        <h5><i class="bi bi-grid-1x2-fill me-2"></i>Menu</h5>
+        <button class="sidebar-close" id="sidebarClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="user-profile-sidebar">
+        <div class="d-flex align-items-center gap-3">
+            <div class="avatar" id="sidebarAvatar">U</div>
+            <div>
+                <div class="user-name" id="sidebarName">User</div>
+                <div class="user-id" id="sidebarUserId">ID: ---</div>
+            </div>
+        </div>
+    </div>
+    <a href="dashboard.html" class="nav-item"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a href="deposit.html" class="nav-item"><i class="bi bi-arrow-down-circle"></i> Deposit</a>
+    <a href="withdrawal.html" class="nav-item"><i class="bi bi-arrow-up-circle"></i> Withdraw</a>
+    <a href="referrals.html" class="nav-item active"><i class="bi bi-people"></i> Referrals <span class="badge" id="referralBadge">0</span></a>
+    <a href="buy-package.html" class="nav-item"><i class="bi bi-box-seam"></i> Buy Package</a>
+    <a href="transactions.html" class="nav-item"><i class="bi bi-receipt"></i> Transactions</a>
+    <a href="profile.html" class="nav-item"><i class="bi bi-person"></i> Profile</a>
+    <div class="sidebar-footer">
+        <a href="#" class="nav-item" id="logoutBtnSidebar"><i class="bi bi-box-arrow-right"></i> Logout</a>
+    </div>
+</div>
+
+<!-- ====== CONTENT ====== -->
+<div class="dashboard-container" id="referralContent">
+    <div class="text-center py-5">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="text-muted mt-3">Loading referral data...</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+    }
+}
+</script>
+<script type="module" src="referrals.js"></script>
+
+</body>
+</html>

@@ -1,5 +1,6 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (PRODUCTION READY v5)
+// RND STAKING PLATFORM - DASHBOARD.JS (PRODUCTION READY v6)
+// WITH 2-LEG RANK & REWARD SYSTEM
 // ============================================================
 // 📌 ALL BUSINESS LOGIC HERE:
 // Firebase Init | Auth | Login | Logout | Dashboard Load
@@ -8,6 +9,7 @@
 // Daily Release (Pending Days) | Commission (Duplicate Proof)
 // Backup (Comprehensive) | Recovery (Referral Chain Verify)
 // Validation | Security | Real-time Listener (Debounced)
+// RANK SYSTEM: 2-Leg Rank & Reward Automation
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -528,7 +530,7 @@ async function recoverUserData(userId, authUser) {
 }
 
 // ============================================================
-// PROCESS DAILY RELEASE (With Pending Days Calculation) - FIXED
+// PROCESS DAILY RELEASE (With Pending Days Calculation)
 // ============================================================
 async function processDailyRelease(userId) {
     if (releaseInProgress) {
@@ -565,7 +567,7 @@ async function processDailyRelease(userId) {
             let updatedPackages = {};
             let releaseTransactions = [];
             let totalReleaseToday = 0;
-            let totalReleaseAmountAll = 0; // ✅ FIX: Total including pending
+            let totalReleaseAmountAll = 0;
             let hasActivePackages = false;
             
             for (const [pkgKey, pkg] of Object.entries(packages)) {
@@ -601,7 +603,7 @@ async function processDailyRelease(userId) {
                 
                 updatedPackages[pkgKey] = pkg;
                 totalReleaseToday += todayReleaseAmount;
-                totalReleaseAmountAll += totalReleaseAmount; // ✅ FIX: Add total including pending
+                totalReleaseAmountAll += totalReleaseAmount;
                 
                 releaseTransactions.push({
                     type: 'daily_release',
@@ -636,7 +638,6 @@ async function processDailyRelease(userId) {
                 return currentData;
             }
             
-            // ✅ FIX: Use totalReleaseAmountAll (includes pending) instead of totalReleaseToday
             currentData.rndWallet = (currentData.rndWallet || 0) + totalReleaseAmountAll;
             currentData.lockedRND = (currentData.lockedRND || 0) - totalReleaseAmountAll;
             currentData.totalReleased = (currentData.totalReleased || 0) + totalReleaseAmountAll;
@@ -655,6 +656,8 @@ async function processDailyRelease(userId) {
         if (result.committed && result.snapshot.exists()) {
             const data = result.snapshot.val();
             console.log('✅ Daily release processed successfully');
+            // Trigger rank evaluation after release
+            await triggerRankEvaluation(userId);
             return data;
         }
         return null;
@@ -804,6 +807,8 @@ async function processReferralCommission(userId, packageId, packageData) {
             });
             
             console.log('✅ Commission processed for package ' + packageId);
+            // Trigger rank evaluation after commission
+            await triggerRankEvaluation(userId);
             return true;
             
         } finally {
@@ -860,11 +865,9 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
     const date = getTodayDate();
     const txId = generateTxId();
     
-    // Get recipient username and UID
     const recipientUsername = recipientData.username || recipientData.referralCode || recipientUid;
     const recipientUidForHistory = recipientUid;
     
-    // Create comprehensive backups
     await createComprehensiveBackup(senderUid, 'transfer_sender');
     await createComprehensiveBackup(recipientUid, 'transfer_recipient');
     
@@ -952,7 +955,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
     });
     
     if (!recipientResult.committed) {
-        // Rollback sender
         await runTransaction(senderRef, (currentData) => {
             if (!currentData) return currentData;
             currentData[walletType] = (currentData[walletType] || 0) + amount;
@@ -999,6 +1001,8 @@ function setupRealtimeListener(userId) {
                 currentUserData.packages = packages;
                 const stats = calculateUserStats(currentUserData);
                 updateDashboardUI(currentUserData, stats);
+                // Update rank UI when packages change
+                updateRankUI(currentUserData);
             }
             updateTimer = null;
         }, 500);
@@ -1006,7 +1010,7 @@ function setupRealtimeListener(userId) {
 }
 
 // ============================================================
-// UPDATE DASHBOARD UI (Safe - No Database Writes) - FIXED UI BINDING
+// UPDATE DASHBOARD UI (Safe - No Database Writes)
 // ============================================================
 function updateDashboardUI(u, stats) {
     const elements = {
@@ -1020,16 +1024,13 @@ function updateDashboardUI(u, stats) {
         totalStake: document.getElementById('totalStakeValue'),
         teamBusiness: document.getElementById('teamBusinessValue'),
         totalReferrals: document.getElementById('totalReferralsValue'),
-        // ✅ FIX: Add releaseWalletInfo and lockedRNDInfo to update together
         releaseWalletInfo: document.getElementById('releaseWalletInfo'),
         lockedRNDInfo: document.getElementById('lockedRNDInfo')
     };
     
-    // Calculate daily release and locked RND values once
     const dailyReleaseValue = stats?.totalDailyRelease || u.releaseWallet || 0;
     const lockedRNDValue = stats?.totalLockedRND || u.lockedRND || 0;
     
-    // Update all elements with the SAME values
     if (elements.depositWallet) elements.depositWallet.textContent = '$' + (u.depositWallet || 0).toFixed(2);
     if (elements.referralWallet) elements.referralWallet.textContent = (u.referralWallet || 0).toFixed(2);
     if (elements.rndWallet) elements.rndWallet.textContent = (u.rndWallet || 0).toFixed(4);
@@ -1041,7 +1042,6 @@ function updateDashboardUI(u, stats) {
     if (elements.teamBusiness) elements.teamBusiness.textContent = '$' + (u.teamBusiness || 0).toFixed(2);
     if (elements.totalReferrals) elements.totalReferrals.textContent = u.totalReferrals || 0;
     
-    // ✅ FIX: Update Release Info Box and Locked RND Info with SAME values as top card
     if (elements.releaseWalletInfo) elements.releaseWalletInfo.textContent = dailyReleaseValue.toFixed(4) + ' RND';
     if (elements.lockedRNDInfo) elements.lockedRNDInfo.textContent = lockedRNDValue.toFixed(2) + ' RND';
 }
@@ -1055,7 +1055,6 @@ function renderDashboard(u) {
     const rank = u.rank || 'Member';
     const isMember = rank === 'Member' || rank === 'member' || !rank;
     
-    // ✅ FIX: Calculate totalReferrals from teamStructure (All Levels Combined)
     const teamStructure = u.teamStructure || { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
     const directReferrals = teamStructure.level1 || 0;
     const totalReferrals = (teamStructure.level1 || 0) + 
@@ -1107,6 +1106,11 @@ function renderDashboard(u) {
     
     const transferHistory = u.transferHistory || [];
     const sortedHistory = [...transferHistory].reverse().slice(0, 5);
+
+    // Calculate rank progress
+    const rankOrder = ['Member', 'Executive', 'Senior Executive', 'Manager', 'Senior Manager', 'Diamond'];
+    const currentRankIndex = rankOrder.indexOf(rank);
+    const progressPercent = ((currentRankIndex) / (rankOrder.length - 1)) * 100;
 
     document.getElementById('dashboardContent').innerHTML = `
         <div class="row g-4">
@@ -1222,6 +1226,92 @@ function renderDashboard(u) {
                     <div>
                         <span class="label">Daily Release:</span>
                         <span class="value" id="releaseWalletInfo">${(releaseWallet || 0).toFixed(4)} RND</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== RANK PROGRESS CARD - NEW ====== -->
+            <div class="col-12">
+                <div class="rank-progress-card">
+                    <div class="rank-header">
+                        <div>
+                            <span class="rank-badge ${rank.toLowerCase().replace(/ /g, '-')}" id="currentRankBadge">${rank}</span>
+                            <span class="rank-label">Current Rank</span>
+                        </div>
+                        <div>
+                            <span class="rank-reward" id="totalRankRewards">$${Object.values(u.rankRewards || {}).reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)}</span>
+                            <span class="rank-label">Total Rank Rewards</span>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-steps">
+                        <div class="step ${currentRankIndex >= 0 ? 'completed' : ''}" id="stepMember">
+                            <span class="step-icon">1</span>
+                            <span class="step-label">Member</span>
+                        </div>
+                        <div class="step ${currentRankIndex >= 1 ? 'completed' : ''} ${currentRankIndex === 1 ? 'active' : ''}" id="stepExecutive">
+                            <span class="step-icon">2</span>
+                            <span class="step-label">Executive</span>
+                            <span class="step-reward">+$100</span>
+                        </div>
+                        <div class="step ${currentRankIndex >= 2 ? 'completed' : ''} ${currentRankIndex === 2 ? 'active' : ''}" id="stepSeniorExecutive">
+                            <span class="step-icon">3</span>
+                            <span class="step-label">Sr. Exec</span>
+                            <span class="step-reward">+$200</span>
+                        </div>
+                        <div class="step ${currentRankIndex >= 3 ? 'completed' : ''} ${currentRankIndex === 3 ? 'active' : ''}" id="stepManager">
+                            <span class="step-icon">4</span>
+                            <span class="step-label">Manager</span>
+                            <span class="step-reward">+$500</span>
+                        </div>
+                        <div class="step ${currentRankIndex >= 4 ? 'completed' : ''} ${currentRankIndex === 4 ? 'active' : ''}" id="stepSeniorManager">
+                            <span class="step-icon">5</span>
+                            <span class="step-label">Sr. Mgr</span>
+                            <span class="step-reward">+$1,000</span>
+                        </div>
+                        <div class="step ${currentRankIndex >= 5 ? 'completed' : ''} ${currentRankIndex === 5 ? 'active' : ''}" id="stepDiamond">
+                            <span class="step-icon">6</span>
+                            <span class="step-label">Diamond</span>
+                            <span class="step-reward">+$2,500</span>
+                        </div>
+                    </div>
+                    
+                    <div class="rank-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Personal Business</span>
+                            <span class="detail-value" id="personalBusiness">$${(u.personalBusiness || 0).toFixed(2)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Team Business</span>
+                            <span class="detail-value" id="teamBusiness">$${(u.teamBusiness || 0).toFixed(2)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Left Leg Business</span>
+                            <span class="detail-value" id="leftLegBusiness">$${(u.leftLegBusiness || 0).toFixed(2)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Right Leg Business</span>
+                            <span class="detail-value" id="rightLegBusiness">$${(u.rightLegBusiness || 0).toFixed(2)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Qualified Directs</span>
+                            <span class="detail-value" id="qualifiedDirects">${Object.keys(u.qualifiedDirects || {}).reduce((sum, key) => sum + (u.qualifiedDirects[key] || []).length, 0)} / 2</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Next Rank</span>
+                            <span class="detail-value" id="nextRank">${rank === 'Diamond' ? '🏆 Max Achieved' : (['Executive','Senior Executive','Manager','Senior Manager','Diamond'][currentRankIndex] || 'Executive')}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Next Reward</span>
+                            <span class="detail-value" id="nextReward">${rank === 'Diamond' ? '🏆 Max' : ['$100','$200','$500','$1,000','$2,500'][currentRankIndex] || '$100'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Progress</span>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill" id="rankProgressBar" style="width: ${Math.min(progressPercent, 100)}%;"></div>
+                            </div>
+                            <span class="detail-value" id="rankProgressPercent">${Math.min(Math.round(progressPercent), 100)}%</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1409,6 +1499,9 @@ function renderDashboard(u) {
         e.preventDefault();
         await handleTransfer();
     });
+    
+    // Update rank UI after render
+    updateRankUI(u);
 }
 
 // ============================================================
@@ -1449,7 +1542,6 @@ async function handleTransfer() {
     const senderUsername = senderData.username || senderData.referralCode;
     const senderUid = user.uid;
     
-    // 🔥 Search recipient by UID, Username or Referral Code
     const recipient = await getUserByIdentifier(recipientIdentifier);
     if (!recipient) { showToast('❌ User not found! Please check the ID, Username or Referral Code.', 'error'); return; }
     
@@ -1457,7 +1549,6 @@ async function handleTransfer() {
     const recipientData = recipient.data;
     const recipientUsername = recipientData.username || recipientData.referralCode;
     
-    // 🔥 Self Transfer Check - by UID
     if (recipientUid === senderUid) { 
         showToast('❌ You cannot send money to yourself!', 'error'); 
         return; 
@@ -1510,6 +1601,711 @@ async function handleTransfer() {
 }
 
 // ============================================================
+// ============================================================
+// 🔥 RANK SYSTEM - 2-LEG RANK & REWARD ENGINE (NEW)
+// ============================================================
+// ============================================================
+
+// ============================================================
+// RANK CONFIGURATION
+// ============================================================
+const RANK_CONFIG = {
+  MEMBER: {
+    name: 'Member',
+    order: 0,
+    personalBusiness: 0,
+    teamBusiness: 0,
+    requiredDirectRank: null,
+    requiredDirectCount: 0,
+    requiredLegs: 0,
+    reward: 0,
+    nextRank: 'Executive'
+  },
+  EXECUTIVE: {
+    name: 'Executive',
+    order: 1,
+    personalBusiness: 3000,
+    teamBusiness: 0,
+    requiredDirectRank: null,
+    requiredDirectCount: 0,
+    requiredLegs: 0,
+    reward: 100,
+    nextRank: 'Senior Executive'
+  },
+  SENIOR_EXECUTIVE: {
+    name: 'Senior Executive',
+    order: 2,
+    personalBusiness: 0,
+    teamBusiness: 10000,
+    requiredDirectRank: 'Executive',
+    requiredDirectCount: 2,
+    requiredLegs: 2,
+    reward: 200,
+    nextRank: 'Manager'
+  },
+  MANAGER: {
+    name: 'Manager',
+    order: 3,
+    personalBusiness: 0,
+    teamBusiness: 25000,
+    requiredDirectRank: 'Senior Executive',
+    requiredDirectCount: 2,
+    requiredLegs: 2,
+    reward: 500,
+    nextRank: 'Senior Manager'
+  },
+  SENIOR_MANAGER: {
+    name: 'Senior Manager',
+    order: 4,
+    personalBusiness: 0,
+    teamBusiness: 50000,
+    requiredDirectRank: 'Manager',
+    requiredDirectCount: 2,
+    requiredLegs: 2,
+    reward: 1000,
+    nextRank: 'Diamond'
+  },
+  DIAMOND: {
+    name: 'Diamond',
+    order: 5,
+    personalBusiness: 0,
+    teamBusiness: 100000,
+    requiredDirectRank: 'Senior Manager',
+    requiredDirectCount: 2,
+    requiredLegs: 2,
+    reward: 2500,
+    nextRank: null
+  }
+};
+
+// ============================================================
+// 🔥 MAIN RANK EVALUATION ENGINE
+// ============================================================
+async function evaluateUserRank(userId) {
+  try {
+    // Check if evaluation is already running
+    const lockRef = ref(db, `rankLocks/${userId}`);
+    const lockSnap = await get(lockRef);
+    if (lockSnap.exists()) {
+      console.log(`⏳ Rank evaluation already running for ${userId}`);
+      return null;
+    }
+    
+    // Set lock
+    await set(lockRef, { lockedAt: Date.now(), userId });
+    
+    try {
+      // Get user data
+      const userSnap = await get(ref(db, `users/${userId}`));
+      if (!userSnap.exists()) {
+        console.log(`❌ User ${userId} not found`);
+        return null;
+      }
+      
+      const userData = userSnap.val();
+      const currentRank = userData.rank || 'Member';
+      const currentRankOrder = RANK_CONFIG[currentRank.replace(/ /g, '_').toUpperCase()]?.order || 0;
+      
+      // Calculate personal business
+      const personalBusiness = userData.personalBusiness || userData.depositWallet || 0;
+      
+      // Get direct referrals (level 1)
+      const directReferrals = await getDirectReferrals(userId);
+      
+      // Calculate team business and leg-wise business
+      const { totalTeamBusiness, leftLegBusiness, rightLegBusiness, qualifiedDirects } = 
+        await calculateTeamBusinessAndQualifiedDirects(userId, directReferrals);
+      
+      // Determine highest eligible rank
+      const eligibleRank = await determineHighestEligibleRank(
+        userId,
+        personalBusiness,
+        totalTeamBusiness,
+        leftLegBusiness,
+        rightLegBusiness,
+        qualifiedDirects,
+        currentRankOrder
+      );
+      
+      if (!eligibleRank) {
+        console.log(`ℹ️ No rank upgrade for ${userId}`);
+        await updateRankEvaluation(userId, userData, personalBusiness, totalTeamBusiness);
+        return null;
+      }
+      
+      // Check if already processed this rank
+      const rankKey = eligibleRank.replace(/ /g, '_').toUpperCase();
+      const rewardKey = `${userId}_${rankKey}_RANK_REWARD`;
+      const rewardCheck = await get(ref(db, `rankRewards/${rewardKey}`));
+      
+      if (rewardCheck.exists()) {
+        console.log(`⚠️ Rank reward already processed: ${eligibleRank} for ${userId}`);
+        return null;
+      }
+      
+      // Process rank upgrade
+      const result = await processRankUpgrade(
+        userId,
+        userData,
+        eligibleRank,
+        personalBusiness,
+        totalTeamBusiness,
+        leftLegBusiness,
+        rightLegBusiness,
+        qualifiedDirects
+      );
+      
+      if (result.success) {
+        console.log(`✅ Rank upgraded to ${eligibleRank} for ${userId}`);
+        await createNotification(userId, eligibleRank, result.rewardAmount);
+        return result;
+      }
+      
+      return null;
+      
+    } finally {
+      // Release lock
+      await set(lockRef, null);
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error evaluating rank for ${userId}:`, error);
+    return null;
+  }
+}
+
+// ============================================================
+// 🔥 GET DIRECT REFERRALS
+// ============================================================
+async function getDirectReferrals(userId) {
+  try {
+    const referrals = [];
+    const usersSnap = await get(ref(db, 'users'));
+    if (!usersSnap.exists()) return referrals;
+    
+    const users = usersSnap.val();
+    for (let uid in users) {
+      const user = users[uid];
+      if (user.referredBy === userId || 
+          user.referredBy === user.referralCode || 
+          user.sponsor === userId) {
+        referrals.push({
+          uid: uid,
+          data: user,
+          rank: user.rank || 'Member'
+        });
+      }
+    }
+    
+    return referrals;
+  } catch (error) {
+    console.error('Error getting direct referrals:', error);
+    return [];
+  }
+}
+
+// ============================================================
+// 🔥 CALCULATE TEAM BUSINESS & QUALIFIED DIRECTS
+// ============================================================
+async function calculateTeamBusinessAndQualifiedDirects(userId, directReferrals) {
+  let totalTeamBusiness = 0;
+  let leftLegBusiness = 0;
+  let rightLegBusiness = 0;
+  const qualifiedDirects = {
+    executive: [],
+    seniorExecutive: [],
+    manager: [],
+    seniorManager: [],
+    diamond: []
+  };
+  
+  // Process each direct referral
+  for (let i = 0; i < directReferrals.length; i++) {
+    const direct = directReferrals[i];
+    const directUid = direct.uid;
+    const directData = direct.data;
+    const directRank = directData.rank || 'Member';
+    
+    // Calculate business for this direct's entire team
+    const teamBusiness = await calculateTeamBusinessForUser(directUid);
+    totalTeamBusiness += teamBusiness;
+    
+    // Determine leg (alternate for now, will use actual leg data)
+    const isLeftLeg = i % 2 === 0;
+    if (isLeftLeg) {
+      leftLegBusiness += teamBusiness;
+    } else {
+      rightLegBusiness += teamBusiness;
+    }
+    
+    // Track qualified directs by rank
+    if (directRank === 'Executive' || directRank === 'Senior Executive' || 
+        directRank === 'Manager' || directRank === 'Senior Manager' || 
+        directRank === 'Diamond') {
+      qualifiedDirects.executive.push(directUid);
+    }
+    if (directRank === 'Senior Executive' || directRank === 'Manager' || 
+        directRank === 'Senior Manager' || directRank === 'Diamond') {
+      qualifiedDirects.seniorExecutive.push(directUid);
+    }
+    if (directRank === 'Manager' || directRank === 'Senior Manager' || directRank === 'Diamond') {
+      qualifiedDirects.manager.push(directUid);
+    }
+    if (directRank === 'Senior Manager' || directRank === 'Diamond') {
+      qualifiedDirects.seniorManager.push(directUid);
+    }
+    if (directRank === 'Diamond') {
+      qualifiedDirects.diamond.push(directUid);
+    }
+  }
+  
+  return {
+    totalTeamBusiness,
+    leftLegBusiness,
+    rightLegBusiness,
+    qualifiedDirects
+  };
+}
+
+// ============================================================
+// 🔥 CALCULATE TEAM BUSINESS FOR A USER
+// ============================================================
+async function calculateTeamBusinessForUser(userId) {
+  try {
+    const userSnap = await get(ref(db, `users/${userId}`));
+    if (!userSnap.exists()) return 0;
+    
+    const userData = userSnap.val();
+    let business = userData.teamBusiness || 0;
+    
+    if (business === 0) {
+      const transactions = userData.transactions || {};
+      for (let key in transactions) {
+        const tx = transactions[key];
+        if ((tx.type === 'deposit' || tx.type === 'package') && tx.status === 'approved') {
+          business += (tx.amount || 0);
+        }
+      }
+    }
+    
+    return business;
+  } catch (error) {
+    console.error('Error calculating team business:', error);
+    return 0;
+  }
+}
+
+// ============================================================
+// 🔥 DETERMINE HIGHEST ELIGIBLE RANK
+// ============================================================
+async function determineHighestEligibleRank(
+  userId,
+  personalBusiness,
+  totalTeamBusiness,
+  leftLegBusiness,
+  rightLegBusiness,
+  qualifiedDirects,
+  currentRankOrder
+) {
+  // Check ranks from highest to lowest
+  const rankOrder = ['DIAMOND', 'SENIOR_MANAGER', 'MANAGER', 'SENIOR_EXECUTIVE', 'EXECUTIVE'];
+  
+  for (let rankKey of rankOrder) {
+    const config = RANK_CONFIG[rankKey];
+    if (!config) continue;
+    
+    const rankOrderValue = config.order;
+    if (rankOrderValue <= currentRankOrder) continue; // Skip if already achieved
+    
+    // Check personal business requirement
+    if (config.personalBusiness > 0 && personalBusiness < config.personalBusiness) {
+      continue;
+    }
+    
+    // Check team business requirement
+    if (config.teamBusiness > 0 && totalTeamBusiness < config.teamBusiness) {
+      continue;
+    }
+    
+    // Check required direct rank
+    if (config.requiredDirectRank) {
+      const requiredRankKey = config.requiredDirectRank.replace(/ /g, '_').toLowerCase();
+      const qualifiedList = qualifiedDirects[requiredRankKey] || [];
+      
+      if (qualifiedList.length < config.requiredDirectCount) {
+        continue;
+      }
+      
+      // Check two-leg rule
+      if (config.requiredLegs === 2) {
+        const legQualified = await checkTwoLegQualification(userId, qualifiedList);
+        if (!legQualified) {
+          continue;
+        }
+      }
+    }
+    
+    // All conditions met
+    return config.name;
+  }
+  
+  // Check if Executive qualifies (special case)
+  if (currentRankOrder < RANK_CONFIG.EXECUTIVE.order && personalBusiness >= RANK_CONFIG.EXECUTIVE.personalBusiness) {
+    return 'Executive';
+  }
+  
+  return null;
+}
+
+// ============================================================
+// 🔥 CHECK TWO-LEG QUALIFICATION
+// ============================================================
+async function checkTwoLegQualification(userId, qualifiedList) {
+  try {
+    if (qualifiedList.length < 2) return false;
+    
+    const directReferrals = await getDirectReferrals(userId);
+    
+    // Group qualified members by their direct parent
+    const groups = {};
+    for (let qualifiedUid of qualifiedList) {
+      for (let direct of directReferrals) {
+        if (await isUserInChain(direct.uid, qualifiedUid)) {
+          if (!groups[direct.uid]) groups[direct.uid] = [];
+          groups[direct.uid].push(qualifiedUid);
+          break;
+        }
+      }
+    }
+    
+    const groupKeys = Object.keys(groups);
+    return groupKeys.length >= 2;
+    
+  } catch (error) {
+    console.error('Error checking two-leg qualification:', error);
+    return false;
+  }
+}
+
+// ============================================================
+// 🔥 CHECK IF USER IS IN CHAIN
+// ============================================================
+async function isUserInChain(ancestorUid, targetUid) {
+  if (ancestorUid === targetUid) return true;
+  
+  try {
+    const usersSnap = await get(ref(db, 'users'));
+    if (!usersSnap.exists()) return false;
+    
+    const users = usersSnap.val();
+    let queue = [ancestorUid];
+    let visited = new Set();
+    
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (visited.has(current)) continue;
+      visited.add(current);
+      
+      if (current === targetUid) return true;
+      
+      for (let uid in users) {
+        const user = users[uid];
+        if (!visited.has(uid) && 
+            (user.referredBy === current || 
+             user.referredBy === user.referralCode || 
+             user.sponsor === current)) {
+          queue.push(uid);
+        }
+      }
+    }
+    
+    return false;
+    
+  } catch (error) {
+    console.error('Error checking user in chain:', error);
+    return false;
+  }
+}
+
+// ============================================================
+// 🔥 PROCESS RANK UPGRADE
+// ============================================================
+async function processRankUpgrade(
+  userId,
+  userData,
+  newRank,
+  personalBusiness,
+  totalTeamBusiness,
+  leftLegBusiness,
+  rightLegBusiness,
+  qualifiedDirects
+) {
+  const rankKey = newRank.replace(/ /g, '_').toUpperCase();
+  const config = RANK_CONFIG[rankKey];
+  if (!config) {
+    return { success: false, error: 'Invalid rank configuration' };
+  }
+  
+  const rewardAmount = config.reward || 0;
+  const rewardKey = `${userId}_${rankKey}_RANK_REWARD`;
+  
+  try {
+    const userRef = ref(db, `users/${userId}`);
+    const result = await runTransaction(userRef, (currentData) => {
+      if (!currentData) return currentData;
+      
+      // Check if already processed
+      const rankRewards = currentData.rankRewards || {};
+      if (rankRewards[rankKey]) {
+        return currentData;
+      }
+      
+      // Update rank
+      const oldRank = currentData.rank || 'Member';
+      currentData.rank = newRank;
+      
+      // Update rank history
+      const rankHistory = currentData.rankHistory || {};
+      const historyId = 'history_' + Date.now();
+      rankHistory[historyId] = {
+        previousRank: oldRank,
+        newRank: newRank,
+        timestamp: Date.now(),
+        personalBusiness: personalBusiness,
+        teamBusiness: totalTeamBusiness,
+        leftLegBusiness: leftLegBusiness,
+        rightLegBusiness: rightLegBusiness,
+        qualifiedDirects: qualifiedDirects,
+        rewardAmount: rewardAmount,
+        status: 'completed'
+      };
+      currentData.rankHistory = rankHistory;
+      
+      // Record reward
+      const rankRewards = currentData.rankRewards || {};
+      rankRewards[rankKey] = {
+        rank: newRank,
+        amount: rewardAmount,
+        status: 'credited',
+        timestamp: Date.now(),
+        transactionId: rewardKey
+      };
+      currentData.rankRewards = rankRewards;
+      
+      // Credit reward to deposit wallet
+      if (rewardAmount > 0) {
+        currentData.depositWallet = (currentData.depositWallet || 0) + rewardAmount;
+        
+        const transactions = currentData.transactions || {};
+        const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+        transactions[txId] = {
+          type: 'rank_reward',
+          rank: newRank,
+          amount: rewardAmount,
+          currency: 'USD',
+          timestamp: Date.now(),
+          date: getTodayDate(),
+          status: 'completed',
+          description: `Rank reward for achieving ${newRank}`
+        };
+        currentData.transactions = transactions;
+      }
+      
+      if (qualifiedDirects) {
+        currentData.qualifiedDirects = qualifiedDirects;
+      }
+      
+      currentData.lastRankEvaluation = Date.now();
+      
+      return currentData;
+    });
+    
+    if (result.committed) {
+      console.log(`✅ Rank upgrade to ${newRank} processed successfully for ${userId}`);
+      await createComprehensiveBackup(userId, `rank_upgrade_to_${newRank}`);
+      
+      return {
+        success: true,
+        newRank: newRank,
+        rewardAmount: rewardAmount,
+        transactionId: rewardKey
+      };
+    } else {
+      return {
+        success: false,
+        error: 'Transaction failed - duplicate or insufficient data'
+      };
+    }
+    
+  } catch (error) {
+    console.error('Error processing rank upgrade:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================================
+// 🔥 CREATE NOTIFICATION
+// ============================================================
+async function createNotification(userId, newRank, rewardAmount) {
+  try {
+    const notificationRef = ref(db, `notifications/${userId}`);
+    const notificationId = 'notif_' + Date.now();
+    
+    const notification = {
+      id: notificationId,
+      type: 'rank_upgrade',
+      rank: newRank,
+      rewardAmount: rewardAmount,
+      message: `🎉 Congratulations! You have achieved ${newRank} rank. Your reward of $${rewardAmount} has been credited to your Deposit Wallet.`,
+      timestamp: Date.now(),
+      read: false,
+      status: 'sent'
+    };
+    
+    await set(ref(db, `notifications/${userId}/${notificationId}`), notification);
+    console.log(`✅ Notification created for ${userId}`);
+    
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+}
+
+// ============================================================
+// 🔥 UPDATE RANK EVALUATION (For tracking)
+// ============================================================
+async function updateRankEvaluation(userId, userData, personalBusiness, totalTeamBusiness) {
+  try {
+    await update(ref(db, `users/${userId}`), {
+      personalBusiness: personalBusiness,
+      teamBusiness: totalTeamBusiness,
+      lastRankEvaluation: Date.now()
+    });
+  } catch (error) {
+    console.error('Error updating rank evaluation:', error);
+  }
+}
+
+// ============================================================
+// 🔥 RANK UI UPDATE FUNCTION
+// ============================================================
+function updateRankUI(userData) {
+    const rank = userData.rank || 'Member';
+    const rankRewards = userData.rankRewards || {};
+    const personalBusiness = userData.personalBusiness || 0;
+    const teamBusiness = userData.teamBusiness || 0;
+    const qualifiedDirects = userData.qualifiedDirects || { 
+      executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] 
+    };
+    
+    // Update rank badge
+    const badge = document.getElementById('currentRankBadge');
+    if (badge) {
+        badge.textContent = rank;
+        badge.className = 'rank-badge ' + rank.toLowerCase().replace(/ /g, '-');
+    }
+    
+    // Calculate total rewards
+    let totalRewards = 0;
+    for (let key in rankRewards) {
+        totalRewards += (rankRewards[key].amount || 0);
+    }
+    const rewardElement = document.getElementById('totalRankRewards');
+    if (rewardElement) rewardElement.textContent = '$' + totalRewards.toFixed(2);
+    
+    // Update business values
+    const personalEl = document.getElementById('personalBusiness');
+    if (personalEl) personalEl.textContent = '$' + personalBusiness.toFixed(2);
+    
+    const teamEl = document.getElementById('teamBusiness');
+    if (teamEl) teamEl.textContent = '$' + teamBusiness.toFixed(2);
+    
+    // Update leg business
+    const leftLegEl = document.getElementById('leftLegBusiness');
+    if (leftLegEl) leftLegEl.textContent = '$' + (userData.leftLegBusiness || 0).toFixed(2);
+    
+    const rightLegEl = document.getElementById('rightLegBusiness');
+    if (rightLegEl) rightLegEl.textContent = '$' + (userData.rightLegBusiness || 0).toFixed(2);
+    
+    // Update qualified directs
+    const qualifiedEl = document.getElementById('qualifiedDirects');
+    if (qualifiedEl) {
+        let totalQualified = 0;
+        for (let key in qualifiedDirects) {
+            totalQualified += (qualifiedDirects[key] || []).length;
+        }
+        qualifiedEl.textContent = totalQualified + ' / 2';
+    }
+    
+    // Update progress steps
+    const rankOrder = ['Member', 'Executive', 'Senior Executive', 'Manager', 'Senior Manager', 'Diamond'];
+    const currentIndex = rankOrder.indexOf(rank);
+    
+    rankOrder.forEach((r, index) => {
+        const stepId = 'step' + r.replace(/ /g, '');
+        const stepEl = document.getElementById(stepId);
+        if (stepEl) {
+            stepEl.className = 'step';
+            if (index < currentIndex) {
+                stepEl.classList.add('completed');
+            } else if (index === currentIndex) {
+                stepEl.classList.add('active');
+            }
+        }
+    });
+    
+    // Update next rank
+    const nextRankMap = {
+        'Member': 'Executive',
+        'Executive': 'Senior Executive',
+        'Senior Executive': 'Manager',
+        'Manager': 'Senior Manager',
+        'Senior Manager': 'Diamond',
+        'Diamond': '🏆 Max Rank Achieved!'
+    };
+    const nextRankEl = document.getElementById('nextRank');
+    if (nextRankEl) nextRankEl.textContent = nextRankMap[rank] || '🏆 Max Rank Achieved!';
+    
+    // Update next reward
+    const rewardMap = {
+        'Executive': '$100',
+        'Senior Executive': '$200',
+        'Manager': '$500',
+        'Senior Manager': '$1,000',
+        'Diamond': '$2,500'
+    };
+    const nextRewardEl = document.getElementById('nextReward');
+    if (nextRewardEl) nextRewardEl.textContent = rewardMap[rank] || '🏆 Max Achieved';
+    
+    // Update progress bar
+    const progress = (currentIndex / (rankOrder.length - 1)) * 100;
+    const progressBar = document.getElementById('rankProgressBar');
+    if (progressBar) progressBar.style.width = Math.min(progress, 100) + '%';
+    
+    const progressPercent = document.getElementById('rankProgressPercent');
+    if (progressPercent) progressPercent.textContent = Math.min(Math.round(progress), 100) + '%';
+}
+
+// ============================================================
+// 🔥 TRIGGER RANK EVALUATION (On Business Change)
+// ============================================================
+async function triggerRankEvaluation(userId) {
+    try {
+        const lockSnap = await get(ref(db, `rankLocks/${userId}`));
+        if (lockSnap.exists()) return;
+        
+        const result = await evaluateUserRank(userId);
+        
+        if (result && result.success) {
+            await loadDashboardData(userId);
+            showToast(`🎉 Congratulations! You've achieved ${result.newRank} rank! Reward $${result.rewardAmount} credited.`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('Error triggering rank evaluation:', error);
+    }
+}
+
+// ============================================================
 // LOAD DASHBOARD DATA
 // ============================================================
 async function loadDashboardData(userId) {
@@ -1534,6 +2330,8 @@ async function loadDashboardData(userId) {
                         currentUserId = userId;
                         renderDashboard(recovered);
                         setupRealtimeListener(userId);
+                        // Trigger rank evaluation
+                        await triggerRankEvaluation(userId);
                         showToast('✅ Your data has been recovered successfully', 'success');
                     }
                 } else {
@@ -1545,6 +2343,8 @@ async function loadDashboardData(userId) {
                         currentUserId = userId;
                         renderDashboard(newUser);
                         setupRealtimeListener(userId);
+                        // Trigger rank evaluation for new user
+                        await triggerRankEvaluation(userId);
                     }
                 }
             }
@@ -1554,13 +2354,9 @@ async function loadDashboardData(userId) {
         
         const u = userSnap.val();
         
-        // Create backup before processing
         await createComprehensiveBackup(userId, 'dashboard_load');
-        
-        // Process daily release (with pending days)
         await processDailyRelease(userId);
         
-        // Check for pending commissions
         const packages = u.packages || {};
         for (let [key, pkg] of Object.entries(packages)) {
             if (pkg.status === 'active' && !pkg.commissionProcessed) {
@@ -1568,7 +2364,6 @@ async function loadDashboardData(userId) {
             }
         }
         
-        // Refresh user data after processing
         const updatedSnap = await get(ref(db, 'users/' + userId));
         const updatedData = updatedSnap.exists() ? updatedSnap.val() : u;
         const stats = calculateUserStats(updatedData);
@@ -1578,6 +2373,9 @@ async function loadDashboardData(userId) {
         
         renderDashboard(updatedData);
         setupRealtimeListener(userId);
+        
+        // Trigger rank evaluation after loading
+        await triggerRankEvaluation(userId);
         
     } catch (error) {
         console.error('Error loading dashboard:', error);

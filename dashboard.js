@@ -17,7 +17,7 @@ import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getDatabase, ref, get, update, runTransaction, onValue, set, query, orderByChild, equalTo, limitToLast } from "firebase/database";
 
 // ============================================================
-// 🔥 NEW FIREBASE CONFIG (rwebsite-e031b)
+// 🔥 FIREBASE CONFIG (rwebsite-e031b)
 // ============================================================
 const firebaseConfig = {
     apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -232,7 +232,7 @@ async function createComprehensiveBackup(userId, action) {
             referralCode: userData.referralCode,
             referredBy: userData.referredBy,
             createdAt: userData.createdAt,
-            rank: userData.rank,
+            rank: userData.rank || 'Member',
             depositWallet: userData.depositWallet || 0,
             referralWallet: userData.referralWallet || 0,
             rndWallet: userData.rndWallet || 0,
@@ -363,7 +363,7 @@ async function recoverUserData(userId, authUser) {
                     'transferHistory', 'commissionHistory', 'teamStructure',
                     'totalReferrals', 'teamBusiness', 'referralEarnings',
                     'level1Earnings', 'level2Earnings', 'level3Earnings',
-                    'level4Earnings', 'level5Earnings', 'lastReleaseDate'
+                    'level4Earnings', 'level5Earnings', 'lastReleaseDate', 'rank'
                 ];
                 
                 for (let field of mergeFields) {
@@ -405,6 +405,10 @@ async function recoverUserData(userId, authUser) {
                 recoveredData.commissionHistory = [];
             }
             
+            if (!recoveredData.rank) {
+                recoveredData.rank = 'Member';
+            }
+            
             // Verify packages
             const packages = recoveredData.packages || {};
             for (let key in packages) {
@@ -437,7 +441,9 @@ async function recoverUserData(userId, authUser) {
                 transferHistory: [],
                 commissionHistory: [],
                 teamStructure: { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 },
-                lastReleaseDate: null
+                lastReleaseDate: null,
+                rankHistory: {},
+                rankRewards: {}
             };
             
             for (let key in defaultFields) {
@@ -501,7 +507,9 @@ async function recoverUserData(userId, authUser) {
             transferHistory: [],
             commissionHistory: [],
             teamStructure: { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 },
-            lastReleaseDate: null
+            lastReleaseDate: null,
+            rankHistory: {},
+            rankRewards: {}
         };
         
         const urlParams = new URLSearchParams(window.location.search);
@@ -530,7 +538,7 @@ async function recoverUserData(userId, authUser) {
 }
 
 // ============================================================
-// PROCESS DAILY RELEASE (With Pending Days Calculation)
+// PROCESS DAILY RELEASE (With Pending Days Calculation) - FIXED
 // ============================================================
 async function processDailyRelease(userId) {
     if (releaseInProgress) {
@@ -1112,6 +1120,22 @@ function renderDashboard(u) {
     const currentRankIndex = rankOrder.indexOf(rank);
     const progressPercent = ((currentRankIndex) / (rankOrder.length - 1)) * 100;
 
+    // Calculate total rank rewards
+    const rankRewards = u.rankRewards || {};
+    let totalRankRewards = 0;
+    for (let key in rankRewards) {
+        totalRankRewards += (rankRewards[key].amount || 0);
+    }
+
+    // Get qualified directs count
+    const qualifiedDirects = u.qualifiedDirects || { 
+        executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] 
+    };
+    let totalQualified = 0;
+    for (let key in qualifiedDirects) {
+        totalQualified += (qualifiedDirects[key] || []).length;
+    }
+
     document.getElementById('dashboardContent').innerHTML = `
         <div class="row g-4">
             <div class="col-12">
@@ -1230,7 +1254,7 @@ function renderDashboard(u) {
                 </div>
             </div>
 
-            <!-- ====== RANK PROGRESS CARD - NEW ====== -->
+            <!-- ====== RANK PROGRESS CARD ====== -->
             <div class="col-12">
                 <div class="rank-progress-card">
                     <div class="rank-header">
@@ -1239,7 +1263,7 @@ function renderDashboard(u) {
                             <span class="rank-label">Current Rank</span>
                         </div>
                         <div>
-                            <span class="rank-reward" id="totalRankRewards">$${Object.values(u.rankRewards || {}).reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)}</span>
+                            <span class="rank-reward" id="totalRankRewards">$${totalRankRewards.toFixed(2)}</span>
                             <span class="rank-label">Total Rank Rewards</span>
                         </div>
                     </div>
@@ -1295,7 +1319,7 @@ function renderDashboard(u) {
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Qualified Directs</span>
-                            <span class="detail-value" id="qualifiedDirects">${Object.keys(u.qualifiedDirects || {}).reduce((sum, key) => sum + (u.qualifiedDirects[key] || []).length, 0)} / 2</span>
+                            <span class="detail-value" id="qualifiedDirects">${totalQualified} / 2</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Next Rank</span>
@@ -1602,7 +1626,7 @@ async function handleTransfer() {
 
 // ============================================================
 // ============================================================
-// 🔥 RANK SYSTEM - 2-LEG RANK & REWARD ENGINE (NEW)
+// 🔥 RANK SYSTEM - 2-LEG RANK & REWARD ENGINE
 // ============================================================
 // ============================================================
 
@@ -1683,7 +1707,6 @@ const RANK_CONFIG = {
 // ============================================================
 async function evaluateUserRank(userId) {
   try {
-    // Check if evaluation is already running
     const lockRef = ref(db, `rankLocks/${userId}`);
     const lockSnap = await get(lockRef);
     if (lockSnap.exists()) {
@@ -1691,11 +1714,9 @@ async function evaluateUserRank(userId) {
       return null;
     }
     
-    // Set lock
     await set(lockRef, { lockedAt: Date.now(), userId });
     
     try {
-      // Get user data
       const userSnap = await get(ref(db, `users/${userId}`));
       if (!userSnap.exists()) {
         console.log(`❌ User ${userId} not found`);
@@ -1706,17 +1727,11 @@ async function evaluateUserRank(userId) {
       const currentRank = userData.rank || 'Member';
       const currentRankOrder = RANK_CONFIG[currentRank.replace(/ /g, '_').toUpperCase()]?.order || 0;
       
-      // Calculate personal business
       const personalBusiness = userData.personalBusiness || userData.depositWallet || 0;
-      
-      // Get direct referrals (level 1)
       const directReferrals = await getDirectReferrals(userId);
-      
-      // Calculate team business and leg-wise business
       const { totalTeamBusiness, leftLegBusiness, rightLegBusiness, qualifiedDirects } = 
         await calculateTeamBusinessAndQualifiedDirects(userId, directReferrals);
       
-      // Determine highest eligible rank
       const eligibleRank = await determineHighestEligibleRank(
         userId,
         personalBusiness,
@@ -1733,7 +1748,6 @@ async function evaluateUserRank(userId) {
         return null;
       }
       
-      // Check if already processed this rank
       const rankKey = eligibleRank.replace(/ /g, '_').toUpperCase();
       const rewardKey = `${userId}_${rankKey}_RANK_REWARD`;
       const rewardCheck = await get(ref(db, `rankRewards/${rewardKey}`));
@@ -1743,7 +1757,6 @@ async function evaluateUserRank(userId) {
         return null;
       }
       
-      // Process rank upgrade
       const result = await processRankUpgrade(
         userId,
         userData,
@@ -1764,7 +1777,6 @@ async function evaluateUserRank(userId) {
       return null;
       
     } finally {
-      // Release lock
       await set(lockRef, null);
     }
     
@@ -1819,18 +1831,14 @@ async function calculateTeamBusinessAndQualifiedDirects(userId, directReferrals)
     diamond: []
   };
   
-  // Process each direct referral
   for (let i = 0; i < directReferrals.length; i++) {
     const direct = directReferrals[i];
     const directUid = direct.uid;
-    const directData = direct.data;
-    const directRank = directData.rank || 'Member';
+    const directRank = direct.rank || 'Member';
     
-    // Calculate business for this direct's entire team
     const teamBusiness = await calculateTeamBusinessForUser(directUid);
     totalTeamBusiness += teamBusiness;
     
-    // Determine leg (alternate for now, will use actual leg data)
     const isLeftLeg = i % 2 === 0;
     if (isLeftLeg) {
       leftLegBusiness += teamBusiness;
@@ -1838,7 +1846,6 @@ async function calculateTeamBusinessAndQualifiedDirects(userId, directReferrals)
       rightLegBusiness += teamBusiness;
     }
     
-    // Track qualified directs by rank
     if (directRank === 'Executive' || directRank === 'Senior Executive' || 
         directRank === 'Manager' || directRank === 'Senior Manager' || 
         directRank === 'Diamond') {
@@ -1907,7 +1914,6 @@ async function determineHighestEligibleRank(
   qualifiedDirects,
   currentRankOrder
 ) {
-  // Check ranks from highest to lowest
   const rankOrder = ['DIAMOND', 'SENIOR_MANAGER', 'MANAGER', 'SENIOR_EXECUTIVE', 'EXECUTIVE'];
   
   for (let rankKey of rankOrder) {
@@ -1915,19 +1921,16 @@ async function determineHighestEligibleRank(
     if (!config) continue;
     
     const rankOrderValue = config.order;
-    if (rankOrderValue <= currentRankOrder) continue; // Skip if already achieved
+    if (rankOrderValue <= currentRankOrder) continue;
     
-    // Check personal business requirement
     if (config.personalBusiness > 0 && personalBusiness < config.personalBusiness) {
       continue;
     }
     
-    // Check team business requirement
     if (config.teamBusiness > 0 && totalTeamBusiness < config.teamBusiness) {
       continue;
     }
     
-    // Check required direct rank
     if (config.requiredDirectRank) {
       const requiredRankKey = config.requiredDirectRank.replace(/ /g, '_').toLowerCase();
       const qualifiedList = qualifiedDirects[requiredRankKey] || [];
@@ -1936,7 +1939,6 @@ async function determineHighestEligibleRank(
         continue;
       }
       
-      // Check two-leg rule
       if (config.requiredLegs === 2) {
         const legQualified = await checkTwoLegQualification(userId, qualifiedList);
         if (!legQualified) {
@@ -1945,11 +1947,9 @@ async function determineHighestEligibleRank(
       }
     }
     
-    // All conditions met
     return config.name;
   }
   
-  // Check if Executive qualifies (special case)
   if (currentRankOrder < RANK_CONFIG.EXECUTIVE.order && personalBusiness >= RANK_CONFIG.EXECUTIVE.personalBusiness) {
     return 'Executive';
   }
@@ -1965,9 +1965,8 @@ async function checkTwoLegQualification(userId, qualifiedList) {
     if (qualifiedList.length < 2) return false;
     
     const directReferrals = await getDirectReferrals(userId);
-    
-    // Group qualified members by their direct parent
     const groups = {};
+    
     for (let qualifiedUid of qualifiedList) {
       for (let direct of directReferrals) {
         if (await isUserInChain(direct.uid, qualifiedUid)) {
@@ -2054,17 +2053,14 @@ async function processRankUpgrade(
     const result = await runTransaction(userRef, (currentData) => {
       if (!currentData) return currentData;
       
-      // Check if already processed
       const rankRewards = currentData.rankRewards || {};
       if (rankRewards[rankKey]) {
         return currentData;
       }
       
-      // Update rank
       const oldRank = currentData.rank || 'Member';
       currentData.rank = newRank;
       
-      // Update rank history
       const rankHistory = currentData.rankHistory || {};
       const historyId = 'history_' + Date.now();
       rankHistory[historyId] = {
@@ -2081,7 +2077,6 @@ async function processRankUpgrade(
       };
       currentData.rankHistory = rankHistory;
       
-      // Record reward
       const rankRewards = currentData.rankRewards || {};
       rankRewards[rankKey] = {
         rank: newRank,
@@ -2092,7 +2087,6 @@ async function processRankUpgrade(
       };
       currentData.rankRewards = rankRewards;
       
-      // Credit reward to deposit wallet
       if (rewardAmount > 0) {
         currentData.depositWallet = (currentData.depositWallet || 0) + rewardAmount;
         
@@ -2286,7 +2280,7 @@ function updateRankUI(userData) {
 }
 
 // ============================================================
-// 🔥 TRIGGER RANK EVALUATION (On Business Change)
+// 🔥 TRIGGER RANK EVALUATION
 // ============================================================
 async function triggerRankEvaluation(userId) {
     try {
@@ -2330,7 +2324,6 @@ async function loadDashboardData(userId) {
                         currentUserId = userId;
                         renderDashboard(recovered);
                         setupRealtimeListener(userId);
-                        // Trigger rank evaluation
                         await triggerRankEvaluation(userId);
                         showToast('✅ Your data has been recovered successfully', 'success');
                     }
@@ -2343,7 +2336,6 @@ async function loadDashboardData(userId) {
                         currentUserId = userId;
                         renderDashboard(newUser);
                         setupRealtimeListener(userId);
-                        // Trigger rank evaluation for new user
                         await triggerRankEvaluation(userId);
                     }
                 }
@@ -2373,8 +2365,6 @@ async function loadDashboardData(userId) {
         
         renderDashboard(updatedData);
         setupRealtimeListener(userId);
-        
-        // Trigger rank evaluation after loading
         await triggerRankEvaluation(userId);
         
     } catch (error) {

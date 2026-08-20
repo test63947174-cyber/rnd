@@ -899,7 +899,6 @@ function renderDashboard(u) {
     const currentRankIndex = rankOrder.indexOf(rank);
     const progressPercent = ((currentRankIndex) / (rankOrder.length - 1)) * 100;
 
-    const rankRewards = u.rankRewards || {};
     let totalRankRewards = 0;
     for (let key in rankRewards) {
         totalRankRewards += (rankRewards[key].amount || 0);

@@ -1684,8 +1684,6 @@ async function processRankUpgrade(userId, userData, newRank, personalBusiness, t
       };
       currentData.rankHistory = rankHistory;
       
-      const rankRewards = currentData.rankRewards || {};
-      rankRewards[rankKey] = {
         rank: newRank,
         amount: rewardAmount,
         status: 'credited',

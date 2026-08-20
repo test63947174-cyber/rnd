@@ -1,15 +1,6 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (PRODUCTION READY v6)
-// WITH 2-LEG RANK & REWARD SYSTEM
-// ============================================================
-// 📌 ALL BUSINESS LOGIC HERE:
-// Firebase Init | Auth | Login | Logout | Dashboard Load
-// Wallet | Referral | Team | Transactions | Packages
-// Transfer (UPDATED - UID + Username + Referral Code Search)
-// Daily Release (Pending Days) | Commission (Duplicate Proof)
-// Backup (Comprehensive) | Recovery (Referral Chain Verify)
-// Validation | Security | Real-time Listener (Debounced)
-// RANK SYSTEM: 2-Leg Rank & Reward Automation
+// RND STAKING PLATFORM - DASHBOARD.JS (FIXED v6.1)
+// WITH 2-LEG RANK & REWARD SYSTEM - DEBUGGED
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -33,11 +24,25 @@ const firebaseConfig = {
 const DOMAIN = "https://staking.randigital.in";
 const REGISTER_URL = `${DOMAIN}/register.html`;
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+// Initialize Firebase
+let app, auth, db;
 
-console.log('✅ Firebase initialized with NEW config (rwebsite-e031b)');
+try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getDatabase(app);
+    console.log('✅ Firebase initialized successfully');
+} catch (error) {
+    console.error('❌ Firebase initialization error:', error);
+    document.getElementById('dashboardContent').innerHTML = `
+        <div class="text-center py-5">
+            <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+            <h4>Firebase Connection Error</h4>
+            <p class="text-muted">${error.message}</p>
+            <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Retry</button>
+        </div>
+    `;
+}
 
 // ============================================================
 // GLOBAL VARIABLES
@@ -57,6 +62,7 @@ let updateTimer = null;
 // ============================================================
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast-custom ${type}`;
     const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
@@ -98,39 +104,49 @@ function getDaysBetween(date1, date2) {
 // ============================================================
 // SIDEBAR CONTROLS
 // ============================================================
-const sidebarPanel = document.getElementById('sidebarPanel');
-const sidebarOverlay = document.getElementById('sidebarOverlay');
-const sidebarToggle = document.getElementById('sidebarToggle');
-const sidebarClose = document.getElementById('sidebarClose');
+function initSidebar() {
+    const sidebarPanel = document.getElementById('sidebarPanel');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarClose = document.getElementById('sidebarClose');
+    const logoutBtn = document.getElementById('logoutBtnSidebar');
 
-function openSidebar() {
-    sidebarPanel.classList.add('open');
-    sidebarOverlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    if (!sidebarPanel || !sidebarToggle) return;
+
+    function openSidebar() {
+        if (sidebarPanel) sidebarPanel.classList.add('open');
+        if (sidebarOverlay) sidebarOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+        if (sidebarPanel) sidebarPanel.classList.remove('open');
+        if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    sidebarToggle.addEventListener('click', openSidebar);
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (auth) {
+                await signOut(auth);
+                window.location.href = 'login.html';
+            }
+        });
+    }
 }
-
-function closeSidebar() {
-    sidebarPanel.classList.remove('open');
-    sidebarOverlay.classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-sidebarToggle.addEventListener('click', openSidebar);
-sidebarClose.addEventListener('click', closeSidebar);
-sidebarOverlay.addEventListener('click', closeSidebar);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
-
-document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
-    e.preventDefault();
-    await signOut(auth);
-    window.location.href = 'login.html';
-});
 
 // ============================================================
 // FETCH LIVE RATE
 // ============================================================
 async function fetchLiveRate() {
     try {
+        if (!db) return 1.00;
         const settingsRef = ref(db, 'settings/rate');
         const snapshot = await get(settingsRef);
         if (snapshot.exists()) {
@@ -144,27 +160,26 @@ async function fetchLiveRate() {
         }
     } catch (error) {
         console.error('Error fetching rate:', error);
+        rndPrice = 1.00;
     }
     return rndPrice;
 }
 
 // ============================================================
-// 🔥 GET USER BY USERNAME, UID OR REFERRAL CODE (UPDATED)
+// 🔥 GET USER BY USERNAME, UID OR REFERRAL CODE
 // ============================================================
 async function getUserByIdentifier(identifier) {
     try {
-        if (!identifier) return null;
+        if (!identifier || !db) return null;
         
         const usersRef = ref(db, 'users');
         
-        // 1. Try by UID (Direct lookup)
         const uidSnap = await get(ref(db, 'users/' + identifier));
         if (uidSnap.exists()) {
             const data = uidSnap.val();
             return { uid: identifier, data: data, source: 'uid' };
         }
         
-        // 2. Try by Username
         const usernameQuery = query(usersRef, orderByChild('username'), equalTo(identifier));
         const usernameSnap = await get(usernameQuery);
         if (usernameSnap.exists()) {
@@ -173,7 +188,6 @@ async function getUserByIdentifier(identifier) {
             return { uid: uid, data: data[uid], source: 'username' };
         }
         
-        // 3. Try by Referral Code
         const referralQuery = query(usersRef, orderByChild('referralCode'), equalTo(identifier));
         const referralSnap = await get(referralQuery);
         if (referralSnap.exists()) {
@@ -190,10 +204,11 @@ async function getUserByIdentifier(identifier) {
 }
 
 // ============================================================
-// BACKUP SYSTEM (Comprehensive)
+// BACKUP SYSTEM
 // ============================================================
 async function createBackup(userId, action, data) {
     try {
+        if (!db) return null;
         const backupId = generateBackupId();
         const backupRef = ref(db, `backups/${userId}/${backupId}`);
         
@@ -217,6 +232,7 @@ async function createBackup(userId, action, data) {
 
 async function createComprehensiveBackup(userId, action) {
     try {
+        if (!db) return null;
         const userSnap = await get(ref(db, 'users/' + userId));
         if (!userSnap.exists()) {
             console.log('⚠️ User data not found for backup');
@@ -266,60 +282,16 @@ async function createComprehensiveBackup(userId, action) {
     }
 }
 
-async function getLatestBackup(userId) {
-    try {
-        const backupsRef = ref(db, `backups/${userId}`);
-        const queryRef = query(backupsRef, orderByChild('timestamp'), limitToLast(1));
-        const snapshot = await get(queryRef);
-        
-        if (!snapshot.exists()) return null;
-        
-        const data = snapshot.val();
-        const backupId = Object.keys(data)[0];
-        return { backupId: backupId, data: data[backupId] };
-    } catch (error) {
-        console.error('Error getting latest backup:', error);
-        return null;
-    }
-}
-
 // ============================================================
-// CHECK USER EXISTENCE (With Recovery Check)
+// CHECK USER EXISTENCE
 // ============================================================
 async function checkUserExists(userId) {
     try {
+        if (!db) return { exists: false };
         const userSnap = await get(ref(db, 'users/' + userId));
         if (userSnap.exists()) {
             return { exists: true, data: userSnap.val(), source: 'main' };
         }
-        
-        const backupSnap = await get(ref(db, 'backups/' + userId));
-        if (backupSnap.exists()) {
-            const backups = backupSnap.val();
-            const keys = Object.keys(backups);
-            if (keys.length > 0) {
-                const latestKey = keys.reduce((a, b) => {
-                    return backups[a].timestamp > backups[b].timestamp ? a : b;
-                });
-                return { exists: true, data: backups[latestKey].data, source: 'backup', backupId: latestKey };
-            }
-        }
-        
-        const txSnap = await get(ref(db, 'users/' + userId + '/transactions'));
-        if (txSnap.exists()) {
-            return { exists: true, data: { transactions: txSnap.val() }, source: 'transactions' };
-        }
-        
-        const pkgSnap = await get(ref(db, 'users/' + userId + '/packages'));
-        if (pkgSnap.exists()) {
-            return { exists: true, data: { packages: pkgSnap.val() }, source: 'packages' };
-        }
-        
-        const refSnap = await get(ref(db, 'referrals/' + userId));
-        if (refSnap.exists()) {
-            return { exists: true, data: { referral: refSnap.val() }, source: 'referral' };
-        }
-        
         return { exists: false };
     } catch (error) {
         console.error('Error checking user existence:', error);
@@ -328,7 +300,7 @@ async function checkUserExists(userId) {
 }
 
 // ============================================================
-// RECOVER USER DATA (With Referral Chain Verification)
+// RECOVER USER DATA
 // ============================================================
 async function recoverUserData(userId, authUser) {
     try {
@@ -338,90 +310,20 @@ async function recoverUserData(userId, authUser) {
         
         if (checkResult.exists) {
             console.log('✅ Found existing data from:', checkResult.source);
-            
-            let recoveredData = {};
-            
-            const userSnap = await get(ref(db, 'users/' + userId));
-            if (userSnap.exists()) {
-                recoveredData = userSnap.val();
-                console.log('✅ Main user data found');
-            }
-            
-            if (checkResult.source === 'backup' && checkResult.data) {
-                const backupData = checkResult.data;
-                
-                const protectedFields = ['referralCode', 'referredBy', 'uid', 'createdAt'];
-                for (let field of protectedFields) {
-                    if (backupData[field]) {
-                        recoveredData[field] = backupData[field];
-                    }
-                }
-                
-                const mergeFields = [
-                    'depositWallet', 'referralWallet', 'rndWallet', 'lockedRND',
-                    'releaseWallet', 'totalReleased', 'packages', 'transactions',
-                    'transferHistory', 'commissionHistory', 'teamStructure',
-                    'totalReferrals', 'teamBusiness', 'referralEarnings',
-                    'level1Earnings', 'level2Earnings', 'level3Earnings',
-                    'level4Earnings', 'level5Earnings', 'lastReleaseDate', 'rank'
-                ];
-                
-                for (let field of mergeFields) {
-                    if (backupData[field] !== undefined && backupData[field] !== null) {
-                        if (typeof backupData[field] === 'object' && !Array.isArray(backupData[field])) {
-                            recoveredData[field] = { ...(recoveredData[field] || {}), ...backupData[field] };
-                        } else {
-                            recoveredData[field] = backupData[field];
-                        }
-                    }
-                }
-                
-                console.log('✅ Restored from backup with referral chain preserved');
-            }
-            
-            // ============================================================
-            // CRITICAL: Verify Referral Chain
-            // ============================================================
-            if (recoveredData.referralCode) {
-                console.log('✅ Referral Code preserved:', recoveredData.referralCode);
-            } else {
-                console.warn('⚠️ Referral Code missing, generating new one');
-                recoveredData.referralCode = userId.substring(0, 8).toUpperCase();
-            }
-            
-            if (recoveredData.referredBy) {
-                console.log('✅ Referred By preserved:', recoveredData.referredBy);
-                const referrer = await getUserByIdentifier(recoveredData.referredBy);
-                if (!referrer) {
-                    console.warn('⚠️ Referrer not found, keeping referral code anyway');
-                }
-            }
-            
-            if (!recoveredData.teamStructure) {
-                recoveredData.teamStructure = { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
-            }
-            
-            if (!recoveredData.commissionHistory) {
-                recoveredData.commissionHistory = [];
-            }
+            let recoveredData = checkResult.data || {};
             
             if (!recoveredData.rank) {
                 recoveredData.rank = 'Member';
             }
-            
-            // Verify packages
-            const packages = recoveredData.packages || {};
-            for (let key in packages) {
-                const pkg = packages[key];
-                if (pkg.status === 'completed' && pkg.commissionProcessed === undefined) {
-                    pkg.commissionProcessed = true;
-                }
+            if (!recoveredData.rankHistory) {
+                recoveredData.rankHistory = {};
             }
-            recoveredData.packages = packages;
-            
-            if (!recoveredData.uid) recoveredData.uid = userId;
-            if (!recoveredData.email) recoveredData.email = authUser.email || '';
-            if (!recoveredData.name) recoveredData.name = authUser.displayName || 'User';
+            if (!recoveredData.rankRewards) {
+                recoveredData.rankRewards = {};
+            }
+            if (!recoveredData.qualifiedDirects) {
+                recoveredData.qualifiedDirects = { executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] };
+            }
             
             const defaultFields = {
                 username: authUser.email ? authUser.email.split('@')[0] : 'user_' + userId.substring(0, 8),
@@ -443,7 +345,8 @@ async function recoverUserData(userId, authUser) {
                 teamStructure: { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 },
                 lastReleaseDate: null,
                 rankHistory: {},
-                rankRewards: {}
+                rankRewards: {},
+                qualifiedDirects: { executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] }
             };
             
             for (let key in defaultFields) {
@@ -452,32 +355,16 @@ async function recoverUserData(userId, authUser) {
                 }
             }
             
-            const updateData = {};
-            for (let key in recoveredData) {
-                if (recoveredData[key] !== undefined && recoveredData[key] !== null) {
-                    updateData[key] = recoveredData[key];
-                }
+            if (!recoveredData.uid) recoveredData.uid = userId;
+            if (!recoveredData.email) recoveredData.email = authUser.email || '';
+            if (!recoveredData.name) recoveredData.name = authUser.displayName || 'User';
+            if (!recoveredData.referralCode) {
+                recoveredData.referralCode = userId.substring(0, 8).toUpperCase();
             }
             
-            await update(ref(db, 'users/' + userId), updateData);
-            console.log('✅ User data recovered successfully with referral chain intact');
-            
+            await update(ref(db, 'users/' + userId), recoveredData);
+            console.log('✅ User data recovered successfully');
             return recoveredData;
-        }
-        
-        // Check if email exists in any user record (prevent duplicate)
-        const email = authUser.email;
-        if (email) {
-            const usersSnap = await get(ref(db, 'users'));
-            if (usersSnap.exists()) {
-                const users = usersSnap.val();
-                for (let uid in users) {
-                    if (users[uid].email === email && uid !== userId) {
-                        console.warn('⚠️ Email already exists with different UID:', uid);
-                        return null;
-                    }
-                }
-            }
         }
         
         console.log('🆕 Creating new user record for:', userId);
@@ -509,26 +396,12 @@ async function recoverUserData(userId, authUser) {
             teamStructure: { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 },
             lastReleaseDate: null,
             rankHistory: {},
-            rankRewards: {}
+            rankRewards: {},
+            qualifiedDirects: { executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] }
         };
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const refCode = urlParams.get('ref');
-        if (refCode) {
-            const refResult = await getUserByIdentifier(refCode);
-            if (refResult && refResult.uid !== userId) {
-                newUserData.referredBy = refCode;
-                await runTransaction(ref(db, 'users/' + refResult.uid), (currentData) => {
-                    if (!currentData) return currentData;
-                    currentData.totalReferrals = (currentData.totalReferrals || 0) + 1;
-                    return currentData;
-                });
-            }
-        }
         
         await set(ref(db, 'users/' + userId), newUserData);
         console.log('✅ New user created successfully');
-        
         return newUserData;
         
     } catch (error) {
@@ -538,7 +411,7 @@ async function recoverUserData(userId, authUser) {
 }
 
 // ============================================================
-// PROCESS DAILY RELEASE (With Pending Days Calculation) - FIXED
+// PROCESS DAILY RELEASE (Simplified)
 // ============================================================
 async function processDailyRelease(userId) {
     if (releaseInProgress) {
@@ -549,6 +422,7 @@ async function processDailyRelease(userId) {
     releaseInProgress = true;
     
     try {
+        if (!db) return null;
         const userRef = ref(db, 'users/' + userId);
         const today = getTodayDate();
         
@@ -557,7 +431,6 @@ async function processDailyRelease(userId) {
             
             const lastReleaseDate = currentData.lastReleaseDate || '';
             
-            // Calculate pending days
             let pendingDays = 0;
             if (lastReleaseDate) {
                 const daysDiff = getDaysBetween(lastReleaseDate, today);
@@ -567,14 +440,9 @@ async function processDailyRelease(userId) {
                 pendingDays = Math.max(0, daysDiff - 1);
             }
             
-            if (!lastReleaseDate) {
-                pendingDays = 0;
-            }
-            
             const packages = currentData.packages || {};
             let updatedPackages = {};
             let releaseTransactions = [];
-            let totalReleaseToday = 0;
             let totalReleaseAmountAll = 0;
             let hasActivePackages = false;
             
@@ -610,7 +478,6 @@ async function processDailyRelease(userId) {
                 }
                 
                 updatedPackages[pkgKey] = pkg;
-                totalReleaseToday += todayReleaseAmount;
                 totalReleaseAmountAll += totalReleaseAmount;
                 
                 releaseTransactions.push({
@@ -624,21 +491,6 @@ async function processDailyRelease(userId) {
                     status: 'completed',
                     description: `Daily release of ${todayReleaseAmount.toFixed(4)} RND from ${pkg.planName || 'Package'}`
                 });
-                
-                if (pendingDays > 0) {
-                    const pendingAmount = totalReleaseAmount - todayReleaseAmount;
-                    releaseTransactions.push({
-                        type: 'pending_release',
-                        amount: pendingAmount,
-                        currency: 'RND',
-                        packageId: pkgKey,
-                        planName: pkg.planName || 'Package',
-                        timestamp: Date.now(),
-                        date: today,
-                        status: 'completed',
-                        description: `Pending release of ${pendingAmount.toFixed(4)} RND from ${pkg.planName || 'Package'} (${pendingDays} days pending)`
-                    });
-                }
             }
             
             if (!hasActivePackages || totalReleaseAmountAll === 0) {
@@ -664,8 +516,6 @@ async function processDailyRelease(userId) {
         if (result.committed && result.snapshot.exists()) {
             const data = result.snapshot.val();
             console.log('✅ Daily release processed successfully');
-            // Trigger rank evaluation after release
-            await triggerRankEvaluation(userId);
             return data;
         }
         return null;
@@ -678,7 +528,7 @@ async function processDailyRelease(userId) {
 }
 
 // ============================================================
-// PROCESS REFERRAL COMMISSION (Duplicate Proof with Lock)
+// PROCESS REFERRAL COMMISSION (Simplified)
 // ============================================================
 async function processReferralCommission(userId, packageId, packageData) {
     if (commissionInProgress) {
@@ -689,6 +539,7 @@ async function processReferralCommission(userId, packageId, packageData) {
     commissionInProgress = true;
     
     try {
+        if (!db) return null;
         if (packageData.commissionProcessed === true) {
             console.log('⚠️ Commission already processed for package:', packageId);
             return null;
@@ -698,130 +549,90 @@ async function processReferralCommission(userId, packageId, packageData) {
             return null;
         }
         
-        // Lock the package to prevent duplicate processing
-        const lockRef = ref(db, `processing_locks/${packageId}`);
-        const lockSnap = await get(lockRef);
-        
-        if (lockSnap.exists()) {
-            console.log('⚠️ Package is being processed by another instance:', packageId);
+        const userSnapshot = await get(ref(db, 'users/' + userId));
+        if (!userSnapshot.exists()) {
+            console.log('❌ User not found for commission:', userId);
             return null;
         }
         
-        await set(lockRef, {
-            lockedAt: Date.now(),
-            userId: userId,
-            packageId: packageId
+        const userData = userSnapshot.val();
+        const referralCode = userData.referralCode;
+        const packageAmount = packageData.usdtAmount || 0;
+        
+        if (packageAmount <= 0) {
+            console.log('⚠️ Package amount is 0, skipping commission');
+            return null;
+        }
+        
+        const commissionLevels = [
+            { level: 1, percent: 0.08 },
+            { level: 2, percent: 0.04 },
+            { level: 3, percent: 0.02 },
+            { level: 4, percent: 0.01 },
+            { level: 5, percent: 0.01 }
+        ];
+        
+        let currentRefCode = referralCode;
+        let level = 1;
+        
+        while (currentRefCode && level <= 5) {
+            const refResult = await getUserByIdentifier(currentRefCode);
+            
+            if (!refResult || refResult.uid === userId) break;
+            
+            const referrerData = refResult.data;
+            const uid = refResult.uid;
+            
+            const commissionPercent = commissionLevels.find(l => l.level === level)?.percent || 0;
+            const commissionAmount = packageAmount * commissionPercent;
+            
+            if (commissionAmount > 0) {
+                const referrerRef = ref(db, 'users/' + uid);
+                await runTransaction(referrerRef, (currentData) => {
+                    if (!currentData) return currentData;
+                    
+                    currentData.referralWallet = (currentData.referralWallet || 0) + commissionAmount;
+                    const levelKey = `level${level}Earnings`;
+                    currentData[levelKey] = (currentData[levelKey] || 0) + commissionAmount;
+                    currentData.referralEarnings = (currentData.referralEarnings || 0) + commissionAmount;
+                    currentData.teamBusiness = (currentData.teamBusiness || 0) + packageAmount;
+                    
+                    const commissionHistory = currentData.commissionHistory || [];
+                    const existing = commissionHistory.find(h => 
+                        h.packageId === packageId && h.level === level && h.fromUser === (userData.username || userData.referralCode || userId)
+                    );
+                    
+                    if (!existing) {
+                        commissionHistory.push({
+                            type: 'referral_commission',
+                            level: level,
+                            percent: commissionPercent * 100,
+                            amount: commissionAmount,
+                            fromUser: userData.username || userData.referralCode || userId,
+                            fromUid: userId,
+                            packageId: packageId,
+                            timestamp: Date.now(),
+                            date: getTodayDate(),
+                            description: `${commissionPercent * 100}% commission from Level ${level} referral`
+                        });
+                        currentData.commissionHistory = commissionHistory;
+                    }
+                    
+                    return currentData;
+                });
+            }
+            
+            currentRefCode = referrerData.referredBy || null;
+            level++;
+        }
+        
+        await update(ref(db, 'users/' + userId + '/packages/' + packageId), {
+            commissionProcessed: true,
+            commissionProcessedAt: Date.now()
         });
         
-        try {
-            const userSnapshot = await get(ref(db, 'users/' + userId));
-            if (!userSnapshot.exists()) {
-                console.log('❌ User not found for commission:', userId);
-                return null;
-            }
-            
-            const userData = userSnapshot.val();
-            const referralCode = userData.referralCode;
-            const packageAmount = packageData.usdtAmount || 0;
-            
-            if (packageAmount <= 0) {
-                console.log('⚠️ Package amount is 0, skipping commission');
-                return null;
-            }
-            
-            const commissionLevels = [
-                { level: 1, percent: 0.08 },
-                { level: 2, percent: 0.04 },
-                { level: 3, percent: 0.02 },
-                { level: 4, percent: 0.01 },
-                { level: 5, percent: 0.01 }
-            ];
-            
-            let currentRefCode = referralCode;
-            let level = 1;
-            let commissionProcessed = false;
-            
-            while (currentRefCode && level <= 5) {
-                const refResult = await getUserByIdentifier(currentRefCode);
-                
-                if (!refResult || refResult.uid === userId) break;
-                
-                const referrerData = refResult.data;
-                const uid = refResult.uid;
-                
-                const commissionPercent = commissionLevels.find(l => l.level === level)?.percent || 0;
-                const commissionAmount = packageAmount * commissionPercent;
-                
-                if (commissionAmount > 0) {
-                    const referrerRef = ref(db, 'users/' + uid);
-                    await runTransaction(referrerRef, (currentData) => {
-                        if (!currentData) return currentData;
-                        
-                        currentData.referralWallet = (currentData.referralWallet || 0) + commissionAmount;
-                        const levelKey = `level${level}Earnings`;
-                        currentData[levelKey] = (currentData[levelKey] || 0) + commissionAmount;
-                        currentData.referralEarnings = (currentData.referralEarnings || 0) + commissionAmount;
-                        currentData.teamBusiness = (currentData.teamBusiness || 0) + packageAmount;
-                        
-                        const commissionHistory = currentData.commissionHistory || [];
-                        const existing = commissionHistory.find(h => 
-                            h.packageId === packageId && h.level === level && h.fromUser === (userData.username || userData.referralCode || userId)
-                        );
-                        
-                        if (!existing) {
-                            commissionHistory.push({
-                                type: 'referral_commission',
-                                level: level,
-                                percent: commissionPercent * 100,
-                                amount: commissionAmount,
-                                fromUser: userData.username || userData.referralCode || userId,
-                                fromUid: userId,
-                                packageId: packageId,
-                                timestamp: Date.now(),
-                                date: getTodayDate(),
-                                description: `${commissionPercent * 100}% commission from Level ${level} referral`
-                            });
-                            currentData.commissionHistory = commissionHistory;
-                            
-                            const transactions = currentData.transactions || {};
-                            transactions[generateTxId()] = {
-                                type: 'referral_commission',
-                                amount: commissionAmount,
-                                currency: 'USDT',
-                                level: level,
-                                percent: commissionPercent * 100,
-                                fromUser: userData.username || userData.referralCode || userId,
-                                fromUid: userId,
-                                timestamp: Date.now(),
-                                date: getTodayDate(),
-                                status: 'completed',
-                                description: `Received ${commissionPercent * 100}% commission ($${commissionAmount.toFixed(2)}) from Level ${level} referral`
-                            };
-                            currentData.transactions = transactions;
-                        }
-                        
-                        return currentData;
-                    });
-                    commissionProcessed = true;
-                }
-                
-                currentRefCode = referrerData.referredBy || null;
-                level++;
-            }
-            
-            await update(ref(db, 'users/' + userId + '/packages/' + packageId), {
-                commissionProcessed: true,
-                commissionProcessedAt: Date.now()
-            });
-            
-            console.log('✅ Commission processed for package ' + packageId);
-            // Trigger rank evaluation after commission
-            await triggerRankEvaluation(userId);
-            return true;
-            
-        } finally {
-            await set(lockRef, null);
-        }
+        console.log('✅ Commission processed for package ' + packageId);
+        return true;
         
     } catch (error) {
         console.error('❌ Error processing commission:', error);
@@ -863,10 +674,11 @@ function calculateUserStats(userData) {
 }
 
 // ============================================================
-// 🔥 ATOMIC TRANSFER (UPDATED - UID + Username + Referral Code Search)
+// 🔥 ATOMIC TRANSFER
 // ============================================================
 async function atomicTransfer(senderUid, recipientUid, recipientData, amount, walletType, currency, senderUsername, senderUidForHistory) {
     if (amount <= 0) return { success: false, error: 'Invalid amount' };
+    if (!db) return { success: false, error: 'Database not initialized' };
     
     const senderRef = ref(db, 'users/' + senderUid);
     const timestamp = Date.now();
@@ -875,9 +687,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
     
     const recipientUsername = recipientData.username || recipientData.referralCode || recipientUid;
     const recipientUidForHistory = recipientUid;
-    
-    await createComprehensiveBackup(senderUid, 'transfer_sender');
-    await createComprehensiveBackup(recipientUid, 'transfer_recipient');
     
     const senderResult = await runTransaction(senderRef, (currentData) => {
         if (!currentData) return currentData;
@@ -901,21 +710,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
             status: 'completed'
         });
         currentData.transferHistory = transferHistory;
-        
-        const transactions = currentData.transactions || {};
-        transactions[txId] = {
-            type: 'transfer_sent',
-            amount: amount,
-            currency: currency,
-            to: recipientUsername,
-            toUid: recipientUidForHistory,
-            from: senderUsername,
-            fromUid: senderUidForHistory || senderUid,
-            timestamp: timestamp,
-            date: date,
-            status: 'completed'
-        };
-        currentData.transactions = transactions;
         
         return currentData;
     });
@@ -944,21 +738,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         });
         currentData.transferHistory = transferHistory;
         
-        const transactions = currentData.transactions || {};
-        transactions[txId] = {
-            type: 'transfer_received',
-            amount: amount,
-            currency: currency,
-            from: senderUsername,
-            fromUid: senderUidForHistory || senderUid,
-            to: recipientUsername,
-            toUid: recipientUidForHistory,
-            timestamp: timestamp,
-            date: date,
-            status: 'completed'
-        };
-        currentData.transactions = transactions;
-        
         return currentData;
     });
     
@@ -966,11 +745,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         await runTransaction(senderRef, (currentData) => {
             if (!currentData) return currentData;
             currentData[walletType] = (currentData[walletType] || 0) + amount;
-            const transactions = currentData.transactions || {};
-            if (transactions[txId]) {
-                transactions[txId].status = 'rolled_back';
-            }
-            currentData.transactions = transactions;
             return currentData;
         });
         return { success: false, error: 'Recipient update failed, funds returned' };
@@ -980,7 +754,7 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
 }
 
 // ============================================================
-// REAL-TIME LISTENER (Debounced - No Duplicate)
+// REAL-TIME LISTENER
 // ============================================================
 function setupRealtimeListener(userId) {
     if (listenerOff) {
@@ -991,6 +765,8 @@ function setupRealtimeListener(userId) {
         clearTimeout(listenerTimeout);
         listenerTimeout = null;
     }
+    
+    if (!db) return;
     
     const packagesRef = ref(db, 'users/' + userId + '/packages');
     let updateTimer = null;
@@ -1009,7 +785,6 @@ function setupRealtimeListener(userId) {
                 currentUserData.packages = packages;
                 const stats = calculateUserStats(currentUserData);
                 updateDashboardUI(currentUserData, stats);
-                // Update rank UI when packages change
                 updateRankUI(currentUserData);
             }
             updateTimer = null;
@@ -1018,7 +793,7 @@ function setupRealtimeListener(userId) {
 }
 
 // ============================================================
-// UPDATE DASHBOARD UI (Safe - No Database Writes)
+// UPDATE DASHBOARD UI
 // ============================================================
 function updateDashboardUI(u, stats) {
     const elements = {
@@ -1058,6 +833,8 @@ function updateDashboardUI(u, stats) {
 // RENDER DASHBOARD
 // ============================================================
 function renderDashboard(u) {
+    console.log('🔄 Rendering dashboard...');
+    
     const username = u.username || u.referralCode || 'USER';
     const name = u.name || 'User';
     const rank = u.rank || 'Member';
@@ -1102,11 +879,14 @@ function renderDashboard(u) {
         }
     }
     
-    document.getElementById('sidebarName').textContent = name;
-    document.getElementById('sidebarUserId').textContent = 'ID: ' + username.substring(0, 20) + '...';
-    document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
-    
+    const sidebarName = document.getElementById('sidebarName');
+    const sidebarUserId = document.getElementById('sidebarUserId');
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
     const badge = document.getElementById('referralBadge');
+    
+    if (sidebarName) sidebarName.textContent = name;
+    if (sidebarUserId) sidebarUserId.textContent = 'ID: ' + username.substring(0, 20) + '...';
+    if (sidebarAvatar) sidebarAvatar.textContent = name.charAt(0).toUpperCase();
     if (badge) badge.textContent = directReferrals;
     
     const referralLink = `${REGISTER_URL}?ref=${u.referralCode}`;
@@ -1115,19 +895,16 @@ function renderDashboard(u) {
     const transferHistory = u.transferHistory || [];
     const sortedHistory = [...transferHistory].reverse().slice(0, 5);
 
-    // Calculate rank progress
     const rankOrder = ['Member', 'Executive', 'Senior Executive', 'Manager', 'Senior Manager', 'Diamond'];
     const currentRankIndex = rankOrder.indexOf(rank);
     const progressPercent = ((currentRankIndex) / (rankOrder.length - 1)) * 100;
 
-    // Calculate total rank rewards
     const rankRewards = u.rankRewards || {};
     let totalRankRewards = 0;
     for (let key in rankRewards) {
         totalRankRewards += (rankRewards[key].amount || 0);
     }
 
-    // Get qualified directs count
     const qualifiedDirects = u.qualifiedDirects || { 
         executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] 
     };
@@ -1136,7 +913,10 @@ function renderDashboard(u) {
         totalQualified += (qualifiedDirects[key] || []).length;
     }
 
-    document.getElementById('dashboardContent').innerHTML = `
+    const dashboardContent = document.getElementById('dashboardContent');
+    if (!dashboardContent) return;
+
+    dashboardContent.innerHTML = `
         <div class="row g-4">
             <div class="col-12">
                 <div class="welcome-section">
@@ -1519,12 +1299,14 @@ function renderDashboard(u) {
         });
     });
     
-    document.getElementById('transferForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await handleTransfer();
-    });
+    const transferForm = document.getElementById('transferForm');
+    if (transferForm) {
+        transferForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await handleTransfer();
+        });
+    }
     
-    // Update rank UI after render
     updateRankUI(u);
 }
 
@@ -1546,12 +1328,12 @@ window.copyUserId = function(username) {
 };
 
 // ============================================================
-// 🔥 TRANSFER HANDLER (UPDATED)
+// 🔥 TRANSFER HANDLER
 // ============================================================
 async function handleTransfer() {
-    const recipientIdentifier = document.getElementById('transferUserId').value.trim();
-    const amount = parseFloat(document.getElementById('transferAmount').value);
-    const walletType = document.getElementById('transferWallet').value;
+    const recipientIdentifier = document.getElementById('transferUserId')?.value.trim();
+    const amount = parseFloat(document.getElementById('transferAmount')?.value);
+    const walletType = document.getElementById('transferWallet')?.value;
     const btn = document.querySelector('#transferForm button[type="submit"]');
     
     if (!recipientIdentifier) { showToast('❌ Please enter recipient User ID, Username or Referral Code', 'error'); return; }
@@ -1559,6 +1341,7 @@ async function handleTransfer() {
     
     const user = auth.currentUser;
     if (!user) { showToast('❌ Please login first', 'error'); return; }
+    if (!db) { showToast('❌ Database not initialized', 'error'); return; }
     
     const senderSnap = await get(ref(db, 'users/' + user.uid));
     if (!senderSnap.exists()) { showToast('❌ User data not found', 'error'); return; }
@@ -1591,8 +1374,10 @@ async function handleTransfer() {
     
     const currency = walletType === 'rndWallet' ? 'RND' : 'USDT';
     
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+    }
     
     try {
         const result = await atomicTransfer(
@@ -1608,8 +1393,10 @@ async function handleTransfer() {
         
         if (result.success) {
             showToast(`✅ ${amount} ${currency} sent successfully to ${recipientUsername}!`, 'success');
-            document.getElementById('transferUserId').value = '';
-            document.getElementById('transferAmount').value = '';
+            const userIdInput = document.getElementById('transferUserId');
+            const amountInput = document.getElementById('transferAmount');
+            if (userIdInput) userIdInput.value = '';
+            if (amountInput) amountInput.value = '';
             await loadDashboardData(user.uid);
         } else {
             showToast('❌ ' + (result.error || 'Transfer failed. Please try again.'), 'error');
@@ -1620,108 +1407,37 @@ async function handleTransfer() {
         showToast('❌ Error sending. Please try again.', 'error');
     }
     
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+    }
 }
 
 // ============================================================
-// ============================================================
-// 🔥 RANK SYSTEM - 2-LEG RANK & REWARD ENGINE
-// ============================================================
+// 🔥 RANK SYSTEM - COMPLETE
 // ============================================================
 
-// ============================================================
-// RANK CONFIGURATION
-// ============================================================
 const RANK_CONFIG = {
-  MEMBER: {
-    name: 'Member',
-    order: 0,
-    personalBusiness: 0,
-    teamBusiness: 0,
-    requiredDirectRank: null,
-    requiredDirectCount: 0,
-    requiredLegs: 0,
-    reward: 0,
-    nextRank: 'Executive'
-  },
-  EXECUTIVE: {
-    name: 'Executive',
-    order: 1,
-    personalBusiness: 3000,
-    teamBusiness: 0,
-    requiredDirectRank: null,
-    requiredDirectCount: 0,
-    requiredLegs: 0,
-    reward: 100,
-    nextRank: 'Senior Executive'
-  },
-  SENIOR_EXECUTIVE: {
-    name: 'Senior Executive',
-    order: 2,
-    personalBusiness: 0,
-    teamBusiness: 10000,
-    requiredDirectRank: 'Executive',
-    requiredDirectCount: 2,
-    requiredLegs: 2,
-    reward: 200,
-    nextRank: 'Manager'
-  },
-  MANAGER: {
-    name: 'Manager',
-    order: 3,
-    personalBusiness: 0,
-    teamBusiness: 25000,
-    requiredDirectRank: 'Senior Executive',
-    requiredDirectCount: 2,
-    requiredLegs: 2,
-    reward: 500,
-    nextRank: 'Senior Manager'
-  },
-  SENIOR_MANAGER: {
-    name: 'Senior Manager',
-    order: 4,
-    personalBusiness: 0,
-    teamBusiness: 50000,
-    requiredDirectRank: 'Manager',
-    requiredDirectCount: 2,
-    requiredLegs: 2,
-    reward: 1000,
-    nextRank: 'Diamond'
-  },
-  DIAMOND: {
-    name: 'Diamond',
-    order: 5,
-    personalBusiness: 0,
-    teamBusiness: 100000,
-    requiredDirectRank: 'Senior Manager',
-    requiredDirectCount: 2,
-    requiredLegs: 2,
-    reward: 2500,
-    nextRank: null
-  }
+  MEMBER: { name: 'Member', order: 0, personalBusiness: 0, teamBusiness: 0, requiredDirectRank: null, requiredDirectCount: 0, requiredLegs: 0, reward: 0, nextRank: 'Executive' },
+  EXECUTIVE: { name: 'Executive', order: 1, personalBusiness: 3000, teamBusiness: 0, requiredDirectRank: null, requiredDirectCount: 0, requiredLegs: 0, reward: 100, nextRank: 'Senior Executive' },
+  SENIOR_EXECUTIVE: { name: 'Senior Executive', order: 2, personalBusiness: 0, teamBusiness: 10000, requiredDirectRank: 'Executive', requiredDirectCount: 2, requiredLegs: 2, reward: 200, nextRank: 'Manager' },
+  MANAGER: { name: 'Manager', order: 3, personalBusiness: 0, teamBusiness: 25000, requiredDirectRank: 'Senior Executive', requiredDirectCount: 2, requiredLegs: 2, reward: 500, nextRank: 'Senior Manager' },
+  SENIOR_MANAGER: { name: 'Senior Manager', order: 4, personalBusiness: 0, teamBusiness: 50000, requiredDirectRank: 'Manager', requiredDirectCount: 2, requiredLegs: 2, reward: 1000, nextRank: 'Diamond' },
+  DIAMOND: { name: 'Diamond', order: 5, personalBusiness: 0, teamBusiness: 100000, requiredDirectRank: 'Senior Manager', requiredDirectCount: 2, requiredLegs: 2, reward: 2500, nextRank: null }
 };
 
-// ============================================================
-// 🔥 MAIN RANK EVALUATION ENGINE
-// ============================================================
 async function evaluateUserRank(userId) {
   try {
+    if (!db) return null;
     const lockRef = ref(db, `rankLocks/${userId}`);
     const lockSnap = await get(lockRef);
-    if (lockSnap.exists()) {
-      console.log(`⏳ Rank evaluation already running for ${userId}`);
-      return null;
-    }
+    if (lockSnap.exists()) return null;
     
     await set(lockRef, { lockedAt: Date.now(), userId });
     
     try {
       const userSnap = await get(ref(db, `users/${userId}`));
-      if (!userSnap.exists()) {
-        console.log(`❌ User ${userId} not found`);
-        return null;
-      }
+      if (!userSnap.exists()) return null;
       
       const userData = userSnap.val();
       const currentRank = userData.rank || 'Member';
@@ -1733,17 +1449,11 @@ async function evaluateUserRank(userId) {
         await calculateTeamBusinessAndQualifiedDirects(userId, directReferrals);
       
       const eligibleRank = await determineHighestEligibleRank(
-        userId,
-        personalBusiness,
-        totalTeamBusiness,
-        leftLegBusiness,
-        rightLegBusiness,
-        qualifiedDirects,
-        currentRankOrder
+        userId, personalBusiness, totalTeamBusiness, leftLegBusiness, rightLegBusiness,
+        qualifiedDirects, currentRankOrder
       );
       
       if (!eligibleRank) {
-        console.log(`ℹ️ No rank upgrade for ${userId}`);
         await updateRankEvaluation(userId, userData, personalBusiness, totalTeamBusiness);
         return null;
       }
@@ -1752,20 +1462,11 @@ async function evaluateUserRank(userId) {
       const rewardKey = `${userId}_${rankKey}_RANK_REWARD`;
       const rewardCheck = await get(ref(db, `rankRewards/${rewardKey}`));
       
-      if (rewardCheck.exists()) {
-        console.log(`⚠️ Rank reward already processed: ${eligibleRank} for ${userId}`);
-        return null;
-      }
+      if (rewardCheck.exists()) return null;
       
       const result = await processRankUpgrade(
-        userId,
-        userData,
-        eligibleRank,
-        personalBusiness,
-        totalTeamBusiness,
-        leftLegBusiness,
-        rightLegBusiness,
-        qualifiedDirects
+        userId, userData, eligibleRank, personalBusiness, totalTeamBusiness,
+        leftLegBusiness, rightLegBusiness, qualifiedDirects
       );
       
       if (result.success) {
@@ -1773,24 +1474,19 @@ async function evaluateUserRank(userId) {
         await createNotification(userId, eligibleRank, result.rewardAmount);
         return result;
       }
-      
       return null;
-      
     } finally {
       await set(lockRef, null);
     }
-    
   } catch (error) {
     console.error(`❌ Error evaluating rank for ${userId}:`, error);
     return null;
   }
 }
 
-// ============================================================
-// 🔥 GET DIRECT REFERRALS
-// ============================================================
 async function getDirectReferrals(userId) {
   try {
+    if (!db) return [];
     const referrals = [];
     const usersSnap = await get(ref(db, 'users'));
     if (!usersSnap.exists()) return referrals;
@@ -1798,17 +1494,10 @@ async function getDirectReferrals(userId) {
     const users = usersSnap.val();
     for (let uid in users) {
       const user = users[uid];
-      if (user.referredBy === userId || 
-          user.referredBy === user.referralCode || 
-          user.sponsor === userId) {
-        referrals.push({
-          uid: uid,
-          data: user,
-          rank: user.rank || 'Member'
-        });
+      if (user.referredBy === userId || user.referredBy === user.referralCode || user.sponsor === userId) {
+        referrals.push({ uid: uid, data: user, rank: user.rank || 'Member' });
       }
     }
-    
     return referrals;
   } catch (error) {
     console.error('Error getting direct referrals:', error);
@@ -1816,20 +1505,11 @@ async function getDirectReferrals(userId) {
   }
 }
 
-// ============================================================
-// 🔥 CALCULATE TEAM BUSINESS & QUALIFIED DIRECTS
-// ============================================================
 async function calculateTeamBusinessAndQualifiedDirects(userId, directReferrals) {
   let totalTeamBusiness = 0;
   let leftLegBusiness = 0;
   let rightLegBusiness = 0;
-  const qualifiedDirects = {
-    executive: [],
-    seniorExecutive: [],
-    manager: [],
-    seniorManager: [],
-    diamond: []
-  };
+  const qualifiedDirects = { executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] };
   
   for (let i = 0; i < directReferrals.length; i++) {
     const direct = directReferrals[i];
@@ -1847,8 +1527,7 @@ async function calculateTeamBusinessAndQualifiedDirects(userId, directReferrals)
     }
     
     if (directRank === 'Executive' || directRank === 'Senior Executive' || 
-        directRank === 'Manager' || directRank === 'Senior Manager' || 
-        directRank === 'Diamond') {
+        directRank === 'Manager' || directRank === 'Senior Manager' || directRank === 'Diamond') {
       qualifiedDirects.executive.push(directUid);
     }
     if (directRank === 'Senior Executive' || directRank === 'Manager' || 
@@ -1866,25 +1545,16 @@ async function calculateTeamBusinessAndQualifiedDirects(userId, directReferrals)
     }
   }
   
-  return {
-    totalTeamBusiness,
-    leftLegBusiness,
-    rightLegBusiness,
-    qualifiedDirects
-  };
+  return { totalTeamBusiness, leftLegBusiness, rightLegBusiness, qualifiedDirects };
 }
 
-// ============================================================
-// 🔥 CALCULATE TEAM BUSINESS FOR A USER
-// ============================================================
 async function calculateTeamBusinessForUser(userId) {
   try {
+    if (!db) return 0;
     const userSnap = await get(ref(db, `users/${userId}`));
     if (!userSnap.exists()) return 0;
-    
     const userData = userSnap.val();
     let business = userData.teamBusiness || 0;
-    
     if (business === 0) {
       const transactions = userData.transactions || {};
       for (let key in transactions) {
@@ -1894,7 +1564,6 @@ async function calculateTeamBusinessForUser(userId) {
         }
       }
     }
-    
     return business;
   } catch (error) {
     console.error('Error calculating team business:', error);
@@ -1902,71 +1571,40 @@ async function calculateTeamBusinessForUser(userId) {
   }
 }
 
-// ============================================================
-// 🔥 DETERMINE HIGHEST ELIGIBLE RANK
-// ============================================================
-async function determineHighestEligibleRank(
-  userId,
-  personalBusiness,
-  totalTeamBusiness,
-  leftLegBusiness,
-  rightLegBusiness,
-  qualifiedDirects,
-  currentRankOrder
-) {
+async function determineHighestEligibleRank(userId, personalBusiness, totalTeamBusiness, leftLegBusiness, rightLegBusiness, qualifiedDirects, currentRankOrder) {
   const rankOrder = ['DIAMOND', 'SENIOR_MANAGER', 'MANAGER', 'SENIOR_EXECUTIVE', 'EXECUTIVE'];
   
   for (let rankKey of rankOrder) {
     const config = RANK_CONFIG[rankKey];
     if (!config) continue;
-    
     const rankOrderValue = config.order;
     if (rankOrderValue <= currentRankOrder) continue;
-    
-    if (config.personalBusiness > 0 && personalBusiness < config.personalBusiness) {
-      continue;
-    }
-    
-    if (config.teamBusiness > 0 && totalTeamBusiness < config.teamBusiness) {
-      continue;
-    }
+    if (config.personalBusiness > 0 && personalBusiness < config.personalBusiness) continue;
+    if (config.teamBusiness > 0 && totalTeamBusiness < config.teamBusiness) continue;
     
     if (config.requiredDirectRank) {
       const requiredRankKey = config.requiredDirectRank.replace(/ /g, '_').toLowerCase();
       const qualifiedList = qualifiedDirects[requiredRankKey] || [];
-      
-      if (qualifiedList.length < config.requiredDirectCount) {
-        continue;
-      }
-      
+      if (qualifiedList.length < config.requiredDirectCount) continue;
       if (config.requiredLegs === 2) {
         const legQualified = await checkTwoLegQualification(userId, qualifiedList);
-        if (!legQualified) {
-          continue;
-        }
+        if (!legQualified) continue;
       }
     }
-    
     return config.name;
   }
   
   if (currentRankOrder < RANK_CONFIG.EXECUTIVE.order && personalBusiness >= RANK_CONFIG.EXECUTIVE.personalBusiness) {
     return 'Executive';
   }
-  
   return null;
 }
 
-// ============================================================
-// 🔥 CHECK TWO-LEG QUALIFICATION
-// ============================================================
 async function checkTwoLegQualification(userId, qualifiedList) {
   try {
     if (qualifiedList.length < 2) return false;
-    
     const directReferrals = await getDirectReferrals(userId);
     const groups = {};
-    
     for (let qualifiedUid of qualifiedList) {
       for (let direct of directReferrals) {
         if (await isUserInChain(direct.uid, qualifiedUid)) {
@@ -1976,87 +1614,57 @@ async function checkTwoLegQualification(userId, qualifiedList) {
         }
       }
     }
-    
     const groupKeys = Object.keys(groups);
     return groupKeys.length >= 2;
-    
   } catch (error) {
     console.error('Error checking two-leg qualification:', error);
     return false;
   }
 }
 
-// ============================================================
-// 🔥 CHECK IF USER IS IN CHAIN
-// ============================================================
 async function isUserInChain(ancestorUid, targetUid) {
   if (ancestorUid === targetUid) return true;
-  
   try {
+    if (!db) return false;
     const usersSnap = await get(ref(db, 'users'));
     if (!usersSnap.exists()) return false;
-    
     const users = usersSnap.val();
     let queue = [ancestorUid];
     let visited = new Set();
-    
     while (queue.length > 0) {
       const current = queue.shift();
       if (visited.has(current)) continue;
       visited.add(current);
-      
       if (current === targetUid) return true;
-      
       for (let uid in users) {
         const user = users[uid];
-        if (!visited.has(uid) && 
-            (user.referredBy === current || 
-             user.referredBy === user.referralCode || 
-             user.sponsor === current)) {
+        if (!visited.has(uid) && (user.referredBy === current || user.referredBy === user.referralCode || user.sponsor === current)) {
           queue.push(uid);
         }
       }
     }
-    
     return false;
-    
   } catch (error) {
     console.error('Error checking user in chain:', error);
     return false;
   }
 }
 
-// ============================================================
-// 🔥 PROCESS RANK UPGRADE
-// ============================================================
-async function processRankUpgrade(
-  userId,
-  userData,
-  newRank,
-  personalBusiness,
-  totalTeamBusiness,
-  leftLegBusiness,
-  rightLegBusiness,
-  qualifiedDirects
-) {
+async function processRankUpgrade(userId, userData, newRank, personalBusiness, totalTeamBusiness, leftLegBusiness, rightLegBusiness, qualifiedDirects) {
   const rankKey = newRank.replace(/ /g, '_').toUpperCase();
   const config = RANK_CONFIG[rankKey];
-  if (!config) {
-    return { success: false, error: 'Invalid rank configuration' };
-  }
+  if (!config) return { success: false, error: 'Invalid rank configuration' };
   
   const rewardAmount = config.reward || 0;
   const rewardKey = `${userId}_${rankKey}_RANK_REWARD`;
   
   try {
+    if (!db) return { success: false, error: 'Database not initialized' };
     const userRef = ref(db, `users/${userId}`);
     const result = await runTransaction(userRef, (currentData) => {
       if (!currentData) return currentData;
-      
       const rankRewards = currentData.rankRewards || {};
-      if (rankRewards[rankKey]) {
-        return currentData;
-      }
+      if (rankRewards[rankKey]) return currentData;
       
       const oldRank = currentData.rank || 'Member';
       currentData.rank = newRank;
@@ -2089,7 +1697,6 @@ async function processRankUpgrade(
       
       if (rewardAmount > 0) {
         currentData.depositWallet = (currentData.depositWallet || 0) + rewardAmount;
-        
         const transactions = currentData.transactions || {};
         const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
         transactions[txId] = {
@@ -2105,47 +1712,28 @@ async function processRankUpgrade(
         currentData.transactions = transactions;
       }
       
-      if (qualifiedDirects) {
-        currentData.qualifiedDirects = qualifiedDirects;
-      }
-      
+      if (qualifiedDirects) currentData.qualifiedDirects = qualifiedDirects;
       currentData.lastRankEvaluation = Date.now();
-      
       return currentData;
     });
     
     if (result.committed) {
       console.log(`✅ Rank upgrade to ${newRank} processed successfully for ${userId}`);
-      await createComprehensiveBackup(userId, `rank_upgrade_to_${newRank}`);
-      
-      return {
-        success: true,
-        newRank: newRank,
-        rewardAmount: rewardAmount,
-        transactionId: rewardKey
-      };
-    } else {
-      return {
-        success: false,
-        error: 'Transaction failed - duplicate or insufficient data'
-      };
+      return { success: true, newRank: newRank, rewardAmount: rewardAmount, transactionId: rewardKey };
     }
-    
+    return { success: false, error: 'Transaction failed' };
   } catch (error) {
     console.error('Error processing rank upgrade:', error);
     return { success: false, error: error.message };
   }
 }
 
-// ============================================================
-// 🔥 CREATE NOTIFICATION
-// ============================================================
 async function createNotification(userId, newRank, rewardAmount) {
   try {
+    if (!db) return;
     const notificationRef = ref(db, `notifications/${userId}`);
     const notificationId = 'notif_' + Date.now();
-    
-    const notification = {
+    await set(ref(db, `notifications/${userId}/${notificationId}`), {
       id: notificationId,
       type: 'rank_upgrade',
       rank: newRank,
@@ -2154,21 +1742,16 @@ async function createNotification(userId, newRank, rewardAmount) {
       timestamp: Date.now(),
       read: false,
       status: 'sent'
-    };
-    
-    await set(ref(db, `notifications/${userId}/${notificationId}`), notification);
+    });
     console.log(`✅ Notification created for ${userId}`);
-    
   } catch (error) {
     console.error('Error creating notification:', error);
   }
 }
 
-// ============================================================
-// 🔥 UPDATE RANK EVALUATION (For tracking)
-// ============================================================
 async function updateRankEvaluation(userId, userData, personalBusiness, totalTeamBusiness) {
   try {
+    if (!db) return;
     await update(ref(db, `users/${userId}`), {
       personalBusiness: personalBusiness,
       teamBusiness: totalTeamBusiness,
@@ -2179,26 +1762,19 @@ async function updateRankEvaluation(userId, userData, personalBusiness, totalTea
   }
 }
 
-// ============================================================
-// 🔥 RANK UI UPDATE FUNCTION
-// ============================================================
 function updateRankUI(userData) {
     const rank = userData.rank || 'Member';
     const rankRewards = userData.rankRewards || {};
     const personalBusiness = userData.personalBusiness || 0;
     const teamBusiness = userData.teamBusiness || 0;
-    const qualifiedDirects = userData.qualifiedDirects || { 
-      executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] 
-    };
+    const qualifiedDirects = userData.qualifiedDirects || { executive: [], seniorExecutive: [], manager: [], seniorManager: [], diamond: [] };
     
-    // Update rank badge
     const badge = document.getElementById('currentRankBadge');
     if (badge) {
         badge.textContent = rank;
         badge.className = 'rank-badge ' + rank.toLowerCase().replace(/ /g, '-');
     }
     
-    // Calculate total rewards
     let totalRewards = 0;
     for (let key in rankRewards) {
         totalRewards += (rankRewards[key].amount || 0);
@@ -2206,21 +1782,18 @@ function updateRankUI(userData) {
     const rewardElement = document.getElementById('totalRankRewards');
     if (rewardElement) rewardElement.textContent = '$' + totalRewards.toFixed(2);
     
-    // Update business values
     const personalEl = document.getElementById('personalBusiness');
     if (personalEl) personalEl.textContent = '$' + personalBusiness.toFixed(2);
     
     const teamEl = document.getElementById('teamBusiness');
     if (teamEl) teamEl.textContent = '$' + teamBusiness.toFixed(2);
     
-    // Update leg business
     const leftLegEl = document.getElementById('leftLegBusiness');
     if (leftLegEl) leftLegEl.textContent = '$' + (userData.leftLegBusiness || 0).toFixed(2);
     
     const rightLegEl = document.getElementById('rightLegBusiness');
     if (rightLegEl) rightLegEl.textContent = '$' + (userData.rightLegBusiness || 0).toFixed(2);
     
-    // Update qualified directs
     const qualifiedEl = document.getElementById('qualifiedDirects');
     if (qualifiedEl) {
         let totalQualified = 0;
@@ -2230,7 +1803,6 @@ function updateRankUI(userData) {
         qualifiedEl.textContent = totalQualified + ' / 2';
     }
     
-    // Update progress steps
     const rankOrder = ['Member', 'Executive', 'Senior Executive', 'Manager', 'Senior Manager', 'Diamond'];
     const currentIndex = rankOrder.indexOf(rank);
     
@@ -2239,38 +1811,19 @@ function updateRankUI(userData) {
         const stepEl = document.getElementById(stepId);
         if (stepEl) {
             stepEl.className = 'step';
-            if (index < currentIndex) {
-                stepEl.classList.add('completed');
-            } else if (index === currentIndex) {
-                stepEl.classList.add('active');
-            }
+            if (index < currentIndex) stepEl.classList.add('completed');
+            else if (index === currentIndex) stepEl.classList.add('active');
         }
     });
     
-    // Update next rank
-    const nextRankMap = {
-        'Member': 'Executive',
-        'Executive': 'Senior Executive',
-        'Senior Executive': 'Manager',
-        'Manager': 'Senior Manager',
-        'Senior Manager': 'Diamond',
-        'Diamond': '🏆 Max Rank Achieved!'
-    };
+    const nextRankMap = { 'Member': 'Executive', 'Executive': 'Senior Executive', 'Senior Executive': 'Manager', 'Manager': 'Senior Manager', 'Senior Manager': 'Diamond', 'Diamond': '🏆 Max Rank Achieved!' };
     const nextRankEl = document.getElementById('nextRank');
     if (nextRankEl) nextRankEl.textContent = nextRankMap[rank] || '🏆 Max Rank Achieved!';
     
-    // Update next reward
-    const rewardMap = {
-        'Executive': '$100',
-        'Senior Executive': '$200',
-        'Manager': '$500',
-        'Senior Manager': '$1,000',
-        'Diamond': '$2,500'
-    };
+    const rewardMap = { 'Executive': '$100', 'Senior Executive': '$200', 'Manager': '$500', 'Senior Manager': '$1,000', 'Diamond': '$2,500' };
     const nextRewardEl = document.getElementById('nextReward');
     if (nextRewardEl) nextRewardEl.textContent = rewardMap[rank] || '🏆 Max Achieved';
     
-    // Update progress bar
     const progress = (currentIndex / (rankOrder.length - 1)) * 100;
     const progressBar = document.getElementById('rankProgressBar');
     if (progressBar) progressBar.style.width = Math.min(progress, 100) + '%';
@@ -2279,21 +1832,16 @@ function updateRankUI(userData) {
     if (progressPercent) progressPercent.textContent = Math.min(Math.round(progress), 100) + '%';
 }
 
-// ============================================================
-// 🔥 TRIGGER RANK EVALUATION
-// ============================================================
 async function triggerRankEvaluation(userId) {
     try {
+        if (!db) return;
         const lockSnap = await get(ref(db, `rankLocks/${userId}`));
         if (lockSnap.exists()) return;
-        
         const result = await evaluateUserRank(userId);
-        
         if (result && result.success) {
             await loadDashboardData(userId);
             showToast(`🎉 Congratulations! You've achieved ${result.newRank} rank! Reward $${result.rewardAmount} credited.`, 'success');
         }
-        
     } catch (error) {
         console.error('Error triggering rank evaluation:', error);
     }
@@ -2307,37 +1855,24 @@ async function loadDashboardData(userId) {
     isDashboardLoading = true;
     
     try {
+        if (!db) {
+            throw new Error('Database not initialized');
+        }
+        
         const userSnap = await get(ref(db, 'users/' + userId));
         
         if (!userSnap.exists()) {
             const authUser = auth.currentUser;
             if (authUser) {
-                const checkResult = await checkUserExists(userId);
-                
-                if (checkResult.exists) {
-                    console.log('🔄 Found existing data, attempting recovery...');
-                    const recovered = await recoverUserData(userId, authUser);
-                    if (recovered) {
-                        await processDailyRelease(userId);
-                        const stats = calculateUserStats(recovered);
-                        currentUserData = recovered;
-                        currentUserId = userId;
-                        renderDashboard(recovered);
-                        setupRealtimeListener(userId);
-                        await triggerRankEvaluation(userId);
-                        showToast('✅ Your data has been recovered successfully', 'success');
-                    }
-                } else {
-                    console.log('🆕 No existing data found, creating new user...');
-                    const newUser = await recoverUserData(userId, authUser);
-                    if (newUser) {
-                        const stats = calculateUserStats(newUser);
-                        currentUserData = newUser;
-                        currentUserId = userId;
-                        renderDashboard(newUser);
-                        setupRealtimeListener(userId);
-                        await triggerRankEvaluation(userId);
-                    }
+                const recovered = await recoverUserData(userId, authUser);
+                if (recovered) {
+                    await processDailyRelease(userId);
+                    currentUserData = recovered;
+                    currentUserId = userId;
+                    renderDashboard(recovered);
+                    setupRealtimeListener(userId);
+                    await triggerRankEvaluation(userId);
+                    showToast('✅ Your account is ready!', 'success');
                 }
             }
             isDashboardLoading = false;
@@ -2345,8 +1880,6 @@ async function loadDashboardData(userId) {
         }
         
         const u = userSnap.val();
-        
-        await createComprehensiveBackup(userId, 'dashboard_load');
         await processDailyRelease(userId);
         
         const packages = u.packages || {};
@@ -2358,7 +1891,6 @@ async function loadDashboardData(userId) {
         
         const updatedSnap = await get(ref(db, 'users/' + userId));
         const updatedData = updatedSnap.exists() ? updatedSnap.val() : u;
-        const stats = calculateUserStats(updatedData);
         
         currentUserData = updatedData;
         currentUserId = userId;
@@ -2369,14 +1901,17 @@ async function loadDashboardData(userId) {
         
     } catch (error) {
         console.error('Error loading dashboard:', error);
-        document.getElementById('dashboardContent').innerHTML = `
-            <div class="text-center py-5">
-                <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
-                <h4>Error Loading Dashboard</h4>
-                <p class="text-muted">${error.message || 'Please check your internet connection.'}</p>
-                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
-            </div>
-        `;
+        const dashboardContent = document.getElementById('dashboardContent');
+        if (dashboardContent) {
+            dashboardContent.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+                    <h4>Error Loading Dashboard</h4>
+                    <p class="text-muted">${error.message || 'Please check your internet connection.'}</p>
+                    <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
+                </div>
+            `;
+        }
     } finally {
         isDashboardLoading = false;
     }
@@ -2386,6 +1921,8 @@ async function loadDashboardData(userId) {
 // MAIN AUTH HANDLER
 // ============================================================
 onAuthStateChanged(auth, async (user) => {
+    console.log('🔐 Auth state changed:', user ? user.uid : 'No user');
+    
     if (!user) {
         window.location.href = 'login.html';
         return;
@@ -2393,72 +1930,21 @@ onAuthStateChanged(auth, async (user) => {
 
     try {
         await fetchLiveRate();
-        
-        const userSnap = await get(ref(db, 'users/' + user.uid));
-        
-        if (!userSnap.exists()) {
-            console.log('🔄 User authenticated, checking for existing data...');
-            const checkResult = await checkUserExists(user.uid);
-            
-            if (checkResult.exists) {
-                console.log('✅ Found existing data in:', checkResult.source);
-                await loadDashboardData(user.uid);
-            } else {
-                const email = user.email;
-                if (email) {
-                    const usersSnap = await get(ref(db, 'users'));
-                    let emailExists = false;
-                    if (usersSnap.exists()) {
-                        const users = usersSnap.val();
-                        for (let uid in users) {
-                            if (users[uid].email === email && uid !== user.uid) {
-                                emailExists = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (emailExists) {
-                        console.warn('⚠️ Email already exists with different UID');
-                        document.getElementById('dashboardContent').innerHTML = `
-                            <div class="text-center py-5">
-                                <i class="bi bi-exclamation-triangle text-warning fs-1 d-block mb-3"></i>
-                                <h4>Account Already Exists</h4>
-                                <p class="text-muted">This email is already registered with another account.</p>
-                                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Try Again</button>
-                            </div>
-                        `;
-                        return;
-                    }
-                }
-                
-                console.log('🆕 Creating new user account...');
-                await loadDashboardData(user.uid);
-            }
-            return;
-        }
-        
-        const u = userSnap.val();
-        
-        if (u && u.banned === true) {
-            alert('Your account has been banned.');
-            await signOut(auth);
-            window.location.href = 'login.html';
-            return;
-        }
-        
+        initSidebar();
         await loadDashboardData(user.uid);
-
     } catch (error) {
         console.error('Error in auth handler:', error);
-        document.getElementById('dashboardContent').innerHTML = `
-            <div class="text-center py-5">
-                <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
-                <h4>Authentication Error</h4>
-                <p class="text-muted">${error.message || 'Please try again.'}</p>
-                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
-            </div>
-        `;
+        const dashboardContent = document.getElementById('dashboardContent');
+        if (dashboardContent) {
+            dashboardContent.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+                    <h4>Authentication Error</h4>
+                    <p class="text-muted">${error.message || 'Please try again.'}</p>
+                    <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
+                </div>
+            `;
+        }
     }
 });
 
@@ -2477,3 +1963,5 @@ window.addEventListener('beforeunload', () => {
         updateTimer = null;
     }
 });
+
+console.log('✅ Dashboard.js loaded successfully!');

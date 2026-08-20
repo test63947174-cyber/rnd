@@ -1,6 +1,6 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (FIXED v6.1)
-// WITH 2-LEG RANK & REWARD SYSTEM - DEBUGGED
+// RND STAKING PLATFORM - DASHBOARD.JS (FIXED v6.2)
+// WITH 2-LEG RANK & REWARD SYSTEM - FULLY DEBUGGED
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -899,6 +899,7 @@ function renderDashboard(u) {
     const currentRankIndex = rankOrder.indexOf(rank);
     const progressPercent = ((currentRankIndex) / (rankOrder.length - 1)) * 100;
 
+    const rankRewards = u.rankRewards || {};
     let totalRankRewards = 0;
     for (let key in rankRewards) {
         totalRankRewards += (rankRewards[key].amount || 0);
@@ -1086,7 +1087,7 @@ function renderDashboard(u) {
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Team Business</span>
-                            <span class="detail-value" id="teamBusiness">$${(u.teamBusiness || 0).toFixed(2)}</span>
+                            <span class="detail-value" id="teamBusinessValue">$${(u.teamBusiness || 0).toFixed(2)}</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Left Leg Business</span>
@@ -1132,7 +1133,7 @@ function renderDashboard(u) {
                         <div class="label">Total Referrals</div>
                     </div>
                     <div class="network-stat-card">
-                        <div class="number" id="teamBusinessValue">$${(teamBusiness || 0).toFixed(2)}</div>
+                        <div class="number" id="teamBusinessValue2">$${(teamBusiness || 0).toFixed(2)}</div>
                         <div class="label">Team Business</div>
                     </div>
                 </div>
@@ -1662,6 +1663,7 @@ async function processRankUpgrade(userId, userData, newRank, personalBusiness, t
     const userRef = ref(db, `users/${userId}`);
     const result = await runTransaction(userRef, (currentData) => {
       if (!currentData) return currentData;
+      
       const rankRewards = currentData.rankRewards || {};
       if (rankRewards[rankKey]) return currentData;
       
@@ -1684,6 +1686,8 @@ async function processRankUpgrade(userId, userData, newRank, personalBusiness, t
       };
       currentData.rankHistory = rankHistory;
       
+      // ✅ FIXED: Correct syntax for rankRewards
+      rankRewards[rankKey] = {
         rank: newRank,
         amount: rewardAmount,
         status: 'credited',
@@ -1782,7 +1786,7 @@ function updateRankUI(userData) {
     const personalEl = document.getElementById('personalBusiness');
     if (personalEl) personalEl.textContent = '$' + personalBusiness.toFixed(2);
     
-    const teamEl = document.getElementById('teamBusiness');
+    const teamEl = document.getElementById('teamBusinessValue');
     if (teamEl) teamEl.textContent = '$' + teamBusiness.toFixed(2);
     
     const leftLegEl = document.getElementById('leftLegBusiness');

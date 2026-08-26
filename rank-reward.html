@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rank Reward - RND Staking</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0b0f1a;
+            color: #e5e7eb;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+            background: rgba(15, 20, 35, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 24px 16px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 1000;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(46, 204, 113, 0.3);
+            border-radius: 10px;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px 24px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .sidebar-brand .brand-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .sidebar-brand .brand-text {
+            font-size: 18px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2ecc71, #6ee7b7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            margin-bottom: 2px;
+        }
+
+        .sidebar-menu li a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.25s ease;
+            position: relative;
+        }
+
+        .sidebar-menu li a:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+        }
+
+        .sidebar-menu li a.active {
+            background: rgba(46, 204, 113, 0.12);
+            color: #2ecc71;
+        }
+
+        .sidebar-menu li a.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 3px;
+            background: #2ecc71;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-menu li a i {
+            font-size: 18px;
+            width: 22px;
+            text-align: center;
+        }
+
+        .sidebar-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.05);
+            margin: 12px 16px;
+        }
+
+        .sidebar-footer {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar-footer .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .sidebar-footer .user-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer .user-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .sidebar-footer .user-email {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            flex: 1;
+            padding: 30px 40px 60px;
+            max-width: calc(100% - 260px);
+            min-height: 100vh;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .page-header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .page-header h1 i {
+            color: #fbbf24;
+        }
+
+        .page-header .subtitle {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        /* ===== RANK CARDS ===== */
+        .rank-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .rank-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 24px 28px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .rank-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #2ecc71, #6ee7b7);
+            opacity: 0.3;
+        }
+
+        .rank-card:hover {
+            border-color: rgba(46, 204, 113, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .rank-card .rank-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .rank-card .rank-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+
+        .rank-card .rank-sub {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .rank-card .rank-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: #fbbf24;
+            margin-top: 8px;
+        }
+
+        .rank-card .rank-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.35);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .rank-card .rank-status {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .rank-card .rank-status.achieved {
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+        }
+
+        .rank-card .rank-status.locked {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .rank-card .rank-status.current {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+        }
+
+        .rank-card .rank-status.eligible {
+            background: rgba(52, 152, 219, 0.12);
+            color: #3498db;
+        }
+
+        /* ===== PROGRESS ===== */
+        .progress-container {
+            margin: 16px 0 6px;
+        }
+
+        .progress-container .progress-track {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-container .progress-track .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #2ecc71, #6ee7b7);
+            transition: width 0.8s ease;
+            width: 0%;
+        }
+
+        .progress-container .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 6px;
+        }
+
+        /* ===== RANK TABLE ===== */
+        .rank-table-wrap {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-top: 24px;
+        }
+
+        .rank-table-wrap .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .rank-table-wrap .table-header h5 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .rank-table-wrap .table-header h5 i {
+            color: #fbbf24;
+        }
+
+        .rank-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .rank-table th {
+            padding: 14px 20px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .rank-table td {
+            padding: 14px 20px;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .rank-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .rank-table td .badge-status {
+            display: inline-block;
+            padding: 3px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-status.achieved {
+            background: rgba(46, 204, 113, 0.12);
+            color: #2ecc71;
+        }
+
+        .badge-status.current {
+            background: rgba(251, 191, 36, 0.12);
+            color: #fbbf24;
+        }
+
+        .badge-status.locked {
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.25);
+        }
+
+        .badge-status.eligible {
+            background: rgba(52, 152, 219, 0.12);
+            color: #3498db;
+        }
+
+        .rank-table .rank-icon-small {
+            font-size: 18px;
+            margin-right: 6px;
+        }
+
+        /* ===== HISTORY ===== */
+        .history-section {
+            margin-top: 30px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px 24px 24px;
+        }
+
+        .history-section h5 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-section h5 i {
+            color: #fbbf24;
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 30px 0;
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .history-empty i {
+            font-size: 36px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-item .h-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .history-item .h-left .h-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(46, 204, 113, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .history-item .h-left .h-rank {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .history-item .h-left .h-desc {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .history-item .h-right {
+            text-align: right;
+        }
+
+        .history-item .h-right .h-amount {
+            font-weight: 700;
+            color: #2ecc71;
+        }
+
+        .history-item .h-right .h-date {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* ===== LOADING ===== */
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .loading-spinner .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.05);
+            border-top-color: #2ecc71;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-spinner p {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 14px;
+        }
+
+        /* ===== TOAST ===== */
+        #toastContainer {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 380px;
+            width: 100%;
+        }
+
+        .toast-custom {
+            padding: 14px 20px;
+            border-radius: 12px;
+            background: rgba(15, 20, 35, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: #e5e7eb;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            animation: slideIn 0.4s ease;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .toast-custom.success {
+            border-color: rgba(46, 204, 113, 0.2);
+        }
+        .toast-custom.error {
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+        .toast-custom.warning {
+            border-color: rgba(251, 191, 36, 0.2);
+        }
+        .toast-custom.info {
+            border-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .toast-custom i {
+            font-size: 20px;
+        }
+        .toast-custom .toast-msg {
+            flex: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 992px) {
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                bottom: 0;
+                width: 280px;
+                transition: left 0.3s ease;
+                z-index: 1100;
+                border-radius: 0;
+                height: 100vh;
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.6);
+                z-index: 1050;
+                backdrop-filter: blur(4px);
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+
+            .main-content {
+                max-width: 100%;
+                padding: 20px;
+            }
+
+            .rank-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header h1 {
+                font-size: 20px;
+            }
+
+            .rank-table-wrap {
+                overflow-x: auto;
+            }
+
+            .rank-table {
+                min-width: 600px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-content {
+                padding: 14px;
+            }
+            .rank-card {
+                padding: 18px;
+            }
+            .history-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .history-item .h-right {
+                text-align: left;
+                width: 100%;
+            }
+        }
+
+        .mobile-toggle {
+            display: none;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .mobile-toggle:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        @media (max-width: 992px) {
+            .mobile-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== SIDEBAR OVERLAY (Mobile) ===== -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebarPanel">
+        <div class="sidebar-brand">
+            <div class="brand-icon">R</div>
+            <span class="brand-text">RND</span>
+        </div>
+
+        <ul class="sidebar-menu">
+            <li><a href="dashboard.html"><i class="bi bi-grid-1x2-fill"></i>Dashboard</a></li>
+            <li><a href="deposit.html"><i class="bi bi-plus-circle"></i>Deposit</a></li>
+            <li><a href="withdrawal.html"><i class="bi bi-arrow-up-circle"></i>Withdrawal</a></li>
+            <li><a href="invoice.html"><i class="bi bi-receipt"></i>Invoice</a></li>
+            <li><a href="referrals.html"><i class="bi bi-people"></i>Referrals</a></li>
+            <li><a href="buy-package.html"><i class="bi bi-box-seam"></i>Buy Package</a></li>
+            <li><a href="rank-reward.html" class="active"><i class="bi bi-trophy"></i>🏆 Rank Reward</a></li>
+            <li><a href="profile.html"><i class="bi bi-person"></i>Profile</a></li>
+            <li><a href="#" id="logoutBtnSidebar"><i class="bi bi-box-arrow-right"></i>Logout</a></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" id="sidebarAvatar">U</div>
+                <div>
+                    <div class="user-name" id="sidebarName">User</div>
+                    <div class="user-email" id="sidebarEmail">user@example.com</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+
+        <!-- Mobile Toggle -->
+        <button class="mobile-toggle" id="mobileToggle">
+            <i class="bi bi-list"></i> Menu
+        </button>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h1><i class="bi bi-trophy-fill"></i> Rank Reward</h1>
+                <span class="subtitle">Your rank is based on your total team business</span>
+            </div>
+            <div>
+                <span style="font-size:13px;color:rgba(255,255,255,0.3);">
+                    <i class="bi bi-clock-history"></i> Live updated
+                </span>
+            </div>
+        </div>
+
+        <!-- ===== LOADING ===== -->
+        <div id="loadingContainer" class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading your rank data...</p>
+        </div>
+
+        <!-- ===== CONTENT (hidden until loaded) ===== -->
+        <div id="contentContainer" style="display:none;">
+
+            <!-- Rank Cards -->
+            <div class="rank-grid" id="rankCards">
+                <!-- Dynamically filled by JS -->
+            </div>
+
+            <!-- Rank Table -->
+            <div class="rank-table-wrap">
+                <div class="table-header">
+                    <h5><i class="bi bi-table"></i> All Ranks</h5>
+                    <span style="font-size:13px;color:rgba(255,255,255,0.25);">
+                        <i class="bi bi-arrow-up"></i> Higher team business = higher rank
+                    </span>
+                </div>
+                <table class="rank-table" id="rankTable">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Required Business</th>
+                            <th>Reward</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankTableBody">
+                        <!-- Dynamically filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Reward History -->
+            <div class="history-section" id="historySection">
+                <h5><i class="bi bi-clock-history"></i> Reward History</h5>
+                <div id="historyList">
+                    <!-- Dynamically filled by JS -->
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div id="toastContainer"></div>
+
+    <!-- ===== SCRIPTS ===== -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
+    </script>
+    <script type="module" src="rank-reward.js"></script>
+
+</body>
+</html>

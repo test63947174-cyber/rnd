@@ -1,16 +1,17 @@
 // ============================================================
-// RANK REWARD - PRODUCTION READY v2
+// RANK REWARD - PRODUCTION READY v4 (FULL SETUP)
 // ============================================================
-// FIXES:
-// 1. ✅ ATOMIC reward + claim in SINGLE transaction
-// 2. ✅ Same transaction ID for both wallet and reward record
-// 3. ✅ Duplicate-proof with race condition handling
-// 4. ✅ Firebase Rules compatible (minimal write permissions)
-// 5. ✅ NO migration | NO business reset | CUMULATIVE business only
+// RANK SYSTEM:
+// Member    → $0      → $0 reward
+// Executive → $3,000  → $100 reward  ✅
+// Senior Exec → $10,000 → $200 reward  ✅
+// Manager   → $25,000 → $500 reward  ✅
+// Sr. Manager → $50,000 → $1,000 reward  ✅
+// Diamond   → $100,000 → $2,500 reward  ✅
 // ============================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import {
     getDatabase,
     ref,
@@ -18,7 +19,7 @@ import {
     runTransaction,
     onValue,
     set
-} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+} from "firebase/database";
 
 // ============================================================
 // FIREBASE CONFIG - UPDATED
@@ -140,7 +141,21 @@ async function getRankRewardStatus(userId) {
 }
 
 // ============================================================
-// 🔥 ATOMIC RANK REWARD - SINGLE TRANSACTION (DUPLICATE PROOF)
+// 🔥 CALCULATE TOTAL RANK REWARD - SUM OF ALL EARNED REWARDS
+// ============================================================
+function calculateTotalRankReward(rankRewardStatus) {
+    let total = 0;
+    for (let key in rankRewardStatus) {
+        const reward = rankRewardStatus[key];
+        if (reward && reward.status === 'completed') {
+            total += Number(reward.rewardAmount) || 0;
+        }
+    }
+    return total;
+}
+
+// ============================================================
+// 🔥 ATOMIC RANK REWARD - SINGLE TRANSACTION
 // ============================================================
 async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusiness) {
     try {
@@ -149,31 +164,24 @@ async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusine
         const txId = generateTxId();
         const timestamp = Date.now();
 
-        // ✅ SINGLE ATOMIC TRANSACTION: Check + Credit + Mark Claimed
         const result = await runTransaction(userRef, (currentData) => {
             if (!currentData) return currentData;
 
-            // 🔥 CRITICAL: Check if reward already exists INSIDE transaction
-            // This prevents race condition between two tabs
             const claimed = currentData._rankRewardsClaimed || {};
             if (claimed[rankKey] === true) {
-                return currentData; // Already claimed, abort
+                return currentData;
             }
 
-            // ✅ Credit to depositWallet ONLY
             const currentWallet = Number(currentData.depositWallet) || 0;
             currentData.depositWallet = currentWallet + rewardAmount;
 
-            // ✅ Update rank in user profile
             currentData.rank = rankInfo.rank;
 
-            // ✅ Mark as claimed inside user object (for transaction check)
             if (!currentData._rankRewardsClaimed) {
                 currentData._rankRewardsClaimed = {};
             }
             currentData._rankRewardsClaimed[rankKey] = true;
 
-            // ✅ Add transaction record with SAME txId
             if (!currentData.transactions) {
                 currentData.transactions = {};
             }
@@ -191,9 +199,6 @@ async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusine
                 description: `🏆 ${rankInfo.rank} Rank Reward: $${rewardAmount} credited to Deposit Wallet`
             };
 
-            // ✅ IMPORTANT: teamBusiness is NEVER changed
-            // Business remains cumulative as per requirement
-
             return currentData;
         });
 
@@ -202,19 +207,15 @@ async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusine
             return { success: false, error: 'Transaction failed' };
         }
 
-        // ✅ Check if it was already claimed (transaction aborted)
         if (result.snapshot.exists()) {
             const data = result.snapshot.val();
             const claimed = data._rankRewardsClaimed || {};
             if (claimed[rankKey] === true) {
-                // It was already claimed by another tab/process
-                console.log(`ℹ️ ${rankInfo.rank} was already claimed (race condition handled)`);
+                console.log(`ℹ️ ${rankInfo.rank} was already claimed`);
                 return { success: false, alreadyClaimed: true };
             }
         }
 
-        // ✅ Step 2: Write to rankRewards (separate path for history/UI)
-        // Use SAME txId for consistency
         await set(ref(db, `rankRewards/${userId}/${rankKey}`), {
             rank: rankInfo.rank,
             rankKey: rankKey,
@@ -224,7 +225,7 @@ async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusine
             creditedAt: timestamp,
             creditedDate: getTodayDate(),
             status: 'completed',
-            transactionId: txId  // ✅ SAME transaction ID as wallet
+            transactionId: txId
         });
 
         console.log(`✅ Rank reward processed: ${rankInfo.rank} - $${rewardAmount}`);
@@ -242,7 +243,6 @@ async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusine
 // ============================================================
 async function checkAndProcessAllRankRewards(userId, teamBusiness) {
     try {
-        // Get current claimed status from user object (fast check)
         const userSnap = await get(ref(db, 'users/' + userId));
         const userData = userSnap.exists() ? userSnap.val() : {};
         const claimed = userData._rankRewardsClaimed || {};
@@ -251,13 +251,11 @@ async function checkAndProcessAllRankRewards(userId, teamBusiness) {
         const errors = [];
         let anyProcessed = false;
 
-        // Process from lowest to highest (cumulative rewards)
+        // Process ALL ranks from Executive to Diamond
         for (let level of RANK_LEVELS) {
-            if (level.reward === 0) continue;
+            if (level.reward === 0) continue; // Skip Member (no reward)
 
-            // Check if teamBusiness meets threshold
             if (teamBusiness >= level.minBusiness) {
-                // Check if already claimed (fast check from user object)
                 if (claimed[level.key] !== true) {
                     console.log(`🔍 Processing ${level.rank} reward...`);
                     const result = await processSingleRankReward(
@@ -275,7 +273,7 @@ async function checkAndProcessAllRankRewards(userId, teamBusiness) {
                         errors.push({ rank: level.rank, error: result.error });
                     }
                 } else {
-                    console.log(`ℹ️ ${level.rank} already claimed (from user object)`);
+                    console.log(`ℹ️ ${level.rank} already claimed`);
                 }
             }
         }
@@ -291,110 +289,63 @@ async function checkAndProcessAllRankRewards(userId, teamBusiness) {
 // ============================================================
 // RENDER UI
 // ============================================================
-function renderUI(userData, rankRewardStatus, processingResult = null) {
+function renderUI(userData, rankRewardStatus) {
     const teamBusiness = Number(userData.teamBusiness) || 0;
     const currentRank = calculateRank(teamBusiness);
     const nextRank = getNextRank(teamBusiness);
     const name = userData.name || 'User';
     const depositWallet = Number(userData.depositWallet) || 0;
+    const username = userData.username || userData.referralCode || 'USER';
+
+    const totalRankReward = calculateTotalRankReward(rankRewardStatus);
+    const rewardCount = Object.values(rankRewardStatus)
+        .filter(r => r.status === 'completed').length;
 
     // Update sidebar
     document.getElementById('sidebarName').textContent = name;
     document.getElementById('sidebarEmail').textContent = userData.email || 'user@example.com';
+    document.getElementById('sidebarUserId').textContent = 'ID: ' + username.substring(0, 20) + '...';
     document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
 
-    // ===== RANK CARDS =====
-    const cardsContainer = document.getElementById('rankCards');
+    // ===== SUMMARY CARDS =====
+    document.getElementById('totalBusiness').textContent = formatCurrency(teamBusiness);
+    document.getElementById('currentRankDisplay').textContent = currentRank.rank;
+    document.getElementById('rankRewardDisplay').textContent = currentRank.reward > 0 ? 
+        `Reward: ${formatCurrency(currentRank.reward)}` : 'No reward for this rank';
+    document.getElementById('totalRankReward').textContent = formatCurrency(totalRankReward);
+    document.getElementById('rewardCount').textContent = rewardCount + ' rewards earned';
 
-    const isCurrentRankClaimed = rankRewardStatus[currentRank.key]?.status === 'completed';
-    const statusText = isCurrentRankClaimed ? '✓ Achieved' :
-        (currentRank.reward > 0 ? '⏳ Eligible' : 'Current');
-    const statusClass = isCurrentRankClaimed ? 'achieved' :
-        (currentRank.reward > 0 ? 'eligible' : 'current');
+    // ===== RANK PROGRESS =====
+    document.getElementById('currentRankText').textContent = currentRank.rank + ' ' + currentRank.icon;
+    document.getElementById('currentBusinessDisplay').textContent = formatCurrency(teamBusiness);
 
-    let nextRankHTML = '';
+    const nextRankInfo = document.getElementById('nextRankInfo');
+    const nextRankText = document.getElementById('nextRankText');
+    const needForNext = document.getElementById('needForNext');
+
     if (nextRank && currentRank.key !== 'diamond') {
-        const progress = Math.min(100, (teamBusiness / nextRank.minBusiness) * 100);
         const remaining = Math.max(0, nextRank.minBusiness - teamBusiness);
-        nextRankHTML = `
-            <div class="progress-container">
-                <div class="progress-track">
-                    <div class="progress-fill" style="width:${progress}%;"></div>
-                </div>
-                <div class="progress-info">
-                    <span>${formatCurrency(teamBusiness)} / ${formatCurrency(nextRank.minBusiness)}</span>
-                    <span>${progress.toFixed(1)}%</span>
-                </div>
-                <div style="font-size:13px;color:rgba(255,255,255,0.35);margin-top:4px;">
-                    🎯 Next: ${nextRank.rank} — Need ${formatCurrency(remaining)} more
-                </div>
-            </div>
-        `;
+        const progress = Math.min(100, (teamBusiness / nextRank.minBusiness) * 100);
+        
+        nextRankText.textContent = nextRank.rank + ' ' + nextRank.icon;
+        needForNext.textContent = formatCurrency(remaining);
+        nextRankInfo.style.display = 'block';
+        
+        document.getElementById('rankProgressFill').style.width = progress + '%';
+        document.getElementById('progressCurrent').textContent = formatCurrency(teamBusiness);
+        document.getElementById('progressTarget').textContent = formatCurrency(nextRank.minBusiness);
+        document.getElementById('progressPercent').textContent = progress.toFixed(1) + '%';
     } else if (currentRank.key === 'diamond') {
-        nextRankHTML = `
-            <div style="margin-top:12px;padding:10px 16px;background:rgba(251,191,36,0.08);border-radius:10px;border:1px solid rgba(251,191,36,0.1);">
-                <span style="color:#fbbf24;font-weight:600;">💎 Highest Rank Achieved!</span>
-            </div>
-        `;
+        nextRankText.textContent = '🏆 MAX RANK';
+        needForNext.textContent = '$0';
+        nextRankInfo.style.display = 'block';
+        document.getElementById('rankProgressFill').style.width = '100%';
+        document.getElementById('progressCurrent').textContent = formatCurrency(teamBusiness);
+        document.getElementById('progressTarget').textContent = formatCurrency(teamBusiness);
+        document.getElementById('progressPercent').textContent = '100%';
+    } else {
+        nextRankInfo.style.display = 'none';
     }
-
-    const totalRewards = Object.values(rankRewardStatus)
-        .filter(r => r.status === 'completed')
-        .reduce((sum, r) => sum + (Number(r.rewardAmount) || 0), 0);
-
-    // Show processing results if any
-    let processingMsg = '';
-    if (processingResult && processingResult.processed.length > 0) {
-        processingMsg = `
-            <div style="margin-top:12px;padding:10px 16px;background:rgba(46,204,113,0.08);border-radius:10px;border:1px solid rgba(46,204,113,0.1);">
-                <span style="color:#2ecc71;">✅ New rewards earned: ${processingResult.processed.join(', ')}</span>
-            </div>
-        `;
-    }
-    if (processingResult && processingResult.errors && processingResult.errors.length > 0) {
-        processingMsg += `
-            <div style="margin-top:8px;padding:10px 16px;background:rgba(239,68,68,0.08);border-radius:10px;border:1px solid rgba(239,68,68,0.1);">
-                <span style="color:#ef4444;">❌ Errors: ${processingResult.errors.map(e => e.rank).join(', ')}</span>
-            </div>
-        `;
-    }
-
-    cardsContainer.innerHTML = `
-        <!-- Current Rank -->
-        <div class="rank-card" style="border-color:rgba(46,204,113,0.15);">
-            <div class="rank-icon">${currentRank.icon}</div>
-            <div class="rank-name">${currentRank.rank}</div>
-            <div class="rank-sub">Current Rank</div>
-            <div class="rank-value">${formatCurrency(teamBusiness)}</div>
-            <div class="rank-label">Total Team Business (Cumulative)</div>
-            <div>
-                <span class="rank-status ${statusClass}">${statusText}</span>
-                ${currentRank.reward > 0 ? `<span style="margin-left:10px;font-size:14px;color:#fbbf24;">Reward: ${formatCurrency(currentRank.reward)}</span>` : ''}
-            </div>
-            ${nextRankHTML}
-            ${processingMsg}
-        </div>
-
-        <!-- Deposit Wallet -->
-        <div class="rank-card" style="border-color:rgba(251,191,36,0.1);">
-            <div class="rank-icon">💰</div>
-            <div class="rank-name">Deposit Wallet</div>
-            <div class="rank-sub">Total USDT Balance</div>
-            <div class="rank-value" style="color:#2ecc71;">${formatCurrency(depositWallet)}</div>
-            <div class="rank-label">Available for withdrawal</div>
-        </div>
-
-        <!-- Total Rewards -->
-        <div class="rank-card" style="border-color:rgba(52,152,219,0.1);">
-            <div class="rank-icon">🏆</div>
-            <div class="rank-name">Total Rank Rewards</div>
-            <div class="rank-sub">All rewards earned</div>
-            <div class="rank-value" style="color:#fbbf24;">
-                ${formatCurrency(totalRewards)}
-            </div>
-            <div class="rank-label">${Object.keys(rankRewardStatus).filter(k => rankRewardStatus[k]?.status === 'completed').length} ranks achieved</div>
-        </div>
-    `;
 
     // ===== RANK TABLE =====
     const tableBody = document.getElementById('rankTableBody');
@@ -403,16 +354,15 @@ function renderUI(userData, rankRewardStatus, processingResult = null) {
     for (let level of RANK_LEVELS) {
         const isAchieved = rankRewardStatus[level.key]?.status === 'completed';
         const isCurrent = level.key === currentRank.key;
-        const isLocked = !isAchieved && !isCurrent;
         const isEligible = !isAchieved && teamBusiness >= level.minBusiness && level.reward > 0;
 
         let statusBadge = '';
         if (isAchieved) {
-            statusBadge = `<span class="badge-status achieved">✓ Achieved</span>`;
-        } else if (isCurrent && level.reward === 0) {
-            statusBadge = `<span class="badge-status current">Current</span>`;
+            statusBadge = `<span class="badge-status achieved">✅ Achieved</span>`;
         } else if (isEligible) {
             statusBadge = `<span class="badge-status eligible">⏳ Eligible</span>`;
+        } else if (isCurrent && level.reward === 0) {
+            statusBadge = `<span class="badge-status current">Current</span>`;
         } else if (isCurrent) {
             statusBadge = `<span class="badge-status current">Current</span>`;
         } else {
@@ -421,8 +371,11 @@ function renderUI(userData, rankRewardStatus, processingResult = null) {
 
         const rewardDisplay = level.reward > 0 ? formatCurrency(level.reward) : '$0';
 
+        // Highlight row if it's the current rank
+        const rowClass = isCurrent ? 'style="background:rgba(251,191,36,0.05);"' : '';
+
         tableRows += `
-            <tr>
+            <tr ${rowClass}>
                 <td><span class="rank-icon-small">${level.icon}</span> ${level.rank}</td>
                 <td>${formatCurrency(level.minBusiness)}</td>
                 <td>${rewardDisplay}</td>
@@ -446,6 +399,7 @@ function renderUI(userData, rankRewardStatus, processingResult = null) {
                 <i class="bi bi-clock"></i>
                 No rank rewards earned yet.
                 <br><span style="font-size:13px;">Build your team business to unlock ranks!</span>
+                <br><span style="font-size:12px;color:#556688;">Start with Executive at $3,000</span>
             </div>
         `;
     } else {
@@ -493,28 +447,24 @@ async function loadRankData(userId) {
         const userData = userSnap.val();
         const teamBusiness = Number(userData.teamBusiness) || 0;
 
-        // Get rank reward status from rankRewards path
         let rankRewardStatus = await getRankRewardStatus(userId);
 
-        // Check and process pending rewards
-        let processingResult = null;
         if (!isProcessing) {
             isProcessing = true;
             try {
-                processingResult = await checkAndProcessAllRankRewards(userId, teamBusiness);
+                const processingResult = await checkAndProcessAllRankRewards(userId, teamBusiness);
                 if (processingResult && processingResult.anyProcessed) {
-                    // Refresh data after processing
                     rankRewardStatus = await getRankRewardStatus(userId);
+                    showToast(`✅ ${processingResult.processed.join(', ')} rank rewards earned!`, 'success');
                 }
             } catch (error) {
                 console.error('Error processing rewards:', error);
-                showToast('❌ Error processing rewards: ' + error.message, 'error');
             } finally {
                 isProcessing = false;
             }
         }
 
-        renderUI(userData, rankRewardStatus, processingResult);
+        renderUI(userData, rankRewardStatus);
 
         document.getElementById('loadingContainer').style.display = 'none';
         document.getElementById('contentContainer').style.display = 'block';
@@ -558,13 +508,13 @@ function setupTeamBusinessListener(userId) {
 
         let rankRewardStatus = await getRankRewardStatus(userId);
 
-        let processingResult = null;
         if (!isProcessing) {
             isProcessing = true;
             try {
-                processingResult = await checkAndProcessAllRankRewards(userId, teamBusiness);
+                const processingResult = await checkAndProcessAllRankRewards(userId, teamBusiness);
                 if (processingResult && processingResult.anyProcessed) {
                     rankRewardStatus = await getRankRewardStatus(userId);
+                    showToast(`✅ ${processingResult.processed.join(', ')} rank rewards earned!`, 'success');
                 }
             } catch (error) {
                 console.error('Error processing rewards:', error);
@@ -573,7 +523,7 @@ function setupTeamBusinessListener(userId) {
             }
         }
 
-        renderUI(userData, rankRewardStatus, processingResult);
+        renderUI(userData, rankRewardStatus);
     });
 }
 
@@ -592,7 +542,8 @@ function cleanup() {
 // ============================================================
 const sidebarPanel = document.getElementById('sidebarPanel');
 const sidebarOverlay = document.getElementById('sidebarOverlay');
-const mobileToggle = document.getElementById('mobileToggle');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarClose = document.getElementById('sidebarClose');
 
 function openSidebar() {
     sidebarPanel.classList.add('open');
@@ -606,25 +557,16 @@ function closeSidebar() {
     document.body.style.overflow = '';
 }
 
-if (mobileToggle) {
-    mobileToggle.addEventListener('click', openSidebar);
-}
-if (sidebarOverlay) {
-    sidebarOverlay.addEventListener('click', closeSidebar);
-}
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeSidebar();
-});
+sidebarToggle.addEventListener('click', openSidebar);
+sidebarClose.addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
 
-// Logout
-const logoutBtn = document.getElementById('logoutBtnSidebar');
-if (logoutBtn) {
-    logoutBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        await signOut(auth);
-        window.location.href = 'login.html';
-    });
-}
+document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await signOut(auth);
+    window.location.href = 'login.html';
+});
 
 // ============================================================
 // AUTH HANDLER
@@ -639,5 +581,4 @@ onAuthStateChanged(auth, async (user) => {
     await loadRankData(user.uid);
 });
 
-// Cleanup on page unload
 window.addEventListener('beforeunload', cleanup);

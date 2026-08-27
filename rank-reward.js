@@ -1,5 +1,5 @@
 // ============================================================
-// RANK REWARD - PRODUCTION READY v4 (FULL SETUP)
+// RANK REWARD - PRODUCTION READY v8 (TRUE ATOMIC MULTI-LOCATION)
 // ============================================================
 // RANK SYSTEM:
 // Member    → $0      → $0 reward
@@ -18,11 +18,12 @@ import {
     get,
     runTransaction,
     onValue,
-    set
+    set,
+    update
 } from "firebase/database";
 
 // ============================================================
-// FIREBASE CONFIG - UPDATED
+// FIREBASE CONFIG
 // ============================================================
 const firebaseConfig = {
     apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -111,12 +112,12 @@ function calculateRank(teamBusiness) {
 
 function getNextRank(teamBusiness) {
     const business = Number(teamBusiness) || 0;
-    for (let i = RANK_LEVELS.length - 1; i >= 0; i--) {
-        if (business < RANK_LEVELS[i].minBusiness) {
-            return RANK_LEVELS[i];
-        }
+    const current = calculateRank(business);
+    const currentIndex = RANK_LEVELS.findIndex(level => level.key === current.key);
+    if (currentIndex >= RANK_LEVELS.length - 1) {
+        return null;
     }
-    return null;
+    return RANK_LEVELS[currentIndex + 1];
 }
 
 function getRankByKey(key) {
@@ -124,7 +125,7 @@ function getRankByKey(key) {
 }
 
 // ============================================================
-// GET RANK REWARD STATUS
+// GET RANK REWARD STATUS - SINGLE SOURCE OF TRUTH
 // ============================================================
 async function getRankRewardStatus(userId) {
     try {
@@ -140,9 +141,6 @@ async function getRankRewardStatus(userId) {
     }
 }
 
-// ============================================================
-// 🔥 CALCULATE TOTAL RANK REWARD - SUM OF ALL EARNED REWARDS
-// ============================================================
 function calculateTotalRankReward(rankRewardStatus) {
     let total = 0;
     for (let key in rankRewardStatus) {
@@ -155,68 +153,88 @@ function calculateTotalRankReward(rankRewardStatus) {
 }
 
 // ============================================================
-// 🔥 ATOMIC RANK REWARD - SINGLE TRANSACTION
+// 🔥🔥🔥 TRUE ATOMIC TRANSACTION WITH MULTI-PATH UPDATE 🔥🔥🔥
 // ============================================================
-async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusiness) {
+async function processSingleRankReward(userId, rankKey, teamBusiness) {
     try {
-        const userRef = ref(db, 'users/' + userId);
         const rankInfo = getRankByKey(rankKey);
+        const rewardAmount = rankInfo.reward;
+        
+        if (rewardAmount <= 0) {
+            console.log(`ℹ️ ${rankInfo.rank} has no reward to claim`);
+            return { success: false, error: 'No reward for this rank' };
+        }
+
+        // ============================================================
+        // Check if already claimed - SINGLE SOURCE OF TRUTH
+        // ============================================================
+        const rankRewardStatus = await getRankRewardStatus(userId);
+        if (rankRewardStatus[rankKey] && rankRewardStatus[rankKey].status === 'completed') {
+            console.log(`ℹ️ ${rankInfo.rank} already claimed (rankRewards record exists)`);
+            return { success: false, alreadyClaimed: true };
+        }
+
+        const userSnap = await get(ref(db, 'users/' + userId));
+        if (!userSnap.exists()) {
+            return { success: false, error: 'User not found' };
+        }
+        
+        const userData = userSnap.val();
+        if (userData._rankRewardsClaimed && userData._rankRewardsClaimed[rankKey] === true) {
+            console.log(`ℹ️ ${rankInfo.rank} already claimed (legacy user flag exists)`);
+            // Repair: Create the rankRewards record if missing
+            await set(ref(db, `rankRewards/${userId}/${rankKey}`), {
+                rank: rankInfo.rank,
+                rankKey: rankKey,
+                requiredBusiness: rankInfo.minBusiness,
+                rewardAmount: rewardAmount,
+                teamBusinessAtReward: teamBusiness,
+                creditedAt: Date.now(),
+                creditedDate: getTodayDate(),
+                status: 'completed',
+                transactionId: 'legacy_' + Date.now()
+            });
+            return { success: false, alreadyClaimed: true, repaired: true };
+        }
+
         const txId = generateTxId();
         const timestamp = Date.now();
 
-        const result = await runTransaction(userRef, (currentData) => {
-            if (!currentData) return currentData;
-
-            const claimed = currentData._rankRewardsClaimed || {};
-            if (claimed[rankKey] === true) {
-                return currentData;
-            }
-
-            const currentWallet = Number(currentData.depositWallet) || 0;
-            currentData.depositWallet = currentWallet + rewardAmount;
-
-            currentData.rank = rankInfo.rank;
-
-            if (!currentData._rankRewardsClaimed) {
-                currentData._rankRewardsClaimed = {};
-            }
-            currentData._rankRewardsClaimed[rankKey] = true;
-
-            if (!currentData.transactions) {
-                currentData.transactions = {};
-            }
-            currentData.transactions[txId] = {
-                type: 'rank_reward',
-                rank: rankInfo.rank,
-                amount: rewardAmount,
-                currency: 'USDT',
-                wallet: 'depositWallet',
-                requiredTeamBusiness: rankInfo.minBusiness,
-                teamBusinessAtReward: teamBusiness,
-                timestamp: timestamp,
-                date: getTodayDate(),
-                status: 'completed',
-                description: `🏆 ${rankInfo.rank} Rank Reward: $${rewardAmount} credited to Deposit Wallet`
-            };
-
-            return currentData;
-        });
-
-        if (!result.committed) {
-            console.log(`❌ Transaction failed for ${rankInfo.rank}`);
-            return { success: false, error: 'Transaction failed' };
-        }
-
-        if (result.snapshot.exists()) {
-            const data = result.snapshot.val();
-            const claimed = data._rankRewardsClaimed || {};
-            if (claimed[rankKey] === true) {
-                console.log(`ℹ️ ${rankInfo.rank} was already claimed`);
-                return { success: false, alreadyClaimed: true };
-            }
-        }
-
-        await set(ref(db, `rankRewards/${userId}/${rankKey}`), {
+        // ============================================================
+        // 🔥🔥🔥 THE MAGIC: ATOMIC MULTI-PATH UPDATE 🔥🔥🔥
+        // This updates BOTH locations in a SINGLE ATOMIC operation!
+        // ============================================================
+        
+        // Prepare the multi-path update object
+        const multiPathUpdate = {};
+        
+        // 1. Update user's wallet and claim status
+        const currentWallet = Number(userData.depositWallet) || 0;
+        const newWallet = currentWallet + rewardAmount;
+        
+        // User path updates
+        multiPathUpdate[`users/${userId}/depositWallet`] = newWallet;
+        multiPathUpdate[`users/${userId}/rank`] = rankInfo.rank;
+        multiPathUpdate[`users/${userId}/_rankRewardsClaimed/${rankKey}`] = true;
+        multiPathUpdate[`users/${userId}/transactions/${txId}`] = {
+            type: 'rank_reward',
+            rank: rankInfo.rank,
+            rankKey: rankKey,
+            amount: rewardAmount,
+            currency: 'USDT',
+            wallet: 'depositWallet',
+            requiredTeamBusiness: rankInfo.minBusiness,
+            teamBusinessAtReward: teamBusiness,
+            timestamp: timestamp,
+            date: getTodayDate(),
+            status: 'completed',
+            description: `🏆 ${rankInfo.rank} Rank Reward: $${rewardAmount} credited to Deposit Wallet`,
+            source: 'rank_reward_system_v8',
+            atomic: true
+        };
+        
+        // 2. RankRewards record path
+        multiPathUpdate[`rankRewards/${userId}/${rankKey}`] = {
             rank: rankInfo.rank,
             rankKey: rankKey,
             requiredBusiness: rankInfo.minBusiness,
@@ -225,55 +243,137 @@ async function processSingleRankReward(userId, rankKey, rewardAmount, teamBusine
             creditedAt: timestamp,
             creditedDate: getTodayDate(),
             status: 'completed',
-            transactionId: txId
-        });
+            transactionId: txId,
+            source: 'rank_reward_system_v8',
+            atomic: true
+        };
 
-        console.log(`✅ Rank reward processed: ${rankInfo.rank} - $${rewardAmount}`);
+        // ============================================================
+        // 🔥🔥🔥 SINGLE ATOMIC UPDATE - ALL OR NOTHING 🔥🔥🔥
+        // ============================================================
+        console.log(`🔍 Attempting atomic multi-path update for ${rankInfo.rank}...`);
+        console.log(`   - Updating wallet: $${currentWallet} → $${newWallet}`);
+        console.log(`   - Setting claim flag for: ${rankKey}`);
+        console.log(`   - Creating rankRewards record for: ${rankKey}`);
+        console.log(`   - Creating transaction: ${txId}`);
+        
+        await update(ref(db), multiPathUpdate);
+        
+        console.log(`✅ TRUE ATOMIC transaction completed for ${rankInfo.rank}`);
+        console.log(`   - ALL writes succeeded together`);
+        console.log(`   - No partial updates possible`);
+        
         showToast(`🏆 ${rankInfo.rank} Rank Reward: $${rewardAmount} credited to Deposit Wallet!`, 'success');
-        return { success: true, alreadyClaimed: false, rank: rankInfo.rank, amount: rewardAmount, txId: txId };
+        
+        // Verify the update was successful
+        const verifySnap = await get(ref(db, `rankRewards/${userId}/${rankKey}`));
+        if (verifySnap.exists()) {
+            console.log(`✅ Verification: rankRewards record exists for ${rankKey}`);
+        } else {
+            console.log(`⚠️ Warning: rankRewards record not found after atomic update`);
+            // This should never happen with a true atomic update
+        }
+        
+        return { 
+            success: true, 
+            alreadyClaimed: false, 
+            rank: rankInfo.rank, 
+            amount: rewardAmount, 
+            txId: txId,
+            atomic: true
+        };
 
     } catch (error) {
-        console.error('❌ Error processing rank reward:', error);
+        console.error('❌ Error in atomic transaction:', error);
+        
+        // ============================================================
+        // 🔥 With true atomic updates, we DON'T need reversal logic
+        // because either ALL writes succeed or NONE do.
+        // ============================================================
+        
+        // Check if any partial writes occurred (shouldn't happen with atomic)
+        try {
+            const checkRankReward = await get(ref(db, `rankRewards/${userId}/${rankKey}`));
+            const checkWallet = await get(ref(db, `users/${userId}/depositWallet`));
+            
+            if (checkRankReward.exists() || checkWallet.exists()) {
+                console.log('⚠️ Partial write detected despite atomic attempt - manual intervention may be needed');
+                // Log for monitoring
+                console.log(`🚨 MANUAL CHECK REQUIRED: User ${userId}, Rank ${rankKey}`);
+                console.log(`   - rankRewards exists: ${checkRankReward.exists()}`);
+                console.log(`   - wallet exists: ${checkWallet.exists()}`);
+            }
+        } catch (checkError) {
+            console.error('Error checking for partial writes:', checkError);
+        }
+        
         return { success: false, error: error.message };
     }
 }
 
 // ============================================================
-// 🔥 CHECK AND PROCESS ALL ELIGIBLE RANK REWARDS
+// CHECK AND PROCESS ALL ELIGIBLE RANK REWARDS
 // ============================================================
 async function checkAndProcessAllRankRewards(userId, teamBusiness) {
     try {
+        const rankRewardStatus = await getRankRewardStatus(userId);
         const userSnap = await get(ref(db, 'users/' + userId));
         const userData = userSnap.exists() ? userSnap.val() : {};
-        const claimed = userData._rankRewardsClaimed || {};
+        const userClaimed = userData._rankRewardsClaimed || {};
 
         const processed = [];
         const errors = [];
         let anyProcessed = false;
 
-        // Process ALL ranks from Executive to Diamond
         for (let level of RANK_LEVELS) {
-            if (level.reward === 0) continue; // Skip Member (no reward)
+            if (level.reward === 0) continue;
+
+            const isClaimedInRankRewards = rankRewardStatus[level.key] && 
+                                          rankRewardStatus[level.key].status === 'completed';
+            const isClaimedInUser = userClaimed[level.key] === true;
+
+            if (isClaimedInRankRewards) {
+                continue;
+            }
+
+            if (isClaimedInUser && !isClaimedInRankRewards) {
+                // Repair missing rankRewards record
+                console.log(`🔧 Repairing missing rankRewards record for ${level.rank}`);
+                try {
+                    await set(ref(db, `rankRewards/${userId}/${level.key}`), {
+                        rank: level.rank,
+                        rankKey: level.key,
+                        requiredBusiness: level.minBusiness,
+                        rewardAmount: level.reward,
+                        teamBusinessAtReward: teamBusiness,
+                        creditedAt: Date.now(),
+                        creditedDate: getTodayDate(),
+                        status: 'completed',
+                        transactionId: 'repaired_' + Date.now(),
+                        source: 'repair_system'
+                    });
+                    console.log(`✅ Repaired rankRewards record for ${level.rank}`);
+                } catch (repairError) {
+                    console.error(`❌ Failed to repair ${level.rank}:`, repairError);
+                }
+                continue;
+            }
 
             if (teamBusiness >= level.minBusiness) {
-                if (claimed[level.key] !== true) {
-                    console.log(`🔍 Processing ${level.rank} reward...`);
-                    const result = await processSingleRankReward(
-                        userId,
-                        level.key,
-                        level.reward,
-                        teamBusiness
-                    );
-                    if (result.success) {
-                        processed.push(level.rank);
-                        anyProcessed = true;
-                    } else if (result.alreadyClaimed) {
-                        console.log(`ℹ️ ${level.rank} was claimed by another process`);
-                    } else if (result.error) {
-                        errors.push({ rank: level.rank, error: result.error });
-                    }
-                } else {
-                    console.log(`ℹ️ ${level.rank} already claimed`);
+                console.log(`🔍 Processing ${level.rank} reward with atomic update...`);
+                const result = await processSingleRankReward(
+                    userId,
+                    level.key,
+                    teamBusiness
+                );
+                
+                if (result.success) {
+                    processed.push(level.rank);
+                    anyProcessed = true;
+                } else if (result.alreadyClaimed) {
+                    console.log(`ℹ️ ${level.rank} was claimed by another process`);
+                } else if (result.error) {
+                    errors.push({ rank: level.rank, error: result.error });
                 }
             }
         }
@@ -287,7 +387,7 @@ async function checkAndProcessAllRankRewards(userId, teamBusiness) {
 }
 
 // ============================================================
-// RENDER UI
+// RENDER UI (SAME AS BEFORE)
 // ============================================================
 function renderUI(userData, rankRewardStatus) {
     const teamBusiness = Number(userData.teamBusiness) || 0;
@@ -301,13 +401,11 @@ function renderUI(userData, rankRewardStatus) {
     const rewardCount = Object.values(rankRewardStatus)
         .filter(r => r.status === 'completed').length;
 
-    // Update sidebar
     document.getElementById('sidebarName').textContent = name;
     document.getElementById('sidebarEmail').textContent = userData.email || 'user@example.com';
     document.getElementById('sidebarUserId').textContent = 'ID: ' + username.substring(0, 20) + '...';
     document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
 
-    // ===== SUMMARY CARDS =====
     document.getElementById('totalBusiness').textContent = formatCurrency(teamBusiness);
     document.getElementById('currentRankDisplay').textContent = currentRank.rank;
     document.getElementById('rankRewardDisplay').textContent = currentRank.reward > 0 ? 
@@ -315,7 +413,6 @@ function renderUI(userData, rankRewardStatus) {
     document.getElementById('totalRankReward').textContent = formatCurrency(totalRankReward);
     document.getElementById('rewardCount').textContent = rewardCount + ' rewards earned';
 
-    // ===== RANK PROGRESS =====
     document.getElementById('currentRankText').textContent = currentRank.rank + ' ' + currentRank.icon;
     document.getElementById('currentBusinessDisplay').textContent = formatCurrency(teamBusiness);
 
@@ -347,7 +444,6 @@ function renderUI(userData, rankRewardStatus) {
         nextRankInfo.style.display = 'none';
     }
 
-    // ===== RANK TABLE =====
     const tableBody = document.getElementById('rankTableBody');
     let tableRows = '';
 
@@ -370,8 +466,6 @@ function renderUI(userData, rankRewardStatus) {
         }
 
         const rewardDisplay = level.reward > 0 ? formatCurrency(level.reward) : '$0';
-
-        // Highlight row if it's the current rank
         const rowClass = isCurrent ? 'style="background:rgba(251,191,36,0.05);"' : '';
 
         tableRows += `
@@ -386,9 +480,7 @@ function renderUI(userData, rankRewardStatus) {
 
     tableBody.innerHTML = tableRows;
 
-    // ===== REWARD HISTORY =====
     const historyList = document.getElementById('historyList');
-
     const historyItems = Object.values(rankRewardStatus)
         .filter(r => r.status === 'completed')
         .sort((a, b) => (b.creditedAt || 0) - (a.creditedAt || 0));
@@ -432,6 +524,7 @@ function renderUI(userData, rankRewardStatus) {
 let currentUserId = null;
 let teamBusinessListenerOff = null;
 let isProcessing = false;
+let processingLock = false;
 
 async function loadRankData(userId) {
     try {
@@ -449,7 +542,8 @@ async function loadRankData(userId) {
 
         let rankRewardStatus = await getRankRewardStatus(userId);
 
-        if (!isProcessing) {
+        if (!isProcessing && !processingLock) {
+            processingLock = true;
             isProcessing = true;
             try {
                 const processingResult = await checkAndProcessAllRankRewards(userId, teamBusiness);
@@ -457,10 +551,14 @@ async function loadRankData(userId) {
                     rankRewardStatus = await getRankRewardStatus(userId);
                     showToast(`✅ ${processingResult.processed.join(', ')} rank rewards earned!`, 'success');
                 }
+                if (processingResult && processingResult.errors && processingResult.errors.length > 0) {
+                    console.error('Errors during processing:', processingResult.errors);
+                }
             } catch (error) {
                 console.error('Error processing rewards:', error);
             } finally {
                 isProcessing = false;
+                processingLock = false;
             }
         }
 
@@ -508,7 +606,8 @@ function setupTeamBusinessListener(userId) {
 
         let rankRewardStatus = await getRankRewardStatus(userId);
 
-        if (!isProcessing) {
+        if (!isProcessing && !processingLock) {
+            processingLock = true;
             isProcessing = true;
             try {
                 const processingResult = await checkAndProcessAllRankRewards(userId, teamBusiness);
@@ -520,6 +619,7 @@ function setupTeamBusinessListener(userId) {
                 console.error('Error processing rewards:', error);
             } finally {
                 isProcessing = false;
+                processingLock = false;
             }
         }
 

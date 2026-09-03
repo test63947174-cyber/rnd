@@ -155,6 +155,7 @@
         .toast-custom.success { border-left: 4px solid #2ecc71; }
         .toast-custom.error { border-left: 4px solid #ef4444; }
         .toast-custom.warning { border-left: 4px solid #f59e0b; }
+        .toast-custom.info { border-left: 4px solid #60a5fa; }
         .toast-custom i { font-size: 1.2rem; }
         .toast-custom .toast-msg { flex: 1; }
         @keyframes slideIn {
@@ -324,6 +325,61 @@
             margin-top: 2px;
         }
 
+        /* ===== REWARD WALLET - NEW ===== */
+        .reward-wallet-card {
+            background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02));
+            border: 2px solid rgba(251,191,36,0.15);
+            border-radius: 20px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .reward-wallet-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(251,191,36,0.05), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .reward-wallet-card .wallet-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+        .reward-wallet-card .wallet-amount {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #fbbf24;
+            line-height: 1.2;
+        }
+        .reward-wallet-card .wallet-amount .currency {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .reward-wallet-card .wallet-sub {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .reward-wallet-card .wallet-sub strong {
+            color: #2ecc71;
+        }
+        .reward-wallet-card .wallet-icon-big {
+            font-size: 2rem;
+            color: #fbbf24;
+            margin-bottom: 8px;
+            display: block;
+        }
+
         /* Progress */
         .progress-section {
             background: rgba(20,27,45,0.6);
@@ -359,7 +415,7 @@
         }
         .progress-bar-track .fill {
             height: 100%;
-            background: linear-gradient(90deg, #2ecc71, #10b981);
+            background: linear-gradient(90deg, #fbbf24, #f59e0b);
             border-radius: 30px;
             transition: width 0.6s ease;
             width: 0%;
@@ -498,7 +554,7 @@
             background: #fbbf24;
         }
 
-        /* Withdrawal - UPDATED */
+        /* ===== WITHDRAWAL SECTION - UPDATED ===== */
         .withdrawal-section {
             background: rgba(20,27,45,0.6);
             border: 1px solid rgba(46,204,113,0.06);
@@ -612,7 +668,7 @@
         }
         .withdrawal-section .btn-withdraw.withdrawal-locked {
             background: #64748b;
-            cursor: not-allowed;
+            cursor: pointer;
         }
         .withdrawal-section .btn-withdraw.withdrawal-locked:hover {
             transform: none;
@@ -640,6 +696,79 @@
             background: rgba(239,68,68,0.05);
             border: 1px solid rgba(239,68,68,0.1);
             color: #ef4444;
+        }
+
+        /* ===== DAYS REMAINING POPUP ===== */
+        .days-remaining-popup {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .days-remaining-popup.visible {
+            display: flex;
+        }
+        .days-remaining-popup .popup-content {
+            background: #141b2d;
+            border: 1px solid rgba(251,191,36,0.15);
+            border-radius: 24px;
+            padding: 40px 48px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            animation: popIn 0.4s ease;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .days-remaining-popup .popup-icon {
+            font-size: 3rem;
+            color: #fbbf24;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .days-remaining-popup .popup-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+        }
+        .days-remaining-popup .popup-text {
+            color: #94a3b8;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .days-remaining-popup .popup-text strong {
+            color: #fbbf24;
+        }
+        .days-remaining-popup .popup-days {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #2ecc71;
+            margin: 8px 0;
+        }
+        .days-remaining-popup .popup-close-btn {
+            background: #2ecc71;
+            color: #0a0e1a;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 8px;
+        }
+        .days-remaining-popup .popup-close-btn:hover {
+            background: #10b981;
+            transform: scale(1.02);
         }
 
         .not-eligible-box {
@@ -685,6 +814,8 @@
             .referral-box code { font-size: 0.7rem; }
             .withdrawal-section .reward-amount-display .amount { font-size: 1.2rem; }
             .navbar-custom .brand { font-size: 1.1rem; }
+            .reward-wallet-card .wallet-amount { font-size: 2.5rem; }
+            .days-remaining-popup .popup-content { padding: 30px 24px; }
         }
         @media (max-width: 480px) {
             .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -693,6 +824,7 @@
             .countdown-item { padding: 10px 12px; min-width: 50px; }
             .countdown-item .number { font-size: 1.3rem; }
             .milestone-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+            .reward-wallet-card .wallet-amount { font-size: 2rem; }
         }
     </style>
 </head>
@@ -705,6 +837,24 @@
 
     <!-- ===== TOAST ===== -->
     <div id="toastContainer"></div>
+
+    <!-- ===== DAYS REMAINING POPUP ===== -->
+    <div class="days-remaining-popup" id="daysPopup">
+        <div class="popup-content">
+            <span class="popup-icon">📅</span>
+            <div class="popup-title">Withdrawal Not Available Yet</div>
+            <div class="popup-text">
+                Your reward wallet has <strong>$<span id="popupRewardAmount">0</span></strong> USDT.
+                <br><br>
+                Withdrawal will be available after the offer ends on <strong>6 October 2026</strong>.
+                <br><br>
+                <span style="color:#94a3b8;font-size:0.9rem;">Days remaining:</span>
+                <div class="popup-days" id="popupDaysRemaining">0</div>
+                <span style="color:#64748b;font-size:0.85rem;">days left</span>
+            </div>
+            <button class="popup-close-btn" id="popupCloseBtn">Got it!</button>
+        </div>
+    </div>
 
     <!-- ===== NAVBAR ===== -->
     <nav class="navbar-custom">
@@ -764,6 +914,18 @@
             </div>
         </div>
 
+        <!-- ===== REWARD WALLET - NEW ===== -->
+        <div class="reward-wallet-card" id="rewardWalletCard">
+            <span class="wallet-icon-big">💰</span>
+            <div class="wallet-label">Your Reward Wallet</div>
+            <div class="wallet-amount">
+                $<span id="walletAmount">0.00</span> <span class="currency">USDT</span>
+            </div>
+            <div class="wallet-sub">
+                <span id="walletStatusText">Start referring to earn rewards!</span>
+            </div>
+        </div>
+
         <!-- ===== STATS ===== -->
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
@@ -772,8 +934,8 @@
             </div>
             <div class="stat-card">
                 <div class="number gold" id="statEligibleReward">$0</div>
-                <div class="label">Your Eligible Reward</div>
-                <div class="sub" id="statRewardNote">You've earned this!</div>
+                <div class="label">Current Reward</div>
+                <div class="sub" id="statRewardNote">Earn more referrals!</div>
             </div>
             <div class="stat-card">
                 <div class="number blue" id="statNextMilestone">5 → $5</div>
@@ -790,7 +952,7 @@
         <!-- ===== PROGRESS ===== -->
         <div class="progress-section" id="progressSection">
             <div class="label-row">
-                <span class="title"><i class="bi bi-graph-up-arrow" style="color:#2ecc71;margin-right:8px;"></i>Your Progress</span>
+                <span class="title"><i class="bi bi-graph-up-arrow" style="color:#fbbf24;margin-right:8px;"></i>Your Progress</span>
                 <span class="value"><strong id="progressCurrent">0</strong> / <span id="progressTarget">100</span> Direct Referrals</span>
             </div>
             <div class="progress-bar-track">
@@ -968,7 +1130,16 @@
             withdrawalStatus: $('withdrawalStatus'),
             withdrawalInfoBox: $('withdrawalInfoBox'),
             withdrawalInfoText: $('withdrawalInfoText'),
-            notEligibleBox: $('notEligibleBox')
+            notEligibleBox: $('notEligibleBox'),
+            // New elements
+            walletAmount: $('walletAmount'),
+            walletStatusText: $('walletStatusText'),
+            rewardWalletCard: $('rewardWalletCard'),
+            // Popup
+            daysPopup: $('daysPopup'),
+            popupRewardAmount: $('popupRewardAmount'),
+            popupDaysRemaining: $('popupDaysRemaining'),
+            popupCloseBtn: $('popupCloseBtn')
         };
 
         let currentUserId = null;
@@ -986,7 +1157,8 @@
             const iconMap = {
                 success: 'bi-check-circle-fill text-success',
                 error: 'bi-exclamation-triangle-fill text-danger',
-                warning: 'bi-exclamation-triangle-fill text-warning'
+                warning: 'bi-exclamation-triangle-fill text-warning',
+                info: 'bi-info-circle-fill text-info'
             };
             toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i><span class="toast-msg">${message}</span>`;
             container.appendChild(toast);
@@ -1017,6 +1189,16 @@
         }
 
         // ============================================================
+        // GET DAYS REMAINING
+        // ============================================================
+        function getDaysRemaining() {
+            const now = new Date();
+            const diff = CAMPAIGN.endDate - now;
+            if (diff <= 0) return 0;
+            return Math.ceil(diff / (1000 * 60 * 60 * 24));
+        }
+
+        // ============================================================
         // COUNTDOWN
         // ============================================================
         function startCountdown() {
@@ -1044,7 +1226,7 @@
         }
 
         // ============================================================
-        // CALCULATE REWARD - ONLY ONE AMOUNT SHOWS
+        // CALCULATE REWARD
         // ============================================================
         function calculateReward(directCount) {
             if (directCount < CAMPAIGN.minQualifying) return 0;
@@ -1061,16 +1243,6 @@
                 if (m.refs > directCount) return m;
             }
             return null;
-        }
-
-        function getCurrentMilestoneIndex(directCount) {
-            let index = -1;
-            for (let i = 0; i < MILESTONES.length; i++) {
-                if (directCount >= MILESTONES[i].refs) {
-                    index = i;
-                }
-            }
-            return index;
         }
 
         // ============================================================
@@ -1208,6 +1380,16 @@
         }
 
         // ============================================================
+        // SHOW DAYS REMAINING POPUP
+        // ============================================================
+        function showDaysPopup(reward) {
+            const daysLeft = getDaysRemaining();
+            el.popupRewardAmount.textContent = reward.toFixed(2);
+            el.popupDaysRemaining.textContent = daysLeft;
+            el.daysPopup.classList.add('visible');
+        }
+
+        // ============================================================
         // UPDATE WITHDRAWAL UI
         // ============================================================
         function updateWithdrawalUI(reward, status) {
@@ -1264,11 +1446,11 @@
                     el.withdrawalInfoBox.style.display = 'block';
                     el.withdrawalInfoText.textContent = '🎉 Offer ended! You can now withdraw your reward.';
                 } else if (campaignStatus === 'ACTIVE') {
-                    el.withdrawBtn.disabled = true;
-                    el.withdrawBtn.innerHTML = '🔒 Withdrawal Available After Offer Ends';
+                    el.withdrawBtn.disabled = false;
+                    el.withdrawBtn.innerHTML = '📅 Check Days Remaining';
                     el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
                     el.withdrawalInfoBox.style.display = 'block';
-                    el.withdrawalInfoText.textContent = '📅 Withdrawal will be available on 6 October 2026 after the offer ends.';
+                    el.withdrawalInfoText.textContent = '📅 Click the button below to see when withdrawal will be available.';
                 } else {
                     el.withdrawBtn.disabled = true;
                     el.withdrawBtn.innerHTML = '⏳ Offer Not Started Yet';
@@ -1283,6 +1465,32 @@
             const statusEl = el.withdrawalStatus;
             statusEl.className = 'withdrawal-status visible ' + type;
             statusEl.textContent = message;
+        }
+
+        // ============================================================
+        // UPDATE WALLET
+        // ============================================================
+        function updateWallet(reward) {
+            el.walletAmount.textContent = reward.toFixed(2);
+            
+            if (reward === 0) {
+                if (directReferrals === 0) {
+                    el.walletStatusText.textContent = '💡 Start referring to earn rewards!';
+                } else if (directReferrals < CAMPAIGN.minQualifying) {
+                    el.walletStatusText.textContent = `📊 Need ${CAMPAIGN.minQualifying - directReferrals} more referrals to qualify`;
+                } else {
+                    el.walletStatusText.textContent = '💰 You\'ve earned rewards! Keep going!';
+                }
+            } else if (reward >= CAMPAIGN.maxReward) {
+                el.walletStatusText.textContent = '🏆 MAXIMUM REWARD ACHIEVED! $' + reward + ' USDT';
+            } else {
+                const next = getNextMilestone(directReferrals);
+                if (next) {
+                    el.walletStatusText.textContent = `🎯 $${reward} USDT earned! Need ${next.refs - directReferrals} more for $${next.reward}`;
+                } else {
+                    el.walletStatusText.textContent = `💰 $${reward} USDT earned! Keep referring!`;
+                }
+            }
         }
 
         // ============================================================
@@ -1343,6 +1551,9 @@
                 el.notEligibleBox.classList.remove('visible');
             }
 
+            // Update Wallet
+            updateWallet(reward);
+
             // Update Withdrawal UI
             updateWithdrawalUI(reward, withdrawalData);
         }
@@ -1402,6 +1613,7 @@
                         if (newDirect !== directReferrals) {
                             directReferrals = newDirect;
                             el.totalReferralsDisplay.textContent = directReferrals;
+                            withdrawalData = await checkWithdrawalStatus(currentUserId);
                             updateUI();
                         }
                     }
@@ -1448,12 +1660,33 @@
         }
 
         // ============================================================
-        // HANDLE WITHDRAWAL
+        // HANDLE WITHDRAWAL BUTTON CLICK
+        // ============================================================
+        function handleWithdrawClick() {
+            const status = getCampaignStatus();
+            const reward = calculateReward(directReferrals);
+
+            // If offer is not ended, show days remaining popup
+            if (status !== 'ENDED') {
+                if (reward > 0) {
+                    showDaysPopup(reward);
+                } else {
+                    showToast('You are not eligible for any reward yet. Keep referring!', 'warning');
+                }
+                return;
+            }
+
+            // Offer ended - proceed with withdrawal
+            handleWithdrawal();
+        }
+
+        // ============================================================
+        // HANDLE WITHDRAWAL (Actual withdrawal process)
         // ============================================================
         async function handleWithdrawal() {
             // Check if offer ended
             if (getCampaignStatus() !== 'ENDED') {
-                showToast('Withdrawal is only available after the offer ends (6 October 2026).', 'error');
+                showToast('Withdrawal is only available after the offer ends.', 'error');
                 return;
             }
 
@@ -1529,7 +1762,16 @@
         function setupListeners() {
             el.copyReferralBtn.addEventListener('click', copyReferralLink);
             el.logoutBtn.addEventListener('click', handleLogout);
-            el.withdrawBtn.addEventListener('click', handleWithdrawal);
+            el.withdrawBtn.addEventListener('click', handleWithdrawClick);
+            el.popupCloseBtn.addEventListener('click', () => {
+                el.daysPopup.classList.remove('visible');
+            });
+            // Close popup on overlay click
+            el.daysPopup.addEventListener('click', (e) => {
+                if (e.target === el.daysPopup) {
+                    el.daysPopup.classList.remove('visible');
+                }
+            });
         }
 
         // ============================================================

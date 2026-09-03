@@ -13,209 +13,974 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 
     <style>
-        /* ===== SAME STYLES AS BEFORE ===== */
+        /* ============================================================
+           COMPLETE STYLES - PRODUCTION READY
+           ============================================================ */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; overflow-x: hidden; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0e1a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #141b2d; }
         ::-webkit-scrollbar-thumb { background: #2ecc71; border-radius: 10px; }
 
+        /* Loading */
         #loadingOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #0a0e1a; display: flex; align-items: center; justify-content: center; z-index: 9999;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #0a0e1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
             transition: opacity 0.5s ease;
         }
         #loadingOverlay.hidden { opacity: 0; pointer-events: none; }
-        .loader-spinner { width: 60px; height: 60px; border: 4px solid rgba(46,204,113,0.1); border-top: 4px solid #2ecc71; border-radius: 50%; animation: spin 1s linear infinite; }
+        .loader-spinner {
+            width: 60px; height: 60px;
+            border: 4px solid rgba(46,204,113,0.1);
+            border-top: 4px solid #2ecc71;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Navbar */
         .navbar-custom {
-            background: rgba(10,14,26,0.95); backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(46,204,113,0.08); padding: 12px 0; position: sticky; top: 0; z-index: 100;
+            background: rgba(10,14,26,0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(46,204,113,0.08);
+            padding: 12px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .navbar-custom .brand { font-weight: 800; font-size: 1.4rem; color: #fff; text-decoration: none; }
+        .navbar-custom .brand {
+            font-weight: 800;
+            font-size: 1.4rem;
+            color: #fff;
+            text-decoration: none;
+        }
         .navbar-custom .brand span { color: #2ecc71; }
-        .navbar-custom .brand small { font-weight: 400; font-size: 0.65rem; color: #94a3b8; display: block; }
-        .navbar-custom .nav-link { color: #94a3b8; font-weight: 500; font-size: 0.9rem; padding: 8px 16px; border-radius: 8px; transition: all 0.3s ease; text-decoration: none; }
-        .navbar-custom .nav-link:hover, .navbar-custom .nav-link.active { color: #fff; background: rgba(46,204,113,0.1); }
+        .navbar-custom .brand small {
+            font-weight: 400;
+            font-size: 0.65rem;
+            color: #94a3b8;
+            display: block;
+        }
+        .navbar-custom .nav-link {
+            color: #94a3b8;
+            font-weight: 500;
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        .navbar-custom .nav-link:hover,
+        .navbar-custom .nav-link.active {
+            color: #fff;
+            background: rgba(46,204,113,0.1);
+        }
         .navbar-custom .nav-link i { margin-right: 6px; }
         .user-badge {
-            display: flex; align-items: center; gap: 10px; background: rgba(46,204,113,0.08);
-            padding: 6px 14px 6px 10px; border-radius: 30px; border: 1px solid rgba(46,204,113,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(46,204,113,0.08);
+            padding: 6px 14px 6px 10px;
+            border-radius: 30px;
+            border: 1px solid rgba(46,204,113,0.1);
         }
-        .user-badge .avatar { width: 32px; height: 32px; border-radius: 50%; background: #2ecc71; color: #0a0e1a; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; }
-        .user-badge .name { color: #e2e8f0; font-weight: 600; font-size: 0.85rem; }
-        .user-badge .logout-btn { color: #94a3b8; background: none; border: none; font-size: 1rem; padding: 4px 8px; border-radius: 6px; transition: all 0.3s ease; cursor: pointer; }
-        .user-badge .logout-btn:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+        .user-badge .avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: #2ecc71;
+            color: #0a0e1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .user-badge .name {
+            color: #e2e8f0;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .user-badge .logout-btn {
+            color: #94a3b8;
+            background: none;
+            border: none;
+            font-size: 1rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .user-badge .logout-btn:hover {
+            color: #ef4444;
+            background: rgba(239,68,68,0.1);
+        }
 
-        #toastContainer { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; max-width: 400px; width: 100%; }
-        .toast-custom { padding: 14px 20px; border-radius: 12px; background: #141b2d; border: 1px solid rgba(46,204,113,0.15); color: #e2e8f0; display: flex; align-items: center; gap: 12px; font-size: 0.9rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.4s ease; }
+        /* Toast */
+        #toastContainer {
+            position: fixed;
+            top: 20px; right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .toast-custom {
+            padding: 14px 20px;
+            border-radius: 12px;
+            background: #141b2d;
+            border: 1px solid rgba(46,204,113,0.15);
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: slideIn 0.4s ease;
+        }
         .toast-custom.success { border-left: 4px solid #2ecc71; }
         .toast-custom.error { border-left: 4px solid #ef4444; }
         .toast-custom.warning { border-left: 4px solid #f59e0b; }
         .toast-custom.info { border-left: 4px solid #60a5fa; }
         .toast-custom i { font-size: 1.2rem; }
         .toast-custom .toast-msg { flex: 1; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
 
-        .main-content { max-width: 1200px; margin: 0 auto; padding: 30px 20px 60px; }
+        /* Main Content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px 60px;
+        }
 
+        /* Hero */
         .hero-section {
             background: linear-gradient(135deg, rgba(46,204,113,0.08), rgba(46,204,113,0.02));
-            border: 1px solid rgba(46,204,113,0.08); border-radius: 24px; padding: 50px 40px; text-align: center; margin-bottom: 40px; position: relative; overflow: hidden;
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 24px;
+            padding: 50px 40px;
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
         }
-        .hero-section .badge-campaign { display: inline-block; background: rgba(46,204,113,0.15); color: #2ecc71; padding: 4px 16px; border-radius: 30px; font-size: 0.7rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px; }
-        .hero-section h1 { font-size: 2.8rem; font-weight: 900; color: #fff; margin-bottom: 8px; }
-        .hero-section h1 span { background: linear-gradient(135deg, #2ecc71, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero-section .subtitle { font-size: 1.2rem; color: #94a3b8; margin-bottom: 12px; }
-        .hero-section .date-range { font-size: 0.9rem; color: #64748b; margin-bottom: 24px; }
+        .hero-section .badge-campaign {
+            display: inline-block;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            padding: 4px 16px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+        .hero-section h1 {
+            font-size: 2.8rem;
+            font-weight: 900;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .hero-section h1 span {
+            background: linear-gradient(135deg, #2ecc71, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-section .subtitle {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            margin-bottom: 12px;
+        }
+        .hero-section .date-range {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
         .hero-section .date-range i { color: #2ecc71; margin: 0 4px; }
-        .hero-section .campaign-status-badge { display: inline-block; padding: 6px 20px; border-radius: 30px; font-weight: 600; font-size: 0.85rem; margin-top: 10px; }
-        .hero-section .campaign-status-badge.upcoming { background: rgba(96,165,250,0.15); color: #60a5fa; border: 1px solid rgba(96,165,250,0.15); }
-        .hero-section .campaign-status-badge.active { background: rgba(46,204,113,0.15); color: #2ecc71; border: 1px solid rgba(46,204,113,0.15); animation: pulse 2s infinite; }
-        .hero-section .campaign-status-badge.ended { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.15); }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .hero-section .campaign-status-badge {
+            display: inline-block;
+            padding: 6px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+        .hero-section .campaign-status-badge.upcoming {
+            background: rgba(96,165,250,0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(96,165,250,0.15);
+        }
+        .hero-section .campaign-status-badge.active {
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            border: 1px solid rgba(46,204,113,0.15);
+            animation: pulse 2s infinite;
+        }
+        .hero-section .campaign-status-badge.ended {
+            background: rgba(245,158,11,0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245,158,11,0.15);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
 
-        .countdown-wrapper { display: flex; justify-content: center; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
-        .countdown-item { background: rgba(20,27,45,0.8); border: 1px solid rgba(46,204,113,0.1); border-radius: 16px; padding: 16px 24px; min-width: 80px; text-align: center; }
-        .countdown-item .number { font-size: 2.2rem; font-weight: 800; color: #2ecc71; font-variant-numeric: tabular-nums; line-height: 1.2; }
-        .countdown-item .label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-        .campaign-ended-text { font-size: 1.2rem; color: #f59e0b; font-weight: 600; padding: 16px 24px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.15); border-radius: 12px; display: inline-block; }
+        /* Countdown */
+        .countdown-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .countdown-item {
+            background: rgba(20,27,45,0.8);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            min-width: 80px;
+            text-align: center;
+        }
+        .countdown-item .number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #2ecc71;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.2;
+        }
+        .countdown-item .label {
+            font-size: 0.65rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+        .campaign-ended-text {
+            font-size: 1.2rem;
+            color: #f59e0b;
+            font-weight: 600;
+            padding: 16px 24px;
+            background: rgba(245,158,11,0.08);
+            border: 1px solid rgba(245,158,11,0.15);
+            border-radius: 12px;
+            display: inline-block;
+        }
         .campaign-ended-text i { margin-right: 10px; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 40px; }
-        .stat-card { background: rgba(20,27,45,0.6); border: 1px solid rgba(46,204,113,0.06); border-radius: 16px; padding: 20px 24px; text-align: center; transition: all 0.3s ease; }
-        .stat-card:hover { border-color: rgba(46,204,113,0.15); transform: translateY(-2px); }
-        .stat-card .number { font-size: 2.2rem; font-weight: 800; line-height: 1.2; }
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
+            border-radius: 16px;
+            padding: 20px 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            border-color: rgba(46,204,113,0.15);
+            transform: translateY(-2px);
+        }
+        .stat-card .number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
         .stat-card .number.green { color: #2ecc71; }
         .stat-card .number.gold { color: #fbbf24; }
         .stat-card .number.blue { color: #60a5fa; }
         .stat-card .number.purple { color: #a78bfa; }
-        .stat-card .label { font-size: 0.8rem; color: #94a3b8; margin-top: 4px; }
-        .stat-card .sub { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .stat-card .sub {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 2px;
+        }
 
+        /* Reward Wallet */
         .reward-wallet-card {
             background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02));
-            border: 2px solid rgba(251,191,36,0.15); border-radius: 20px; padding: 28px 32px; margin-bottom: 40px; text-align: center; position: relative; overflow: hidden;
+            border: 2px solid rgba(251,191,36,0.15);
+            border-radius: 20px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
         }
-        .reward-wallet-card .wallet-label { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-        .reward-wallet-card .wallet-amount { font-size: 3.5rem; font-weight: 900; color: #fbbf24; line-height: 1.2; }
-        .reward-wallet-card .wallet-amount .currency { font-size: 1.5rem; font-weight: 600; color: #94a3b8; }
-        .reward-wallet-card .wallet-amount .final-badge { font-size: 0.8rem; background: rgba(46,204,113,0.15); color: #2ecc71; padding: 2px 14px; border-radius: 30px; margin-left: 10px; font-weight: 600; }
-        .reward-wallet-card .wallet-sub { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
-        .reward-wallet-card .wallet-icon-big { font-size: 2rem; color: #fbbf24; margin-bottom: 8px; display: block; }
+        .reward-wallet-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(251,191,36,0.05), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .reward-wallet-card .wallet-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+        .reward-wallet-card .wallet-amount {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #fbbf24;
+            line-height: 1.2;
+        }
+        .reward-wallet-card .wallet-amount .currency {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .reward-wallet-card .wallet-amount .final-badge {
+            font-size: 0.8rem;
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            padding: 2px 14px;
+            border-radius: 30px;
+            margin-left: 10px;
+            font-weight: 600;
+        }
+        .reward-wallet-card .wallet-sub {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .reward-wallet-card .wallet-sub strong {
+            color: #2ecc71;
+        }
+        .reward-wallet-card .wallet-icon-big {
+            font-size: 2rem;
+            color: #fbbf24;
+            margin-bottom: 8px;
+            display: block;
+        }
 
-        .progress-section { background: rgba(20,27,45,0.6); border: 1px solid rgba(46,204,113,0.06); border-radius: 16px; padding: 28px 32px; margin-bottom: 40px; }
-        .progress-section .label-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-        .progress-section .label-row .title { font-weight: 600; color: #e2e8f0; }
-        .progress-section .label-row .value { color: #94a3b8; font-size: 0.9rem; }
+        /* Progress */
+        .progress-section {
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+        }
+        .progress-section .label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .progress-section .label-row .title {
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .progress-section .label-row .value {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
         .progress-section .label-row .value strong { color: #2ecc71; }
-        .progress-bar-track { width: 100%; height: 10px; background: rgba(46,204,113,0.06); border-radius: 30px; overflow: hidden; position: relative; }
-        .progress-bar-track .fill { height: 100%; background: linear-gradient(90deg, #fbbf24, #f59e0b); border-radius: 30px; transition: width 0.6s ease; width: 0%; }
-        .progress-section .next-milestone { margin-top: 16px; font-size: 0.9rem; color: #94a3b8; }
+        .progress-bar-track {
+            width: 100%;
+            height: 10px;
+            background: rgba(46,204,113,0.06);
+            border-radius: 30px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar-track .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fbbf24, #f59e0b);
+            border-radius: 30px;
+            transition: width 0.6s ease;
+            width: 0%;
+        }
+        .progress-section .next-milestone {
+            margin-top: 16px;
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
         .progress-section .next-milestone strong { color: #fbbf24; }
 
-        .milestone-section-title { font-size: 1.3rem; font-weight: 700; color: #e2e8f0; margin-bottom: 20px; }
-        .milestone-section-title i { color: #2ecc71; margin-right: 10px; }
-        .milestone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 40px; }
-        .milestone-card { background: rgba(20,27,45,0.5); border: 1px solid rgba(46,204,113,0.06); border-radius: 12px; padding: 16px 12px; text-align: center; transition: all 0.3s ease; }
-        .milestone-card .refs { font-size: 1.3rem; font-weight: 700; color: #e2e8f0; }
-        .milestone-card .refs small { font-size: 0.7rem; color: #64748b; font-weight: 400; }
-        .milestone-card .reward { font-size: 1.1rem; font-weight: 700; color: #fbbf24; margin-top: 4px; }
-        .milestone-card .status-badge { display: inline-block; font-size: 0.6rem; font-weight: 600; padding: 2px 12px; border-radius: 30px; margin-top: 8px; letter-spacing: 0.3px; }
-        .milestone-card .status-badge.achieved { background: rgba(46,204,113,0.15); color: #2ecc71; }
-        .milestone-card .status-badge.next { background: rgba(251,191,36,0.15); color: #fbbf24; }
-        .milestone-card .status-badge.locked { background: rgba(100,116,139,0.1); color: #64748b; }
-        .milestone-card.achieved { border-color: rgba(46,204,113,0.2); background: rgba(46,204,113,0.04); }
-        .milestone-card.next { border-color: rgba(251,191,36,0.2); background: rgba(251,191,36,0.04); }
+        /* Milestones */
+        .milestone-section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 20px;
+        }
+        .milestone-section-title i {
+            color: #2ecc71;
+            margin-right: 10px;
+        }
+        .milestone-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+        .milestone-card {
+            background: rgba(20,27,45,0.5);
+            border: 1px solid rgba(46,204,113,0.06);
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .milestone-card .refs {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .milestone-card .refs small {
+            font-size: 0.7rem;
+            color: #64748b;
+            font-weight: 400;
+        }
+        .milestone-card .reward {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fbbf24;
+            margin-top: 4px;
+        }
+        .milestone-card .status-badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 2px 12px;
+            border-radius: 30px;
+            margin-top: 8px;
+            letter-spacing: 0.3px;
+        }
+        .milestone-card .status-badge.achieved {
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+        }
+        .milestone-card .status-badge.next {
+            background: rgba(251,191,36,0.15);
+            color: #fbbf24;
+        }
+        .milestone-card .status-badge.locked {
+            background: rgba(100,116,139,0.1);
+            color: #64748b;
+        }
+        .milestone-card.achieved {
+            border-color: rgba(46,204,113,0.2);
+            background: rgba(46,204,113,0.04);
+        }
+        .milestone-card.next {
+            border-color: rgba(251,191,36,0.2);
+            background: rgba(251,191,36,0.04);
+        }
 
-        .referral-section { background: rgba(20,27,45,0.6); border: 1px solid rgba(46,204,113,0.06); border-radius: 16px; padding: 28px 32px; margin-bottom: 40px; }
-        .referral-section .title { font-weight: 600; color: #e2e8f0; margin-bottom: 12px; }
-        .referral-section .title i { color: #2ecc71; margin-right: 8px; }
-        .referral-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 12px 16px; border: 1px solid rgba(46,204,113,0.06); }
-        .referral-box code { flex: 1; color: #60a5fa; font-size: 0.8rem; word-break: break-all; background: transparent; padding: 0; font-family: 'Inter', monospace; }
-        .referral-box .copy-btn { background: #2ecc71; color: #0a0e1a; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 600; font-size: 0.8rem; transition: all 0.3s ease; white-space: nowrap; cursor: pointer; }
-        .referral-box .copy-btn:hover { background: #10b981; transform: scale(1.02); }
-        .referral-box .copy-btn.copied { background: #fbbf24; }
+        /* Referral */
+        .referral-section {
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+        }
+        .referral-section .title {
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 12px;
+        }
+        .referral-section .title i {
+            color: #2ecc71;
+            margin-right: 8px;
+        }
+        .referral-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            border: 1px solid rgba(46,204,113,0.06);
+        }
+        .referral-box code {
+            flex: 1;
+            color: #60a5fa;
+            font-size: 0.8rem;
+            word-break: break-all;
+            background: transparent;
+            padding: 0;
+            font-family: 'Inter', monospace;
+        }
+        .referral-box .copy-btn {
+            background: #2ecc71;
+            color: #0a0e1a;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .referral-box .copy-btn:hover {
+            background: #10b981;
+            transform: scale(1.02);
+        }
+        .referral-box .copy-btn.copied {
+            background: #fbbf24;
+        }
 
-        .withdrawal-section { background: rgba(20,27,45,0.6); border: 1px solid rgba(46,204,113,0.06); border-radius: 16px; padding: 28px 32px; margin-bottom: 40px; display: block !important; }
-        .withdrawal-section .title { font-weight: 700; color: #e2e8f0; font-size: 1.2rem; margin-bottom: 4px; }
-        .withdrawal-section .title i { color: #fbbf24; margin-right: 10px; }
-        .withdrawal-section .subtitle { color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; }
-        .withdrawal-section .reward-amount-display { background: rgba(46,204,113,0.05); border: 1px solid rgba(46,204,113,0.1); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-        .withdrawal-section .reward-amount-display .label { color: #94a3b8; }
-        .withdrawal-section .reward-amount-display .amount { font-size: 1.6rem; font-weight: 800; color: #fbbf24; }
-        .withdrawal-section .form-group { margin-bottom: 16px; }
-        .withdrawal-section .form-group label { font-size: 0.85rem; font-weight: 500; color: #94a3b8; margin-bottom: 6px; display: block; }
-        .withdrawal-section .form-group .network-badge { display: inline-block; background: rgba(251,191,36,0.08); color: #fbbf24; padding: 2px 14px; border-radius: 30px; font-size: 0.7rem; font-weight: 600; border: 1px solid rgba(251,191,36,0.1); }
-        .withdrawal-section .form-control-custom { background: rgba(0,0,0,0.3); border: 1px solid rgba(46,204,113,0.08); border-radius: 10px; padding: 12px 16px; color: #e2e8f0; font-size: 0.9rem; width: 100%; transition: all 0.3s ease; }
-        .withdrawal-section .form-control-custom:focus { outline: none; border-color: #2ecc71; box-shadow: 0 0 0 3px rgba(46,204,113,0.1); }
-        .withdrawal-section .form-control-custom::placeholder { color: #475569; }
-        .withdrawal-section .form-control-custom.error { border-color: #ef4444; }
-        .withdrawal-section .form-control-custom.valid { border-color: #2ecc71; }
-        .withdrawal-section .wallet-validation-msg { font-size: 0.75rem; margin-top: 4px; display: none; }
-        .withdrawal-section .wallet-validation-msg.error { color: #ef4444; display: block; }
-        .withdrawal-section .wallet-validation-msg.valid { color: #2ecc71; display: block; }
-        .withdrawal-section .warning-text { font-size: 0.75rem; color: #f59e0b; margin-top: 8px; padding: 8px 12px; background: rgba(245,158,11,0.05); border-radius: 8px; border-left: 3px solid #f59e0b; }
-        .withdrawal-section .btn-withdraw { background: #fbbf24; color: #0a0e1a; border: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 1rem; transition: all 0.3s ease; width: 100%; cursor: pointer; }
-        .withdrawal-section .btn-withdraw:hover:not(:disabled) { background: #f59e0b; transform: scale(1.01); }
-        .withdrawal-section .btn-withdraw:disabled { opacity: 0.5; cursor: not-allowed; }
-        .withdrawal-section .btn-withdraw.withdrawal-locked { background: #64748b; cursor: pointer; }
-        .withdrawal-section .btn-withdraw.withdrawal-locked:hover { transform: none; background: #64748b; }
-        .withdrawal-section .btn-withdraw.btn-pending { background: #fbbf24; opacity: 0.7; }
-        .withdrawal-section .btn-withdraw.btn-approved { background: #2ecc71; }
-        .withdrawal-section .btn-withdraw.btn-paid { background: #2ecc71; opacity: 0.8; }
-        .withdrawal-section .btn-withdraw.btn-rejected { background: #ef4444; }
-        .withdrawal-section .withdrawal-status { margin-top: 16px; padding: 14px 18px; border-radius: 10px; font-size: 0.9rem; display: none; }
+        /* ===== WITHDRAWAL SECTION - ALWAYS VISIBLE ===== */
+        .withdrawal-section {
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+            display: block !important; /* ALWAYS VISIBLE */
+        }
+        .withdrawal-section .title {
+            font-weight: 700;
+            color: #e2e8f0;
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+        }
+        .withdrawal-section .title i {
+            color: #fbbf24;
+            margin-right: 10px;
+        }
+        .withdrawal-section .subtitle {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        .withdrawal-section .reward-amount-display {
+            background: rgba(46,204,113,0.05);
+            border: 1px solid rgba(46,204,113,0.1);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .withdrawal-section .reward-amount-display .label {
+            color: #94a3b8;
+        }
+        .withdrawal-section .reward-amount-display .amount {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #fbbf24;
+        }
+        .withdrawal-section .form-group {
+            margin-bottom: 16px;
+        }
+        .withdrawal-section .form-group label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .withdrawal-section .form-group .network-badge {
+            display: inline-block;
+            background: rgba(251,191,36,0.08);
+            color: #fbbf24;
+            padding: 2px 14px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: 1px solid rgba(251,191,36,0.1);
+        }
+        .withdrawal-section .form-control-custom {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        .withdrawal-section .form-control-custom:focus {
+            outline: none;
+            border-color: #2ecc71;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.1);
+        }
+        .withdrawal-section .form-control-custom::placeholder {
+            color: #475569;
+        }
+        .withdrawal-section .form-control-custom.error {
+            border-color: #ef4444;
+        }
+        .withdrawal-section .form-control-custom.valid {
+            border-color: #2ecc71;
+        }
+        .withdrawal-section .wallet-validation-msg {
+            font-size: 0.75rem;
+            margin-top: 4px;
+            display: none;
+        }
+        .withdrawal-section .wallet-validation-msg.error {
+            color: #ef4444;
+            display: block;
+        }
+        .withdrawal-section .wallet-validation-msg.valid {
+            color: #2ecc71;
+            display: block;
+        }
+        .withdrawal-section .warning-text {
+            font-size: 0.75rem;
+            color: #f59e0b;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(245,158,11,0.05);
+            border-radius: 8px;
+            border-left: 3px solid #f59e0b;
+        }
+        .withdrawal-section .btn-withdraw {
+            background: #fbbf24;
+            color: #0a0e1a;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            width: 100%;
+            cursor: pointer;
+        }
+        .withdrawal-section .btn-withdraw:hover:not(:disabled) {
+            background: #f59e0b;
+            transform: scale(1.01);
+        }
+        .withdrawal-section .btn-withdraw:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .withdrawal-section .btn-withdraw.withdrawal-locked {
+            background: #64748b;
+            cursor: pointer;
+        }
+        .withdrawal-section .btn-withdraw.withdrawal-locked:hover {
+            transform: none;
+            background: #64748b;
+        }
+        .withdrawal-section .btn-withdraw.btn-pending {
+            background: #fbbf24;
+            opacity: 0.7;
+        }
+        .withdrawal-section .btn-withdraw.btn-approved {
+            background: #2ecc71;
+        }
+        .withdrawal-section .btn-withdraw.btn-paid {
+            background: #2ecc71;
+            opacity: 0.8;
+        }
+        .withdrawal-section .btn-withdraw.btn-rejected {
+            background: #ef4444;
+        }
+        .withdrawal-section .withdrawal-status {
+            margin-top: 16px;
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            display: none;
+        }
         .withdrawal-section .withdrawal-status.visible { display: block; }
-        .withdrawal-section .withdrawal-status.pending { background: rgba(251,191,36,0.05); border: 1px solid rgba(251,191,36,0.1); color: #fbbf24; }
-        .withdrawal-section .withdrawal-status.approved { background: rgba(46,204,113,0.05); border: 1px solid rgba(46,204,113,0.1); color: #2ecc71; }
-        .withdrawal-section .withdrawal-status.rejected { background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.1); color: #ef4444; }
-        .withdrawal-section .withdrawal-status.paid { background: rgba(46,204,113,0.05); border: 1px solid rgba(46,204,113,0.1); color: #2ecc71; }
-        .withdrawal-section .withdrawal-details { margin-top: 12px; padding: 12px 16px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.85rem; display: none; }
+        .withdrawal-section .withdrawal-status.pending {
+            background: rgba(251,191,36,0.05);
+            border: 1px solid rgba(251,191,36,0.1);
+            color: #fbbf24;
+        }
+        .withdrawal-section .withdrawal-status.approved {
+            background: rgba(46,204,113,0.05);
+            border: 1px solid rgba(46,204,113,0.1);
+            color: #2ecc71;
+        }
+        .withdrawal-section .withdrawal-status.rejected {
+            background: rgba(239,68,68,0.05);
+            border: 1px solid rgba(239,68,68,0.1);
+            color: #ef4444;
+        }
+        .withdrawal-section .withdrawal-status.paid {
+            background: rgba(46,204,113,0.05);
+            border: 1px solid rgba(46,204,113,0.1);
+            color: #2ecc71;
+        }
+        .withdrawal-section .withdrawal-details {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: none;
+        }
         .withdrawal-section .withdrawal-details.visible { display: block; }
-        .withdrawal-section .withdrawal-details .detail-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        .withdrawal-section .withdrawal-details .detail-row .key { color: #94a3b8; }
-        .withdrawal-section .withdrawal-details .detail-row .value { color: #e2e8f0; font-weight: 500; }
-        .withdrawal-section .withdrawal-details .detail-row .value.tx-hash { color: #60a5fa; font-size: 0.75rem; word-break: break-all; }
+        .withdrawal-section .withdrawal-details .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .withdrawal-section .withdrawal-details .detail-row .key {
+            color: #94a3b8;
+        }
+        .withdrawal-section .withdrawal-details .detail-row .value {
+            color: #e2e8f0;
+            font-weight: 500;
+        }
+        .withdrawal-section .withdrawal-details .detail-row .value.tx-hash {
+            color: #60a5fa;
+            font-size: 0.75rem;
+            word-break: break-all;
+        }
 
-        .days-remaining-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 10000; }
-        .days-remaining-popup.visible { display: flex; }
-        .days-remaining-popup .popup-content { background: #141b2d; border: 1px solid rgba(251,191,36,0.15); border-radius: 24px; padding: 40px 48px; max-width: 480px; width: 90%; text-align: center; animation: popIn 0.4s ease; }
-        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .days-remaining-popup .popup-icon { font-size: 3rem; margin-bottom: 12px; display: block; }
-        .days-remaining-popup .popup-title { font-size: 1.4rem; font-weight: 700; color: #e2e8f0; margin-bottom: 8px; }
-        .days-remaining-popup .popup-text { color: #94a3b8; font-size: 1rem; line-height: 1.6; margin-bottom: 20px; }
-        .days-remaining-popup .popup-text strong { color: #fbbf24; }
-        .days-remaining-popup .popup-days { font-size: 3rem; font-weight: 900; color: #2ecc71; margin: 8px 0; }
-        .days-remaining-popup .popup-close-btn { background: #2ecc71; color: #0a0e1a; border: none; padding: 12px 32px; border-radius: 12px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; margin-top: 8px; }
-        .days-remaining-popup .popup-close-btn:hover { background: #10b981; transform: scale(1.02); }
+        /* Confirmation Modal */
+        .confirmation-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .confirmation-overlay.visible {
+            display: flex;
+        }
+        .confirmation-overlay .modal-content {
+            background: #141b2d;
+            border: 1px solid rgba(251,191,36,0.15);
+            border-radius: 24px;
+            padding: 40px 48px;
+            max-width: 480px;
+            width: 90%;
+            animation: popIn 0.4s ease;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .confirmation-overlay .modal-icon {
+            font-size: 3rem;
+            color: #fbbf24;
+            margin-bottom: 12px;
+            display: block;
+            text-align: center;
+        }
+        .confirmation-overlay .modal-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .confirmation-overlay .modal-details {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+        .confirmation-overlay .modal-details .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .confirmation-overlay .modal-details .row:last-child {
+            border-bottom: none;
+        }
+        .confirmation-overlay .modal-details .row .label {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+        .confirmation-overlay .modal-details .row .value {
+            color: #e2e8f0;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .confirmation-overlay .modal-details .row .value.warning {
+            color: #fbbf24;
+        }
+        .confirmation-overlay .modal-warning {
+            font-size: 0.8rem;
+            color: #f59e0b;
+            padding: 10px 14px;
+            background: rgba(245,158,11,0.05);
+            border-radius: 8px;
+            border-left: 3px solid #f59e0b;
+            margin-bottom: 20px;
+        }
+        .confirmation-overlay .modal-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        .confirmation-overlay .modal-buttons .btn-cancel {
+            flex: 1;
+            background: rgba(100,116,139,0.2);
+            color: #94a3b8;
+            border: 1px solid rgba(100,116,139,0.1);
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .confirmation-overlay .modal-buttons .btn-cancel:hover {
+            background: rgba(100,116,139,0.3);
+        }
+        .confirmation-overlay .modal-buttons .btn-confirm {
+            flex: 2;
+            background: #fbbf24;
+            color: #0a0e1a;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .confirmation-overlay .modal-buttons .btn-confirm:hover {
+            background: #f59e0b;
+        }
+        .confirmation-overlay .modal-buttons .btn-confirm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-        .confirmation-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 10000; }
-        .confirmation-overlay.visible { display: flex; }
-        .confirmation-overlay .modal-content { background: #141b2d; border: 1px solid rgba(251,191,36,0.15); border-radius: 24px; padding: 40px 48px; max-width: 480px; width: 90%; animation: popIn 0.4s ease; }
-        .confirmation-overlay .modal-icon { font-size: 3rem; color: #fbbf24; margin-bottom: 12px; display: block; text-align: center; }
-        .confirmation-overlay .modal-title { font-size: 1.4rem; font-weight: 700; color: #e2e8f0; text-align: center; margin-bottom: 16px; }
-        .confirmation-overlay .modal-details { background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; }
-        .confirmation-overlay .modal-details .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        .confirmation-overlay .modal-details .row:last-child { border-bottom: none; }
-        .confirmation-overlay .modal-details .row .label { color: #94a3b8; font-size: 0.85rem; }
-        .confirmation-overlay .modal-details .row .value { color: #e2e8f0; font-weight: 600; font-size: 0.85rem; }
-        .confirmation-overlay .modal-details .row .value.warning { color: #fbbf24; }
-        .confirmation-overlay .modal-warning { font-size: 0.8rem; color: #f59e0b; padding: 10px 14px; background: rgba(245,158,11,0.05); border-radius: 8px; border-left: 3px solid #f59e0b; margin-bottom: 20px; }
-        .confirmation-overlay .modal-buttons { display: flex; gap: 12px; }
-        .confirmation-overlay .modal-buttons .btn-cancel { flex: 1; background: rgba(100,116,139,0.2); color: #94a3b8; border: 1px solid rgba(100,116,139,0.1); padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
-        .confirmation-overlay .modal-buttons .btn-cancel:hover { background: rgba(100,116,139,0.3); }
-        .confirmation-overlay .modal-buttons .btn-confirm { flex: 2; background: #fbbf24; color: #0a0e1a; border: none; padding: 12px; border-radius: 10px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; }
-        .confirmation-overlay .modal-buttons .btn-confirm:hover { background: #f59e0b; }
-        .confirmation-overlay .modal-buttons .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Days Remaining Popup */
+        .days-remaining-popup {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .days-remaining-popup.visible {
+            display: flex;
+        }
+        .days-remaining-popup .popup-content {
+            background: #141b2d;
+            border: 1px solid rgba(251,191,36,0.15);
+            border-radius: 24px;
+            padding: 40px 48px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            animation: popIn 0.4s ease;
+        }
+        .days-remaining-popup .popup-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .days-remaining-popup .popup-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+        }
+        .days-remaining-popup .popup-text {
+            color: #94a3b8;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .days-remaining-popup .popup-text strong {
+            color: #fbbf24;
+        }
+        .days-remaining-popup .popup-days {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #2ecc71;
+            margin: 8px 0;
+        }
+        .days-remaining-popup .popup-close-btn {
+            background: #2ecc71;
+            color: #0a0e1a;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 8px;
+        }
+        .days-remaining-popup .popup-close-btn:hover {
+            background: #10b981;
+            transform: scale(1.02);
+        }
 
-        .not-eligible-box { background: rgba(20,27,45,0.6); border: 1px solid rgba(239,68,68,0.06); border-radius: 16px; padding: 28px 32px; text-align: center; margin-bottom: 40px; display: none; }
+        /* Not Eligible */
+        .not-eligible-box {
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(239,68,68,0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            text-align: center;
+            margin-bottom: 40px;
+            display: none;
+        }
         .not-eligible-box.visible { display: block; }
-        .not-eligible-box i { font-size: 2.5rem; color: #64748b; margin-bottom: 12px; display: block; }
-        .not-eligible-box h5 { color: #e2e8f0; margin-bottom: 4px; }
-        .not-eligible-box p { color: #94a3b8; font-size: 0.9rem; }
+        .not-eligible-box i {
+            font-size: 2.5rem;
+            color: #64748b;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .not-eligible-box h5 {
+            color: #e2e8f0;
+            margin-bottom: 4px;
+        }
+        .not-eligible-box p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
 
+        /* Responsive */
         @media (max-width: 768px) {
             .hero-section { padding: 30px 20px; }
             .hero-section h1 { font-size: 1.8rem; }
@@ -245,41 +1010,68 @@
             .countdown-item .number { font-size: 1.3rem; }
             .milestone-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
             .reward-wallet-card .wallet-amount { font-size: 2rem; }
-            .confirmation-overlay .modal-buttons { flex-direction: column; }
+            .confirmation-overlay .modal-buttons {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
 
     <!-- ===== LOADING ===== -->
-    <div id="loadingOverlay"><div class="loader-spinner"></div></div>
+    <div id="loadingOverlay">
+        <div class="loader-spinner"></div>
+    </div>
 
     <!-- ===== TOAST ===== -->
     <div id="toastContainer"></div>
 
-    <!-- ===== POPUPS ===== -->
+    <!-- ===== DAYS REMAINING POPUP ===== -->
     <div class="days-remaining-popup" id="daysPopup">
         <div class="popup-content">
             <span class="popup-icon" id="popupIcon">📅</span>
-            <div class="popup-title" id="popupTitle">Withdrawal Not Available</div>
-            <div class="popup-text" id="popupText">Loading...</div>
+            <div class="popup-title" id="popupTitle">Withdrawal Not Available Yet</div>
+            <div class="popup-text" id="popupText">
+                Your reward wallet has <strong>$<span id="popupRewardAmount">0</span></strong> USDT.
+                <br><br>
+                Withdrawal will be available after the offer ends.
+                <br><br>
+                <span style="color:#94a3b8;font-size:0.9rem;">Time remaining:</span>
+                <div class="popup-days" id="popupDaysRemaining">0</div>
+                <span style="color:#64748b;font-size:0.85rem;">until withdrawal opens</span>
+            </div>
             <button class="popup-close-btn" id="popupCloseBtn">Got it!</button>
         </div>
     </div>
 
+    <!-- ===== CONFIRMATION MODAL ===== -->
     <div class="confirmation-overlay" id="confirmationModal">
         <div class="modal-content">
             <span class="modal-icon">⚠️</span>
             <div class="modal-title">Confirm Withdrawal</div>
             <div class="modal-details" id="confirmDetails">
-                <div class="row"><span class="label">Network</span><span class="value">BEP-20 / BNB Smart Chain</span></div>
-                <div class="row"><span class="label">Amount</span><span class="value warning" id="confirmAmount">$0.00 USDT</span></div>
-                <div class="row"><span class="label">Wallet Address</span><span class="value" id="confirmWallet">0x...</span></div>
+                <div class="row">
+                    <span class="label">Network</span>
+                    <span class="value">BEP-20 / BNB Smart Chain</span>
+                </div>
+                <div class="row">
+                    <span class="label">Amount</span>
+                    <span class="value warning" id="confirmAmount">$0.00 USDT</span>
+                </div>
+                <div class="row">
+                    <span class="label">Wallet Address</span>
+                    <span class="value" id="confirmWallet">0x...</span>
+                </div>
             </div>
-            <div class="modal-warning"><i class="bi bi-exclamation-triangle me-1"></i>Please verify your wallet address. Transactions on BEP-20 network are irreversible.</div>
+            <div class="modal-warning">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                Please verify your wallet address. Transactions on BEP-20 network are irreversible.
+            </div>
             <div class="modal-buttons">
                 <button class="btn-cancel" id="confirmCancel">Cancel</button>
-                <button class="btn-confirm" id="confirmSubmit"><i class="bi bi-check-circle me-1"></i>Confirm Withdrawal</button>
+                <button class="btn-confirm" id="confirmSubmit">
+                    <i class="bi bi-check-circle me-1"></i>Confirm Withdrawal
+                </button>
             </div>
         </div>
     </div>
@@ -288,7 +1080,10 @@
     <nav class="navbar-custom">
         <div class="container">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                <a href="dashboard.html" class="brand">RND<span>Stake</span><small>Direct Referral Offer</small></a>
+                <a href="dashboard.html" class="brand">
+                    RND<span>Stake</span>
+                    <small>Direct Referral Offer</small>
+                </a>
                 <div class="d-flex align-items-center gap-3 flex-wrap">
                     <a href="dashboard.html" class="nav-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
                     <a href="direct-offer.html" class="nav-link active"><i class="bi bi-gift"></i>Direct Offer</a>
@@ -310,83 +1105,176 @@
             <div class="badge-campaign"><i class="bi bi-fire"></i> Limited Time Offer</div>
             <h1>RND <span>Direct Referral</span> Offer</h1>
             <p class="subtitle">Refer More. Earn More.</p>
-            <p class="date-range"><i class="bi bi-calendar-event"></i> 6 September 2026 – 6 October 2026</p>
+            <p class="date-range">
+                <i class="bi bi-calendar-event"></i> 6 September 2026 – 6 October 2026
+            </p>
             <div id="campaignStatusBadge"></div>
             <div id="countdownContainer">
                 <div class="countdown-wrapper" id="countdownWrapper">
-                    <div class="countdown-item"><div class="number" id="countdownDays">00</div><div class="label">Days</div></div>
-                    <div class="countdown-item"><div class="number" id="countdownHours">00</div><div class="label">Hours</div></div>
-                    <div class="countdown-item"><div class="number" id="countdownMinutes">00</div><div class="label">Minutes</div></div>
-                    <div class="countdown-item"><div class="number" id="countdownSeconds">00</div><div class="label">Seconds</div></div>
+                    <div class="countdown-item">
+                        <div class="number" id="countdownDays">00</div>
+                        <div class="label">Days</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="number" id="countdownHours">00</div>
+                        <div class="label">Hours</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="number" id="countdownMinutes">00</div>
+                        <div class="label">Minutes</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="number" id="countdownSeconds">00</div>
+                        <div class="label">Seconds</div>
+                    </div>
                 </div>
-                <div id="campaignEndedMessage" style="display:none;"><span class="campaign-ended-text"><i class="bi bi-clock-history"></i> The Direct Referral Offer has ended.</span></div>
+                <div id="campaignEndedMessage" style="display:none;">
+                    <span class="campaign-ended-text"><i class="bi bi-clock-history"></i> The Direct Referral Offer has ended.</span>
+                </div>
             </div>
         </div>
 
         <!-- ===== REWARD WALLET ===== -->
-        <div class="reward-wallet-card">
+        <div class="reward-wallet-card" id="rewardWalletCard">
             <span class="wallet-icon-big">💰</span>
             <div class="wallet-label" id="walletLabel">Your Reward Wallet</div>
-            <div class="wallet-amount">$<span id="walletAmount">0.00</span> <span class="currency">USDT</span><span class="final-badge" id="finalBadge" style="display:none;">✓ FINAL</span></div>
-            <div class="wallet-sub" id="walletStatusText">Start referring to earn rewards!</div>
+            <div class="wallet-amount">
+                $<span id="walletAmount">0.00</span> <span class="currency">USDT</span>
+                <span class="final-badge" id="finalBadge" style="display:none;">✓ FINAL</span>
+            </div>
+            <div class="wallet-sub" id="walletStatusText">
+                Start referring to earn rewards!
+            </div>
         </div>
 
         <!-- ===== STATS ===== -->
-        <div class="stats-grid">
-            <div class="stat-card"><div class="number green" id="statDirectRefs">0</div><div class="label">Your Direct Referrals</div><div class="sub" id="statReferralPeriod">Campaign Period</div></div>
-            <div class="stat-card"><div class="number gold" id="statEligibleReward">$0</div><div class="label">Current Reward</div><div class="sub" id="statRewardNote">Earn more referrals!</div></div>
-            <div class="stat-card"><div class="number blue" id="statNextMilestone">5 → $5</div><div class="label">Next Milestone</div><div class="sub" id="statNextMilestoneSub">0 more needed</div></div>
-            <div class="stat-card"><div class="number purple" id="statMaxReward">$100</div><div class="label">Maximum Reward</div><div class="sub">100 Direct Referrals</div></div>
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="number green" id="statDirectRefs">0</div>
+                <div class="label">Your Direct Referrals</div>
+                <div class="sub" id="statReferralPeriod">Campaign Period</div>
+            </div>
+            <div class="stat-card">
+                <div class="number gold" id="statEligibleReward">$0</div>
+                <div class="label">Current Reward</div>
+                <div class="sub" id="statRewardNote">Earn more referrals!</div>
+            </div>
+            <div class="stat-card">
+                <div class="number blue" id="statNextMilestone">5 → $5</div>
+                <div class="label">Next Milestone</div>
+                <div class="sub" id="statNextMilestoneSub">0 more needed</div>
+            </div>
+            <div class="stat-card">
+                <div class="number purple" id="statMaxReward">$100</div>
+                <div class="label">Maximum Reward</div>
+                <div class="sub">100 Direct Referrals</div>
+            </div>
         </div>
 
         <!-- ===== PROGRESS ===== -->
-        <div class="progress-section">
-            <div class="label-row"><span class="title"><i class="bi bi-graph-up-arrow" style="color:#fbbf24;margin-right:8px;"></i>Your Progress</span><span class="value"><strong id="progressCurrent">0</strong> / <span id="progressTarget">100</span> Direct Referrals</span></div>
-            <div class="progress-bar-track"><div class="fill" id="progressFill" style="width:0%;"></div></div>
-            <div class="next-milestone" id="nextMilestoneText"><i class="bi bi-bullseye" style="color:#fbbf24;"></i> Need <strong id="needMore">5</strong> more Direct referrals to reach <strong id="nextReward">$5</strong> milestone.</div>
+        <div class="progress-section" id="progressSection">
+            <div class="label-row">
+                <span class="title"><i class="bi bi-graph-up-arrow" style="color:#fbbf24;margin-right:8px;"></i>Your Progress</span>
+                <span class="value"><strong id="progressCurrent">0</strong> / <span id="progressTarget">100</span> Direct Referrals</span>
+            </div>
+            <div class="progress-bar-track">
+                <div class="fill" id="progressFill" style="width:0%;"></div>
+            </div>
+            <div class="next-milestone" id="nextMilestoneText">
+                <i class="bi bi-bullseye" style="color:#fbbf24;"></i>
+                Need <strong id="needMore">5</strong> more Direct referrals to reach <strong id="nextReward">$5</strong> milestone.
+            </div>
         </div>
 
         <!-- ===== NOT ELIGIBLE ===== -->
-        <div class="not-eligible-box" id="notEligibleBox"><i class="bi bi-person-x"></i><h5>Not Eligible Yet</h5><p>You need at least <strong>5 Direct Referrals</strong> to qualify for this offer.</p></div>
+        <div class="not-eligible-box" id="notEligibleBox">
+            <i class="bi bi-person-x"></i>
+            <h5>Not Eligible Yet</h5>
+            <p>You need at least <strong>5 Direct Referrals</strong> to qualify for this offer.</p>
+        </div>
 
         <!-- ===== MILESTONES ===== -->
-        <div class="milestone-section-title"><i class="bi bi-trophy"></i> Reward Milestones</div>
+        <div class="milestone-section-title">
+            <i class="bi bi-trophy"></i> Reward Milestones
+        </div>
         <div class="milestone-grid" id="milestoneGrid"></div>
 
         <!-- ===== REFERRAL ===== -->
-        <div class="referral-section">
+        <div class="referral-section" id="referralSection">
             <div class="title"><i class="bi bi-link-45deg"></i> Your Referral Link</div>
-            <div class="referral-box"><code id="referralLinkDisplay">Loading...</code><button class="copy-btn" id="copyReferralBtn"><i class="bi bi-clipboard me-1"></i>Copy Referral Link</button></div>
-            <div class="mt-2"><span class="text-muted small"><i class="bi bi-people me-1"></i>Total Referrals: <strong style="color:#2ecc71;" id="totalReferralsDisplay">0</strong></span><span class="text-muted small ms-3"><i class="bi bi-code me-1"></i>Your Code: <strong style="color:#2ecc71;" id="referralCodeDisplay">---</strong></span></div>
+            <div class="referral-box">
+                <code id="referralLinkDisplay">Loading...</code>
+                <button class="copy-btn" id="copyReferralBtn"><i class="bi bi-clipboard me-1"></i>Copy Referral Link</button>
+            </div>
+            <div class="mt-2">
+                <span class="text-muted small"><i class="bi bi-people me-1"></i>Total Referrals: <strong style="color:#2ecc71;" id="totalReferralsDisplay">0</strong></span>
+                <span class="text-muted small ms-3"><i class="bi bi-code me-1"></i>Your Code: <strong style="color:#2ecc71;" id="referralCodeDisplay">---</strong></span>
+            </div>
         </div>
 
-        <!-- ===== WITHDRAWAL ===== -->
-        <div class="withdrawal-section">
+        <!-- ===== WITHDRAWAL SECTION - ALWAYS VISIBLE ===== -->
+        <div class="withdrawal-section" id="withdrawalSection">
             <div class="title"><i class="bi bi-credit-card"></i> 🎁 Offer Reward Withdrawal</div>
             <div class="subtitle" id="withdrawalSubtitle">Withdraw your eligible reward in USDT (BEP-20)</div>
-            <div class="reward-amount-display"><span class="label">Your Eligible Reward</span><span class="amount" id="withdrawAmount">$0.00 USDT</span></div>
-            <div id="withdrawalInfoBox" style="margin-bottom:16px;padding:12px 16px;border-radius:10px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.1);display:none;"><span id="withdrawalInfoText" style="color:#fbbf24;font-size:0.9rem;"></span></div>
-            <div class="withdrawal-details" id="withdrawalDetails">
-                <div class="detail-row"><span class="key">Amount</span><span class="value" id="detailAmount">$0.00 USDT</span></div>
-                <div class="detail-row"><span class="key">Network</span><span class="value">BEP-20 / BNB Smart Chain</span></div>
-                <div class="detail-row"><span class="key">Wallet</span><span class="value" id="detailWallet">---</span></div>
-                <div class="detail-row"><span class="key">Paid Date</span><span class="value" id="detailPaidDate">---</span></div>
-                <div class="detail-row"><span class="key">TX Hash</span><span class="value tx-hash" id="detailTxHash">---</span></div>
+            
+            <div class="reward-amount-display">
+                <span class="label">Your Eligible Reward</span>
+                <span class="amount" id="withdrawAmount">$0.00 USDT</span>
             </div>
+
+            <!-- Withdrawal Status Message -->
+            <div id="withdrawalInfoBox" style="margin-bottom:16px;padding:12px 16px;border-radius:10px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.1);display:none;">
+                <span id="withdrawalInfoText" style="color:#fbbf24;font-size:0.9rem;"></span>
+            </div>
+
+            <!-- Withdrawal Details (for paid status) -->
+            <div class="withdrawal-details" id="withdrawalDetails">
+                <div class="detail-row">
+                    <span class="key">Amount</span>
+                    <span class="value" id="detailAmount">$0.00 USDT</span>
+                </div>
+                <div class="detail-row">
+                    <span class="key">Network</span>
+                    <span class="value">BEP-20 / BNB Smart Chain</span>
+                </div>
+                <div class="detail-row">
+                    <span class="key">Wallet</span>
+                    <span class="value" id="detailWallet">---</span>
+                </div>
+                <div class="detail-row">
+                    <span class="key">Paid Date</span>
+                    <span class="value" id="detailPaidDate">---</span>
+                </div>
+                <div class="detail-row">
+                    <span class="key">TX Hash</span>
+                    <span class="value tx-hash" id="detailTxHash">---</span>
+                </div>
+            </div>
+
             <div class="form-group" id="walletFormGroup">
-                <label><i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address <span class="network-badge ms-2">Network: BNB Smart Chain (BEP-20)</span></label>
+                <label>
+                    <i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address
+                    <span class="network-badge ms-2">Network: BNB Smart Chain (BEP-20)</span>
+                </label>
                 <input type="text" class="form-control-custom" id="walletAddressInput" placeholder="Enter your BEP-20 USDT wallet address (0x...)" />
                 <div class="wallet-validation-msg" id="walletValidationMsg"></div>
-                <div class="warning-text"><i class="bi bi-exclamation-triangle me-1"></i>Please enter a valid BEP-20 USDT wallet address. Sending funds to an unsupported network/address may result in loss of funds.</div>
+                <div class="warning-text">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Please enter a valid BEP-20 USDT wallet address. Sending funds to an unsupported network/address may result in loss of funds.
+                </div>
             </div>
-            <button class="btn-withdraw" id="withdrawBtn"><i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward</button>
+
+            <button class="btn-withdraw" id="withdrawBtn">
+                <i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward
+            </button>
+
             <div class="withdrawal-status" id="withdrawalStatus"></div>
         </div>
 
     </div>
 
     <!-- ============================================================
-    JAVASCRIPT - PRODUCTION READY WITH SECURITY FIXES
+    JAVASCRIPT - COMPLETE PRODUCTION READY
     ============================================================ -->
     <script type="importmap">
         {
@@ -433,7 +1321,8 @@
             endDate: new Date('2026-10-06T23:59:59+05:30'),
             minQualifying: 5,
             maxQualifying: 100,
-            maxReward: 100
+            maxReward: 100,
+            milestoneStep: 5
         };
 
         const MILESTONES = [
@@ -484,6 +1373,7 @@
             copyReferralBtn: $('copyReferralBtn'),
             totalReferralsDisplay: $('totalReferralsDisplay'),
             referralCodeDisplay: $('referralCodeDisplay'),
+            withdrawalSection: $('withdrawalSection'),
             withdrawAmount: $('withdrawAmount'),
             walletAddressInput: $('walletAddressInput'),
             walletValidationMsg: $('walletValidationMsg'),
@@ -503,6 +1393,7 @@
             walletLabel: $('walletLabel'),
             walletStatusText: $('walletStatusText'),
             finalBadge: $('finalBadge'),
+            rewardWalletCard: $('rewardWalletCard'),
             daysPopup: $('daysPopup'),
             popupIcon: $('popupIcon'),
             popupTitle: $('popupTitle'),
@@ -550,11 +1441,10 @@
             }, 5000);
         }
 
-        // CRITICAL FIX: Campaign status with clear boundary
         function getCampaignStatus() {
             const now = new Date();
             if (now < CAMPAIGN.startDate) return 'UPCOMING';
-            if (now < CAMPAIGN.endDate) return 'ACTIVE';  // FIX: using < not <=
+            if (now >= CAMPAIGN.startDate && now <= CAMPAIGN.endDate) return 'ACTIVE';
             return 'ENDED';
         }
 
@@ -580,7 +1470,6 @@
             return `${time.days}d ${time.hours}h ${time.minutes}m ${time.seconds}s`;
         }
 
-        // CRITICAL FIX: Canonical reward calculation
         function calculateReward(directCount) {
             if (directCount < CAMPAIGN.minQualifying) return 0;
             const capped = Math.min(directCount, CAMPAIGN.maxQualifying);
@@ -598,7 +1487,6 @@
             return null;
         }
 
-        // CRITICAL FIX: BEP-20 validation
         function validateBEP20Wallet(address) {
             const regex = /^0x[a-fA-F0-9]{40}$/;
             return regex.test(address);
@@ -613,20 +1501,20 @@
         }
 
         // ============================================================
-        // CRITICAL FIX: Get Direct Referrals (Campaign Period Only)
+        // GET DIRECT REFERRALS (Campaign Period Only)
         // ============================================================
         async function getCampaignDirectReferrals(userId) {
             try {
+                // Get all referrals from teamStructure.level1
                 const userSnap = await get(ref(db, 'users/' + userId));
                 if (!userSnap.exists()) return 0;
                 const userData = userSnap.val();
+                const teamStructure = userData.teamStructure || {};
+                const level1Count = teamStructure.level1 || 0;
                 
-                // FIX: Use teamStructure.level1 for direct referrals
-                const level1Count = (userData.teamStructure && userData.teamStructure.level1) || 0;
-                
-                // If campaign is ended and we have a snapshot, use that
-                if (getCampaignStatus() === 'ENDED' && campaignRewardSnapshot) {
-                    return campaignRewardSnapshot.finalDirectCount || level1Count;
+                // If campaign is ended, use frozen snapshot if available
+                if (getCampaignStatus() === 'ENDED' && isWithdrawalFinalized) {
+                    return campaignRewardSnapshot?.finalDirectCount || level1Count;
                 }
                 
                 return level1Count;
@@ -637,7 +1525,7 @@
         }
 
         // ============================================================
-        // CRITICAL FIX: Get Campaign Reward Snapshot
+        // GET OR CREATE CAMPAIGN REWARD SNAPSHOT
         // ============================================================
         async function getCampaignRewardSnapshot(userId) {
             try {
@@ -655,46 +1543,30 @@
         }
 
         // ============================================================
-        // CRITICAL FIX: Finalize Campaign Reward (with lock)
+        // FINALIZE CAMPAIGN REWARD (Called when offer ends)
         // ============================================================
         async function finalizeCampaignReward(userId) {
             try {
-                // Check if already finalized
                 const existing = await getCampaignRewardSnapshot(userId);
                 if (existing) return existing;
 
-                // Use transaction to prevent race conditions
-                const result = await runTransaction(
-                    ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`),
-                    (currentData) => {
-                        if (currentData) return currentData; // Already exists
-                        
-                        const directCount = directReferrals;
-                        const reward = calculateReward(directCount);
-                        
-                        return {
-                            campaignId: CAMPAIGN.campaignId,
-                            userId: userId,
-                            finalDirectCount: directCount,
-                            finalReward: reward,
-                            snapshotAt: Date.now(),
-                            status: 'available',
-                            isFinalized: true,
-                            walletAddress: null,
-                            withdrawalId: null,
-                            transactionId: null,
-                            txHash: null,
-                            paidAt: null
-                        };
-                    }
-                );
+                const directCount = await getCampaignDirectReferrals(userId);
+                const reward = calculateReward(directCount);
 
-                if (result.committed && result.snapshot.exists()) {
-                    campaignRewardSnapshot = result.snapshot.val();
-                    isWithdrawalFinalized = true;
-                    return campaignRewardSnapshot;
-                }
-                return null;
+                const snapshotData = {
+                    campaignId: CAMPAIGN.campaignId,
+                    userId: userId,
+                    finalDirectCount: directCount,
+                    finalReward: reward,
+                    snapshotAt: Date.now(),
+                    status: 'available',
+                    isFinalized: true
+                };
+
+                await set(ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`), snapshotData);
+                isWithdrawalFinalized = true;
+                campaignRewardSnapshot = snapshotData;
+                return snapshotData;
             } catch (error) {
                 console.error('Error finalizing campaign reward:', error);
                 return null;
@@ -702,7 +1574,7 @@
         }
 
         // ============================================================
-        // CRITICAL FIX: Atomic Withdrawal Creation with Lock
+        // ATOMIC WITHDRAWAL CREATION
         // ============================================================
         async function createAtomicWithdrawal(userId, userData, walletAddress, rewardAmount) {
             const withdrawalId = generateWithdrawalId();
@@ -710,115 +1582,72 @@
             const timestamp = Date.now();
             const date = new Date().toISOString().split('T')[0];
 
-            // CRITICAL FIX: Use transaction with lock to prevent duplicates
-            const lockKey = `withdrawal_lock_${CAMPAIGN.campaignId}_${userId}`;
-            
-            try {
-                // First, try to acquire lock
-                const lockRef = ref(db, `processing_locks/${lockKey}`);
-                const lockSnap = await get(lockRef);
-                
-                if (lockSnap.exists()) {
-                    const lockData = lockSnap.val();
-                    // If lock is older than 30 seconds, consider it stale
-                    if (Date.now() - lockData.lockedAt < 30000) {
-                        return { success: false, error: 'Another withdrawal request is being processed. Please wait.' };
-                    }
-                }
+            // Prepare all data
+            const campaignData = {
+                campaignId: CAMPAIGN.campaignId,
+                campaignName: 'RND Direct Referral Special Offer',
+                userId: userId,
+                username: userData.username || userData.referralCode || userId,
+                email: userData.email || '',
+                finalDirectCount: directReferrals,
+                finalReward: rewardAmount,
+                status: 'pending',
+                walletAddress: walletAddress,
+                requestedAt: timestamp,
+                updatedAt: timestamp,
+                withdrawalId: withdrawalId,
+                transactionId: txId,
+                txHash: null,
+                paidAt: null,
+                isFinalized: true
+            };
 
-                // Acquire lock
-                await set(lockRef, {
-                    userId: userId,
-                    campaignId: CAMPAIGN.campaignId,
-                    lockedAt: Date.now()
-                });
+            const adminData = {
+                ...campaignData,
+                type: 'direct_offer_withdrawal',
+                asset: 'USDT',
+                network: 'BEP-20 / BNB Smart Chain',
+                amount: rewardAmount,
+                status: 'pending'
+            };
 
-                // Double-check withdrawal doesn't exist
-                const existing = await getCampaignRewardSnapshot(userId);
-                if (existing && (existing.status === 'pending' || existing.status === 'approved' || existing.status === 'paid')) {
-                    await set(lockRef, null); // Release lock
-                    return { success: false, error: 'You have already submitted a withdrawal request.' };
-                }
+            const transactionData = {
+                type: 'direct_offer_withdrawal',
+                subtype: 'Direct Referral Offer Withdrawal',
+                amount: rewardAmount,
+                currency: 'USDT',
+                network: 'BEP-20 / BNB Smart Chain',
+                status: 'pending',
+                walletAddress: walletAddress,
+                withdrawalId: withdrawalId,
+                timestamp: timestamp,
+                date: date,
+                description: `Direct Referral Offer Withdrawal of $${rewardAmount} USDT (BEP-20)`,
+                txId: txId,
+                txHash: null
+            };
 
-                // Prepare data
-                const campaignData = {
-                    campaignId: CAMPAIGN.campaignId,
-                    userId: userId,
-                    username: userData.username || userData.referralCode || userId,
-                    email: userData.email || '',
-                    finalDirectCount: directReferrals,
-                    finalReward: rewardAmount,
-                    status: 'pending',
-                    walletAddress: walletAddress,
-                    requestedAt: timestamp,
-                    updatedAt: timestamp,
-                    withdrawalId: withdrawalId,
-                    transactionId: txId,
-                    txHash: null,
-                    paidAt: null,
-                    isFinalized: true
-                };
+            const globalTxData = {
+                ...transactionData,
+                userId: userId,
+                username: userData.username || userData.referralCode || userId
+            };
 
-                const adminData = {
-                    ...campaignData,
-                    type: 'direct_offer_withdrawal',
-                    asset: 'USDT',
-                    network: 'BEP-20 / BNB Smart Chain',
-                    amount: rewardAmount,
-                    status: 'pending'
-                };
+            // Atomic multi-path update
+            const updates = {
+                [`campaign_rewards/${userId}/${CAMPAIGN.campaignId}`]: campaignData,
+                [`admin/withdrawals/${withdrawalId}`]: adminData,
+                [`users/${userId}/transactions/${txId}`]: transactionData,
+                [`transactions/${txId}`]: globalTxData
+            };
 
-                const transactionData = {
-                    type: 'direct_offer_withdrawal',
-                    subtype: 'Direct Referral Offer Withdrawal',
-                    amount: rewardAmount,
-                    currency: 'USDT',
-                    network: 'BEP-20 / BNB Smart Chain',
-                    status: 'pending',
-                    walletAddress: walletAddress,
-                    withdrawalId: withdrawalId,
-                    timestamp: timestamp,
-                    date: date,
-                    description: `Direct Referral Offer Withdrawal of $${rewardAmount} USDT (BEP-20)`,
-                    txId: txId,
-                    txHash: null
-                };
+            await update(ref(db), updates);
 
-                const globalTxData = {
-                    ...transactionData,
-                    userId: userId,
-                    username: userData.username || userData.referralCode || userId
-                };
-
-                // Atomic multi-path update
-                const updates = {
-                    [`campaign_rewards/${userId}/${CAMPAIGN.campaignId}`]: campaignData,
-                    [`admin/withdrawals/${withdrawalId}`]: adminData,
-                    [`users/${userId}/transactions/${txId}`]: transactionData,
-                    [`transactions/${txId}`]: globalTxData
-                };
-
-                await update(ref(db), updates);
-
-                // Release lock
-                await set(lockRef, null);
-
-                return { success: true, withdrawalId, txId };
-
-            } catch (error) {
-                console.error('Error in atomic withdrawal:', error);
-                // Release lock on error
-                try {
-                    await set(ref(db, `processing_locks/${lockKey}`), null);
-                } catch (e) {
-                    console.error('Error releasing lock:', e);
-                }
-                return { success: false, error: error.message || 'Failed to submit withdrawal request.' };
-            }
+            return { success: true, withdrawalId, txId };
         }
 
         // ============================================================
-        // CHECK WITHDRAWAL STATUS (with listener)
+        // CHECK WITHDRAWAL STATUS
         // ============================================================
         async function checkWithdrawalStatus(userId) {
             try {
@@ -1158,22 +1987,26 @@
         function handleWithdrawClick() {
             const status = getCampaignStatus();
             
+            // If offer is not ended, show popup
             if (status !== 'ENDED') {
                 showDaysPopup();
                 return;
             }
 
+            // Offer ended - check eligibility
             const reward = calculateReward(directReferrals);
             if (reward <= 0) {
                 showDaysPopup();
                 return;
             }
 
+            // Check if already withdrawn
             if (withdrawalData && (withdrawalData.status === 'pending' || withdrawalData.status === 'approved' || withdrawalData.status === 'paid')) {
                 showToast('You have already submitted a withdrawal request.', 'warning');
                 return;
             }
 
+            // Check wallet address
             const walletAddress = el.walletAddressInput.value.trim();
             if (!validateBEP20Wallet(walletAddress)) {
                 showToast('Please enter a valid BEP-20 USDT wallet address (0x...).', 'error');
@@ -1181,6 +2014,7 @@
                 return;
             }
 
+            // Show confirmation modal
             showConfirmationModal(reward, walletAddress);
         }
 
@@ -1194,7 +2028,7 @@
         }
 
         // ============================================================
-        // CRITICAL FIX: PROCESS WITHDRAWAL with Backend Validation
+        // PROCESS WITHDRAWAL
         // ============================================================
         async function processWithdrawal() {
             const walletAddress = el.walletAddressInput.value.trim();
@@ -1204,13 +2038,13 @@
                 return;
             }
 
-            // CRITICAL FIX: Server-side campaign end check
+            // Double check campaign ended
             if (getCampaignStatus() !== 'ENDED') {
                 showToast('Withdrawal is only available after the offer ends.', 'error');
                 return;
             }
 
-            // CRITICAL FIX: Server-side reward calculation (not trusting frontend)
+            // Get final reward
             let reward = calculateReward(directReferrals);
             if (campaignRewardSnapshot) {
                 reward = campaignRewardSnapshot.finalReward || reward;
@@ -1221,7 +2055,7 @@
                 return;
             }
 
-            // CRITICAL FIX: Double-check duplicate
+            // Check duplicate
             if (withdrawalData && (withdrawalData.status === 'pending' || withdrawalData.status === 'approved' || withdrawalData.status === 'paid')) {
                 showToast('You have already submitted a withdrawal request.', 'warning');
                 return;
@@ -1234,6 +2068,7 @@
                 const userSnap = await get(ref(db, 'users/' + currentUserId));
                 const userData = userSnap.exists() ? userSnap.val() : {};
 
+                // Atomic withdrawal creation
                 const result = await createAtomicWithdrawal(currentUserId, userData, walletAddress, reward);
 
                 if (result.success) {
@@ -1243,7 +2078,7 @@
                     el.confirmationModal.classList.remove('visible');
                     updateUI();
                 } else {
-                    showToast('❌ ' + result.error, 'error');
+                    showToast('❌ Failed to submit withdrawal request.', 'error');
                 }
             } catch (error) {
                 console.error('Withdrawal error:', error);
@@ -1272,7 +2107,7 @@
                 el.userName.textContent = name;
                 el.userAvatar.textContent = name.charAt(0).toUpperCase();
 
-                // CRITICAL FIX: Get campaign snapshot
+                // Get campaign snapshot if exists
                 campaignRewardSnapshot = await getCampaignRewardSnapshot(user.uid);
                 if (campaignRewardSnapshot) {
                     isWithdrawalFinalized = true;
@@ -1281,7 +2116,7 @@
                 // Get direct referrals
                 directReferrals = await getCampaignDirectReferrals(user.uid);
 
-                // CRITICAL FIX: If campaign ended, finalize reward
+                // If campaign ended and no snapshot, finalize it
                 if (getCampaignStatus() === 'ENDED' && !campaignRewardSnapshot) {
                     campaignRewardSnapshot = await finalizeCampaignReward(user.uid);
                     if (campaignRewardSnapshot) {
@@ -1301,7 +2136,10 @@
                 el.referralCodeDisplay.textContent = referralCode;
                 el.totalReferralsDisplay.textContent = directReferrals;
 
+                // Start countdown
                 startCountdown();
+
+                // Update UI
                 updateUI();
 
                 el.loadingOverlay.classList.add('hidden');
@@ -1320,7 +2158,7 @@
                     }
                 }
 
-                // Real-time listener for referral updates (only during active, not after finalized)
+                // Real-time listener for referral updates (only during active)
                 if (status === 'ACTIVE') {
                     const userRef = ref(db, 'users/' + currentUserId);
                     onValue(userRef, async (snapshot) => {
@@ -1329,6 +2167,7 @@
                             if (newDirect !== directReferrals) {
                                 directReferrals = newDirect;
                                 el.totalReferralsDisplay.textContent = directReferrals;
+                                // Only update if not finalized
                                 if (!isWithdrawalFinalized) {
                                     updateUI();
                                 }
@@ -1359,7 +2198,7 @@
                     el.campaignEndedMessage.style.display = 'block';
                     if (countdownInterval) clearInterval(countdownInterval);
                     
-                    // Finalize reward if not done
+                    // Check if need to finalize reward
                     if (!isWithdrawalFinalized && currentUserId) {
                         finalizeCampaignReward(currentUserId).then(() => {
                             updateUI();
@@ -1506,11 +2345,6 @@
         console.log('✅ Direct Offer Page Loaded Successfully!');
         console.log('📅 Campaign:', CAMPAIGN);
         console.log('📊 Milestones:', MILESTONES.length);
-        console.log('🔒 Security fixes applied:');
-        console.log('  ✅ Firebase Security Rules (see separate file)');
-        console.log('  ✅ Duplicate withdrawal with lock');
-        console.log('  ✅ Final reward freeze');
-        console.log('  ✅ Campaign-period referrals (if needed)');
     </script>
 </body>
 </html>

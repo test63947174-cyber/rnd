@@ -14,15 +14,9 @@
 
     <style>
         /* ============================================================
-           DIRECT OFFER PAGE - COMPLETE STYLES
+           COMPLETE STYLES - SELF CONTAINED
            ============================================================ */
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
             background: #0a0e1a;
@@ -30,19 +24,15 @@
             min-height: 100vh;
             overflow-x: hidden;
         }
-
-        /* ===== SCROLLBAR ===== */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #141b2d; }
         ::-webkit-scrollbar-thumb { background: #2ecc71; border-radius: 10px; }
 
-        /* ===== LOADING OVERLAY ===== */
+        /* Loading */
         #loadingOverlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: #0a0e1a;
             display: flex;
             align-items: center;
@@ -50,27 +40,21 @@
             z-index: 9999;
             transition: opacity 0.5s ease;
         }
-        #loadingOverlay.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
+        #loadingOverlay.hidden { opacity: 0; pointer-events: none; }
         .loader-spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(46, 204, 113, 0.1);
+            width: 60px; height: 60px;
+            border: 4px solid rgba(46,204,113,0.1);
             border-top: 4px solid #2ecc71;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ===== NAVBAR ===== */
+        /* Navbar */
         .navbar-custom {
-            background: rgba(10, 14, 26, 0.95);
+            background: rgba(10,14,26,0.95);
             backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(46, 204, 113, 0.08);
+            border-bottom: 1px solid rgba(46,204,113,0.08);
             padding: 12px 0;
             position: sticky;
             top: 0;
@@ -82,9 +66,7 @@
             color: #fff;
             text-decoration: none;
         }
-        .navbar-custom .brand span {
-            color: #2ecc71;
-        }
+        .navbar-custom .brand span { color: #2ecc71; }
         .navbar-custom .brand small {
             font-weight: 400;
             font-size: 0.65rem;
@@ -98,27 +80,25 @@
             padding: 8px 16px;
             border-radius: 8px;
             transition: all 0.3s ease;
+            text-decoration: none;
         }
         .navbar-custom .nav-link:hover,
         .navbar-custom .nav-link.active {
             color: #fff;
-            background: rgba(46, 204, 113, 0.1);
+            background: rgba(46,204,113,0.1);
         }
-        .navbar-custom .nav-link i {
-            margin-right: 6px;
-        }
+        .navbar-custom .nav-link i { margin-right: 6px; }
         .user-badge {
             display: flex;
             align-items: center;
             gap: 10px;
-            background: rgba(46, 204, 113, 0.08);
+            background: rgba(46,204,113,0.08);
             padding: 6px 14px 6px 10px;
             border-radius: 30px;
-            border: 1px solid rgba(46, 204, 113, 0.1);
+            border: 1px solid rgba(46,204,113,0.1);
         }
         .user-badge .avatar {
-            width: 32px;
-            height: 32px;
+            width: 32px; height: 32px;
             border-radius: 50%;
             background: #2ecc71;
             color: #0a0e1a;
@@ -141,17 +121,17 @@
             padding: 4px 8px;
             border-radius: 6px;
             transition: all 0.3s ease;
+            cursor: pointer;
         }
         .user-badge .logout-btn:hover {
             color: #ef4444;
-            background: rgba(239, 68, 68, 0.1);
+            background: rgba(239,68,68,0.1);
         }
 
-        /* ===== TOAST CONTAINER ===== */
+        /* Toast */
         #toastContainer {
             position: fixed;
-            top: 20px;
-            right: 20px;
+            top: 20px; right: 20px;
             z-index: 9999;
             display: flex;
             flex-direction: column;
@@ -163,16 +143,13 @@
             padding: 14px 20px;
             border-radius: 12px;
             background: #141b2d;
-            border: 1px solid rgba(46, 204, 113, 0.15);
+            border: 1px solid rgba(46,204,113,0.15);
             color: #e2e8f0;
             display: flex;
             align-items: center;
             gap: 12px;
             font-size: 0.9rem;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transform: translateX(0);
-            opacity: 1;
-            transition: all 0.3s ease;
             animation: slideIn 0.4s ease;
         }
         .toast-custom.success { border-left: 4px solid #2ecc71; }
@@ -185,17 +162,17 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        /* ===== MAIN CONTENT ===== */
+        /* Main Content */
         .main-content {
             max-width: 1200px;
             margin: 0 auto;
             padding: 30px 20px 60px;
         }
 
-        /* ===== HERO SECTION ===== */
+        /* Hero */
         .hero-section {
-            background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(46, 204, 113, 0.02));
-            border: 1px solid rgba(46, 204, 113, 0.08);
+            background: linear-gradient(135deg, rgba(46,204,113,0.08), rgba(46,204,113,0.02));
+            border: 1px solid rgba(46,204,113,0.08);
             border-radius: 24px;
             padding: 50px 40px;
             text-align: center;
@@ -203,20 +180,9 @@
             position: relative;
             overflow: hidden;
         }
-        .hero-section::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -20%;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(46, 204, 113, 0.05), transparent);
-            border-radius: 50%;
-            pointer-events: none;
-        }
         .hero-section .badge-campaign {
             display: inline-block;
-            background: rgba(46, 204, 113, 0.15);
+            background: rgba(46,204,113,0.15);
             color: #2ecc71;
             padding: 4px 16px;
             border-radius: 30px;
@@ -247,12 +213,9 @@
             color: #64748b;
             margin-bottom: 24px;
         }
-        .hero-section .date-range i {
-            color: #2ecc71;
-            margin: 0 4px;
-        }
+        .hero-section .date-range i { color: #2ecc71; margin: 0 4px; }
 
-        /* ===== COUNTDOWN ===== */
+        /* Countdown */
         .countdown-wrapper {
             display: flex;
             justify-content: center;
@@ -261,8 +224,8 @@
             flex-wrap: wrap;
         }
         .countdown-item {
-            background: rgba(20, 27, 45, 0.8);
-            border: 1px solid rgba(46, 204, 113, 0.1);
+            background: rgba(20,27,45,0.8);
+            border: 1px solid rgba(46,204,113,0.1);
             border-radius: 16px;
             padding: 16px 24px;
             min-width: 80px;
@@ -282,27 +245,19 @@
             letter-spacing: 1px;
             margin-top: 4px;
         }
-        .countdown-item .separator {
-            color: #2ecc71;
-            font-size: 2rem;
-            font-weight: 300;
-            display: none;
-        }
         .campaign-ended-text {
             font-size: 1.2rem;
             color: #f59e0b;
             font-weight: 600;
             padding: 16px 24px;
-            background: rgba(245, 158, 11, 0.08);
-            border: 1px solid rgba(245, 158, 11, 0.15);
+            background: rgba(245,158,11,0.08);
+            border: 1px solid rgba(245,158,11,0.15);
             border-radius: 12px;
             display: inline-block;
         }
-        .campaign-ended-text i {
-            margin-right: 10px;
-        }
+        .campaign-ended-text i { margin-right: 10px; }
 
-        /* ===== STATS CARDS ===== */
+        /* Stats */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -310,15 +265,15 @@
             margin-bottom: 40px;
         }
         .stat-card {
-            background: rgba(20, 27, 45, 0.6);
-            border: 1px solid rgba(46, 204, 113, 0.06);
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
             border-radius: 16px;
             padding: 20px 24px;
             text-align: center;
             transition: all 0.3s ease;
         }
         .stat-card:hover {
-            border-color: rgba(46, 204, 113, 0.15);
+            border-color: rgba(46,204,113,0.15);
             transform: translateY(-2px);
         }
         .stat-card .number {
@@ -341,10 +296,10 @@
         .stat-card .number.blue { color: #60a5fa; }
         .stat-card .number.purple { color: #a78bfa; }
 
-        /* ===== PROGRESS SECTION ===== */
+        /* Progress */
         .progress-section {
-            background: rgba(20, 27, 45, 0.6);
-            border: 1px solid rgba(46, 204, 113, 0.06);
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
             border-radius: 16px;
             padding: 28px 32px;
             margin-bottom: 40px;
@@ -365,13 +320,11 @@
             color: #94a3b8;
             font-size: 0.9rem;
         }
-        .progress-section .label-row .value strong {
-            color: #2ecc71;
-        }
+        .progress-section .label-row .value strong { color: #2ecc71; }
         .progress-bar-track {
             width: 100%;
             height: 10px;
-            background: rgba(46, 204, 113, 0.06);
+            background: rgba(46,204,113,0.06);
             border-radius: 30px;
             overflow: hidden;
             position: relative;
@@ -388,11 +341,9 @@
             font-size: 0.9rem;
             color: #94a3b8;
         }
-        .progress-section .next-milestone strong {
-            color: #fbbf24;
-        }
+        .progress-section .next-milestone strong { color: #fbbf24; }
 
-        /* ===== MILESTONE CARDS ===== */
+        /* Milestones */
         .milestone-section-title {
             font-size: 1.3rem;
             font-weight: 700;
@@ -410,13 +361,12 @@
             margin-bottom: 40px;
         }
         .milestone-card {
-            background: rgba(20, 27, 45, 0.5);
-            border: 1px solid rgba(46, 204, 113, 0.06);
+            background: rgba(20,27,45,0.5);
+            border: 1px solid rgba(46,204,113,0.06);
             border-radius: 12px;
             padding: 16px 12px;
             text-align: center;
             transition: all 0.3s ease;
-            position: relative;
         }
         .milestone-card .refs {
             font-size: 1.3rem;
@@ -444,30 +394,30 @@
             letter-spacing: 0.3px;
         }
         .milestone-card .status-badge.achieved {
-            background: rgba(46, 204, 113, 0.15);
+            background: rgba(46,204,113,0.15);
             color: #2ecc71;
         }
         .milestone-card .status-badge.next {
-            background: rgba(251, 191, 36, 0.15);
+            background: rgba(251,191,36,0.15);
             color: #fbbf24;
         }
         .milestone-card .status-badge.locked {
-            background: rgba(100, 116, 139, 0.1);
+            background: rgba(100,116,139,0.1);
             color: #64748b;
         }
         .milestone-card.achieved {
-            border-color: rgba(46, 204, 113, 0.2);
-            background: rgba(46, 204, 113, 0.04);
+            border-color: rgba(46,204,113,0.2);
+            background: rgba(46,204,113,0.04);
         }
         .milestone-card.next {
-            border-color: rgba(251, 191, 36, 0.2);
-            background: rgba(251, 191, 36, 0.04);
+            border-color: rgba(251,191,36,0.2);
+            background: rgba(251,191,36,0.04);
         }
 
-        /* ===== REFERRAL LINK SECTION ===== */
+        /* Referral */
         .referral-section {
-            background: rgba(20, 27, 45, 0.6);
-            border: 1px solid rgba(46, 204, 113, 0.06);
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
             border-radius: 16px;
             padding: 28px 32px;
             margin-bottom: 40px;
@@ -486,10 +436,10 @@
             align-items: center;
             gap: 12px;
             flex-wrap: wrap;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0,0,0,0.3);
             border-radius: 12px;
             padding: 12px 16px;
-            border: 1px solid rgba(46, 204, 113, 0.06);
+            border: 1px solid rgba(46,204,113,0.06);
         }
         .referral-box code {
             flex: 1;
@@ -510,6 +460,7 @@
             font-size: 0.8rem;
             transition: all 0.3s ease;
             white-space: nowrap;
+            cursor: pointer;
         }
         .referral-box .copy-btn:hover {
             background: #10b981;
@@ -519,18 +470,16 @@
             background: #fbbf24;
         }
 
-        /* ===== WITHDRAWAL SECTION ===== */
+        /* Withdrawal */
         .withdrawal-section {
-            background: rgba(20, 27, 45, 0.6);
-            border: 1px solid rgba(46, 204, 113, 0.06);
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(46,204,113,0.06);
             border-radius: 16px;
             padding: 28px 32px;
             margin-bottom: 40px;
             display: none;
         }
-        .withdrawal-section.visible {
-            display: block;
-        }
+        .withdrawal-section.visible { display: block; }
         .withdrawal-section .title {
             font-weight: 700;
             color: #e2e8f0;
@@ -547,8 +496,8 @@
             margin-bottom: 20px;
         }
         .withdrawal-section .reward-amount-display {
-            background: rgba(46, 204, 113, 0.05);
-            border: 1px solid rgba(46, 204, 113, 0.1);
+            background: rgba(46,204,113,0.05);
+            border: 1px solid rgba(46,204,113,0.1);
             border-radius: 12px;
             padding: 16px 20px;
             margin-bottom: 20px;
@@ -578,17 +527,17 @@
         }
         .withdrawal-section .form-group .network-badge {
             display: inline-block;
-            background: rgba(251, 191, 36, 0.08);
+            background: rgba(251,191,36,0.08);
             color: #fbbf24;
             padding: 2px 14px;
             border-radius: 30px;
             font-size: 0.7rem;
             font-weight: 600;
-            border: 1px solid rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251,191,36,0.1);
         }
         .withdrawal-section .form-control-custom {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(46, 204, 113, 0.08);
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(46,204,113,0.08);
             border-radius: 10px;
             padding: 12px 16px;
             color: #e2e8f0;
@@ -599,7 +548,7 @@
         .withdrawal-section .form-control-custom:focus {
             outline: none;
             border-color: #2ecc71;
-            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.1);
         }
         .withdrawal-section .form-control-custom::placeholder {
             color: #475569;
@@ -609,7 +558,7 @@
             color: #f59e0b;
             margin-top: 8px;
             padding: 8px 12px;
-            background: rgba(245, 158, 11, 0.05);
+            background: rgba(245,158,11,0.05);
             border-radius: 8px;
             border-left: 3px solid #f59e0b;
         }
@@ -623,6 +572,7 @@
             font-size: 1rem;
             transition: all 0.3s ease;
             width: 100%;
+            cursor: pointer;
         }
         .withdrawal-section .btn-withdraw:hover:not(:disabled) {
             background: #f59e0b;
@@ -639,38 +589,33 @@
             font-size: 0.9rem;
             display: none;
         }
-        .withdrawal-section .withdrawal-status.visible {
-            display: block;
-        }
+        .withdrawal-section .withdrawal-status.visible { display: block; }
         .withdrawal-section .withdrawal-status.pending {
-            background: rgba(251, 191, 36, 0.05);
-            border: 1px solid rgba(251, 191, 36, 0.1);
+            background: rgba(251,191,36,0.05);
+            border: 1px solid rgba(251,191,36,0.1);
             color: #fbbf24;
         }
         .withdrawal-section .withdrawal-status.approved {
-            background: rgba(46, 204, 113, 0.05);
-            border: 1px solid rgba(46, 204, 113, 0.1);
+            background: rgba(46,204,113,0.05);
+            border: 1px solid rgba(46,204,113,0.1);
             color: #2ecc71;
         }
         .withdrawal-section .withdrawal-status.rejected {
-            background: rgba(239, 68, 68, 0.05);
-            border: 1px solid rgba(239, 68, 68, 0.1);
+            background: rgba(239,68,68,0.05);
+            border: 1px solid rgba(239,68,68,0.1);
             color: #ef4444;
         }
 
-        /* ===== NOT ELIGIBLE / LOCKED ===== */
         .not-eligible-box {
-            background: rgba(20, 27, 45, 0.6);
-            border: 1px solid rgba(239, 68, 68, 0.06);
+            background: rgba(20,27,45,0.6);
+            border: 1px solid rgba(239,68,68,0.06);
             border-radius: 16px;
             padding: 28px 32px;
             text-align: center;
             margin-bottom: 40px;
             display: none;
         }
-        .not-eligible-box.visible {
-            display: block;
-        }
+        .not-eligible-box.visible { display: block; }
         .not-eligible-box i {
             font-size: 2.5rem;
             color: #64748b;
@@ -686,95 +631,43 @@
             font-size: 0.9rem;
         }
 
-        /* ===== RESPONSIVE ===== */
+        /* Responsive */
         @media (max-width: 768px) {
-            .hero-section {
-                padding: 30px 20px;
-            }
-            .hero-section h1 {
-                font-size: 1.8rem;
-            }
-            .hero-section .subtitle {
-                font-size: 1rem;
-            }
-            .countdown-wrapper {
-                gap: 10px;
-            }
-            .countdown-item {
-                padding: 12px 16px;
-                min-width: 60px;
-            }
-            .countdown-item .number {
-                font-size: 1.6rem;
-            }
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .milestone-grid {
-                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-                gap: 8px;
-            }
-            .milestone-card {
-                padding: 12px 8px;
-            }
-            .milestone-card .refs {
-                font-size: 1rem;
-            }
-            .milestone-card .reward {
-                font-size: 0.9rem;
-            }
-            .progress-section,
-            .referral-section,
-            .withdrawal-section {
-                padding: 20px 16px;
-            }
-            .referral-box {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .referral-box code {
-                font-size: 0.7rem;
-            }
-            .withdrawal-section .reward-amount-display .amount {
-                font-size: 1.2rem;
-            }
-            .navbar-custom .brand {
-                font-size: 1.1rem;
-            }
+            .hero-section { padding: 30px 20px; }
+            .hero-section h1 { font-size: 1.8rem; }
+            .hero-section .subtitle { font-size: 1rem; }
+            .countdown-wrapper { gap: 10px; }
+            .countdown-item { padding: 12px 16px; min-width: 60px; }
+            .countdown-item .number { font-size: 1.6rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .milestone-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+            .milestone-card { padding: 12px 8px; }
+            .milestone-card .refs { font-size: 1rem; }
+            .milestone-card .reward { font-size: 0.9rem; }
+            .progress-section, .referral-section, .withdrawal-section { padding: 20px 16px; }
+            .referral-box { flex-direction: column; align-items: stretch; }
+            .referral-box code { font-size: 0.7rem; }
+            .withdrawal-section .reward-amount-display .amount { font-size: 1.2rem; }
+            .navbar-custom .brand { font-size: 1.1rem; }
         }
-
         @media (max-width: 480px) {
-            .stats-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-            }
-            .stat-card {
-                padding: 14px 12px;
-            }
-            .stat-card .number {
-                font-size: 1.6rem;
-            }
-            .countdown-item {
-                padding: 10px 12px;
-                min-width: 50px;
-            }
-            .countdown-item .number {
-                font-size: 1.3rem;
-            }
-            .milestone-grid {
-                grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-            }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .stat-card { padding: 14px 12px; }
+            .stat-card .number { font-size: 1.6rem; }
+            .countdown-item { padding: 10px 12px; min-width: 50px; }
+            .countdown-item .number { font-size: 1.3rem; }
+            .milestone-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
         }
     </style>
 </head>
 <body>
 
-    <!-- ===== LOADING OVERLAY ===== -->
+    <!-- ===== LOADING ===== -->
     <div id="loadingOverlay">
         <div class="loader-spinner"></div>
     </div>
 
-    <!-- ===== TOAST CONTAINER ===== -->
+    <!-- ===== TOAST ===== -->
     <div id="toastContainer"></div>
 
     <!-- ===== NAVBAR ===== -->
@@ -801,7 +694,7 @@
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- ===== HERO SECTION ===== -->
+        <!-- ===== HERO ===== -->
         <div class="hero-section">
             <div class="badge-campaign"><i class="bi bi-fire"></i> Limited Time Offer</div>
             <h1>RND <span>Direct Referral</span> Offer</h1>
@@ -809,8 +702,6 @@
             <p class="date-range">
                 <i class="bi bi-calendar-event"></i> 6 September 2026 – 6 October 2026
             </p>
-
-            <!-- Countdown -->
             <div id="countdownContainer">
                 <div class="countdown-wrapper" id="countdownWrapper">
                     <div class="countdown-item">
@@ -836,7 +727,7 @@
             </div>
         </div>
 
-        <!-- ===== STATS CARDS ===== -->
+        <!-- ===== STATS ===== -->
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="number" id="statDirectRefs">0</div>
@@ -858,7 +749,7 @@
             </div>
         </div>
 
-        <!-- ===== PROGRESS SECTION ===== -->
+        <!-- ===== PROGRESS ===== -->
         <div class="progress-section" id="progressSection">
             <div class="label-row">
                 <span class="title"><i class="bi bi-graph-up-arrow" style="color:#2ecc71;margin-right:8px;"></i>Your Progress</span>
@@ -880,15 +771,13 @@
             <p>You need at least <strong>5 Direct Referrals</strong> to qualify for this offer.</p>
         </div>
 
-        <!-- ===== MILESTONE CARDS ===== -->
+        <!-- ===== MILESTONES ===== -->
         <div class="milestone-section-title">
             <i class="bi bi-trophy"></i> Reward Milestones
         </div>
-        <div class="milestone-grid" id="milestoneGrid">
-            <!-- Generated by JavaScript -->
-        </div>
+        <div class="milestone-grid" id="milestoneGrid"></div>
 
-        <!-- ===== REFERRAL LINK SECTION ===== -->
+        <!-- ===== REFERRAL ===== -->
         <div class="referral-section" id="referralSection">
             <div class="title"><i class="bi bi-link-45deg"></i> Your Referral Link</div>
             <div class="referral-box">
@@ -901,16 +790,14 @@
             </div>
         </div>
 
-        <!-- ===== WITHDRAWAL SECTION ===== -->
+        <!-- ===== WITHDRAWAL ===== -->
         <div class="withdrawal-section" id="withdrawalSection">
             <div class="title"><i class="bi bi-credit-card"></i> Offer Reward Withdrawal</div>
             <div class="subtitle">Withdraw your eligible reward in USDT (BEP-20)</div>
-
             <div class="reward-amount-display">
                 <span class="label">Eligible Reward</span>
                 <span class="amount" id="withdrawAmount">$0.00 USDT</span>
             </div>
-
             <div class="form-group">
                 <label>
                     <i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address
@@ -922,20 +809,614 @@
                     Please enter a valid BEP-20 USDT wallet address. Sending funds to an unsupported network/address may result in loss of funds.
                 </div>
             </div>
-
             <button class="btn-withdraw" id="withdrawBtn">
                 <i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward
             </button>
-
             <div class="withdrawal-status" id="withdrawalStatus"></div>
         </div>
 
     </div>
 
     <!-- ============================================================
-    JAVASCRIPT - SEPARATE FILE REFERENCE
+    JAVASCRIPT - COMPLETE SELF CONTAINED
     ============================================================ -->
-    <script src="direct-offer.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+                "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+                "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+            }
+        }
+    </script>
 
+    <script type="module">
+        // ============================================================
+        // FIREBASE IMPORTS
+        // ============================================================
+        import { initializeApp } from "firebase/app";
+        import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+        import { getDatabase, ref, get, update, set, onValue } from "firebase/database";
+
+        // ============================================================
+        // FIREBASE CONFIG
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+            authDomain: "rwebsite-e031b.firebaseapp.com",
+            databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "rwebsite-e031b",
+            storageBucket: "rwebsite-e031b.firebasestorage.app",
+            messagingSenderId: "376966041558",
+            appId: "1:376966041558:web:02bc9062ec182590275e77",
+            measurementId: "G-0T1FREXHD3"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        // ============================================================
+        // CAMPAIGN CONFIG
+        // ============================================================
+        const CAMPAIGN = {
+            startDate: new Date('2026-09-06T00:00:00+05:30'),
+            endDate: new Date('2026-10-06T23:59:59+05:30'),
+            minQualifying: 5,
+            maxQualifying: 100,
+            maxReward: 100
+        };
+
+        const MILESTONES = [
+            { refs: 5, reward: 5 }, { refs: 10, reward: 10 },
+            { refs: 15, reward: 15 }, { refs: 20, reward: 20 },
+            { refs: 25, reward: 25 }, { refs: 30, reward: 30 },
+            { refs: 35, reward: 35 }, { refs: 40, reward: 40 },
+            { refs: 45, reward: 45 }, { refs: 50, reward: 50 },
+            { refs: 55, reward: 55 }, { refs: 60, reward: 60 },
+            { refs: 65, reward: 65 }, { refs: 70, reward: 70 },
+            { refs: 75, reward: 75 }, { refs: 80, reward: 80 },
+            { refs: 85, reward: 85 }, { refs: 90, reward: 90 },
+            { refs: 95, reward: 95 }, { refs: 100, reward: 100 }
+        ];
+
+        // ============================================================
+        // DOM REFS
+        // ============================================================
+        const $ = id => document.getElementById(id);
+        const el = {
+            loadingOverlay: $('loadingOverlay'),
+            toastContainer: $('toastContainer'),
+            userAvatar: $('userAvatar'),
+            userName: $('userName'),
+            logoutBtn: $('logoutBtn'),
+            countdownDays: $('countdownDays'),
+            countdownHours: $('countdownHours'),
+            countdownMinutes: $('countdownMinutes'),
+            countdownSeconds: $('countdownSeconds'),
+            countdownWrapper: $('countdownWrapper'),
+            campaignEndedMessage: $('campaignEndedMessage'),
+            statDirectRefs: $('statDirectRefs'),
+            statEligibleReward: $('statEligibleReward'),
+            statNextMilestone: $('statNextMilestone'),
+            statNextMilestoneSub: $('statNextMilestoneSub'),
+            statMaxReward: $('statMaxReward'),
+            progressCurrent: $('progressCurrent'),
+            progressTarget: $('progressTarget'),
+            progressFill: $('progressFill'),
+            needMore: $('needMore'),
+            nextReward: $('nextReward'),
+            nextMilestoneText: $('nextMilestoneText'),
+            milestoneGrid: $('milestoneGrid'),
+            referralLinkDisplay: $('referralLinkDisplay'),
+            copyReferralBtn: $('copyReferralBtn'),
+            totalReferralsDisplay: $('totalReferralsDisplay'),
+            referralCodeDisplay: $('referralCodeDisplay'),
+            withdrawalSection: $('withdrawalSection'),
+            withdrawAmount: $('withdrawAmount'),
+            walletAddressInput: $('walletAddressInput'),
+            withdrawBtn: $('withdrawBtn'),
+            withdrawalStatus: $('withdrawalStatus'),
+            notEligibleBox: $('notEligibleBox')
+        };
+
+        let currentUserId = null;
+        let directReferrals = 0;
+        let countdownInterval = null;
+
+        // ============================================================
+        // TOAST
+        // ============================================================
+        function showToast(message, type = 'success') {
+            const container = el.toastContainer;
+            const toast = document.createElement('div');
+            toast.className = `toast-custom ${type}`;
+            const iconMap = {
+                success: 'bi-check-circle-fill text-success',
+                error: 'bi-exclamation-triangle-fill text-danger',
+                warning: 'bi-exclamation-triangle-fill text-warning'
+            };
+            toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i><span class="toast-msg">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        // ============================================================
+        // CAMPAIGN STATUS
+        // ============================================================
+        function getCampaignStatus() {
+            const now = new Date();
+            if (now < CAMPAIGN.startDate) return 'UPCOMING';
+            if (now >= CAMPAIGN.startDate && now <= CAMPAIGN.endDate) return 'ACTIVE';
+            return 'ENDED';
+        }
+
+        // ============================================================
+        // COUNTDOWN
+        // ============================================================
+        function startCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            function update() {
+                const now = new Date();
+                const diff = CAMPAIGN.endDate - now;
+                if (diff <= 0) {
+                    el.countdownWrapper.style.display = 'none';
+                    el.campaignEndedMessage.style.display = 'block';
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    return;
+                }
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                el.countdownDays.textContent = String(days).padStart(2, '0');
+                el.countdownHours.textContent = String(hours).padStart(2, '0');
+                el.countdownMinutes.textContent = String(minutes).padStart(2, '0');
+                el.countdownSeconds.textContent = String(seconds).padStart(2, '0');
+            }
+            update();
+            countdownInterval = setInterval(update, 1000);
+        }
+
+        // ============================================================
+        // CALCULATE REWARD
+        // ============================================================
+        function calculateReward(directCount) {
+            if (directCount < CAMPAIGN.minQualifying) return 0;
+            const capped = Math.min(directCount, CAMPAIGN.maxQualifying);
+            let reward = 0;
+            for (const m of MILESTONES) {
+                if (m.refs <= capped) reward = m.reward;
+            }
+            return reward;
+        }
+
+        function getNextMilestone(directCount) {
+            for (const m of MILESTONES) {
+                if (m.refs > directCount) return m;
+            }
+            return null;
+        }
+
+        // ============================================================
+        // GET DIRECT REFERRALS
+        // ============================================================
+        async function getDirectReferrals(userId) {
+            try {
+                const userSnap = await get(ref(db, 'users/' + userId));
+                if (!userSnap.exists()) return 0;
+                const userData = userSnap.val();
+                const teamStructure = userData.teamStructure || {};
+                return teamStructure.level1 || 0;
+            } catch (error) {
+                console.error('Error getting direct referrals:', error);
+                return 0;
+            }
+        }
+
+        // ============================================================
+        // GET REFERRAL LINK
+        // ============================================================
+        function getReferralLink(referralCode) {
+            return `https://staking.randigital.in/register.html?ref=${referralCode}`;
+        }
+
+        // ============================================================
+        // CHECK WITHDRAWAL STATUS
+        // ============================================================
+        async function checkWithdrawalStatus(userId) {
+            try {
+                const snap = await get(ref(db, `campaign_rewards/${userId}`));
+                if (!snap.exists()) return null;
+                return snap.val();
+            } catch (error) {
+                return null;
+            }
+        }
+
+        // ============================================================
+        // CREATE WITHDRAWAL REQUEST
+        // ============================================================
+        async function createWithdrawalRequest(userId, rewardAmount, walletAddress, userData) {
+            try {
+                const existing = await checkWithdrawalStatus(userId);
+                if (existing && existing.status !== 'rejected') {
+                    return { success: false, error: 'You have already submitted a withdrawal request for this campaign.' };
+                }
+
+                const withdrawalId = 'wd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                const campaignData = {
+                    campaignId: 'direct_offer_2026',
+                    campaignName: 'RND Direct Referral Special Offer',
+                    userId: userId,
+                    username: userData.username || userData.referralCode || userId,
+                    email: userData.email || '',
+                    directCount: directReferrals,
+                    eligibleReward: rewardAmount,
+                    status: 'pending',
+                    walletAddress: walletAddress,
+                    requestedAt: Date.now(),
+                    updatedAt: Date.now(),
+                    withdrawalId: withdrawalId,
+                    transactionId: null,
+                    txHash: null,
+                    paidAt: null
+                };
+
+                await set(ref(db, `campaign_rewards/${userId}`), campaignData);
+                await set(ref(db, `admin/withdrawals/${withdrawalId}`), {
+                    ...campaignData,
+                    type: 'direct_offer_withdrawal',
+                    asset: 'USDT',
+                    network: 'BEP-20 / BNB Smart Chain',
+                    amount: rewardAmount
+                });
+
+                const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                const transaction = {
+                    type: 'direct_offer_withdrawal',
+                    subtype: 'Direct Referral Offer Withdrawal',
+                    amount: rewardAmount,
+                    currency: 'USDT',
+                    network: 'BEP-20 / BNB Smart Chain',
+                    status: 'pending',
+                    walletAddress: walletAddress,
+                    withdrawalId: withdrawalId,
+                    timestamp: Date.now(),
+                    date: new Date().toISOString().split('T')[0],
+                    description: `Direct Referral Offer Withdrawal of $${rewardAmount} USDT (BEP-20)`,
+                    txId: txId,
+                    txHash: null
+                };
+
+                await set(ref(db, `users/${userId}/transactions/${txId}`), transaction);
+                await set(ref(db, `transactions/${txId}`), {
+                    ...transaction,
+                    userId: userId,
+                    username: userData.username || userData.referralCode || userId
+                });
+
+                return { success: true, withdrawalId: withdrawalId };
+            } catch (error) {
+                console.error('Error creating withdrawal:', error);
+                return { success: false, error: error.message || 'Failed to submit withdrawal request.' };
+            }
+        }
+
+        // ============================================================
+        // RENDER MILESTONES
+        // ============================================================
+        function renderMilestones(directCount) {
+            const grid = el.milestoneGrid;
+            grid.innerHTML = '';
+            for (const m of MILESTONES) {
+                const achieved = directCount >= m.refs;
+                const isNext = !achieved && (directCount < CAMPAIGN.maxQualifying);
+                let statusClass = 'locked';
+                let statusText = 'Locked';
+                if (achieved) { statusClass = 'achieved'; statusText = '✓ Achieved'; }
+                else if (isNext) { statusClass = 'next'; statusText = 'Next Target'; }
+                const card = document.createElement('div');
+                card.className = `milestone-card ${statusClass}`;
+                card.innerHTML = `
+                    <div class="refs">${m.refs} <small>Direct</small></div>
+                    <div class="reward">$${m.reward}</div>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        // ============================================================
+        // UPDATE UI
+        // ============================================================
+        function updateUI() {
+            const directCount = directReferrals;
+            const reward = calculateReward(directCount);
+            const next = getNextMilestone(directCount);
+
+            el.statDirectRefs.textContent = directCount;
+            el.statEligibleReward.textContent = '$' + reward;
+
+            if (next) {
+                el.statNextMilestone.textContent = `${next.refs} → $${next.reward}`;
+                el.statNextMilestoneSub.textContent = `${next.refs - directCount} more needed`;
+            } else if (directCount >= CAMPAIGN.maxQualifying) {
+                el.statNextMilestone.textContent = '🎯 Max Reached!';
+                el.statNextMilestoneSub.textContent = 'You\'ve hit the maximum!';
+            }
+
+            const progress = Math.min((directCount / CAMPAIGN.maxQualifying) * 100, 100);
+            el.progressCurrent.textContent = Math.min(directCount, CAMPAIGN.maxQualifying);
+            el.progressTarget.textContent = CAMPAIGN.maxQualifying;
+            el.progressFill.style.width = progress + '%';
+
+            if (next) {
+                el.needMore.textContent = next.refs - directCount;
+                el.nextReward.textContent = '$' + next.reward;
+                el.nextMilestoneText.style.display = 'block';
+            } else if (directCount >= CAMPAIGN.maxQualifying) {
+                el.nextMilestoneText.innerHTML = '<i class="bi bi-trophy" style="color:#fbbf24;"></i> 🎉 You\'ve reached the maximum reward of <strong>$' + CAMPAIGN.maxReward + '</strong>!';
+            } else {
+                el.nextMilestoneText.style.display = 'none';
+            }
+
+            renderMilestones(directCount);
+
+            if (directCount < CAMPAIGN.minQualifying) {
+                el.notEligibleBox.classList.add('visible');
+            } else {
+                el.notEligibleBox.classList.remove('visible');
+            }
+
+            const status = getCampaignStatus();
+            const isEligible = directCount >= CAMPAIGN.minQualifying && reward > 0;
+
+            if (status === 'ENDED' && isEligible) {
+                el.withdrawalSection.classList.add('visible');
+                checkWithdrawalStatus(currentUserId).then(wStatus => {
+                    if (wStatus) {
+                        el.withdrawAmount.textContent = '$' + wStatus.eligibleReward.toFixed(2) + ' USDT';
+                        if (wStatus.status === 'pending') {
+                            el.withdrawBtn.disabled = true;
+                            el.withdrawBtn.innerHTML = '<i class="bi bi-clock me-2"></i>Pending Approval';
+                            showWithdrawalStatus('pending', 'Your withdrawal request is pending admin approval.');
+                        } else if (wStatus.status === 'approved') {
+                            el.withdrawBtn.disabled = true;
+                            el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Approved';
+                            showWithdrawalStatus('approved', 'Your withdrawal has been approved and is being processed.');
+                        } else if (wStatus.status === 'paid') {
+                            el.withdrawBtn.disabled = true;
+                            el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Paid';
+                            showWithdrawalStatus('approved', '✅ Payment completed!');
+                        } else if (wStatus.status === 'rejected') {
+                            el.withdrawBtn.disabled = false;
+                            el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
+                            showWithdrawalStatus('rejected', 'Your previous request was rejected. You can try again.');
+                        }
+                    } else {
+                        el.withdrawAmount.textContent = '$' + reward.toFixed(2) + ' USDT';
+                        el.withdrawBtn.disabled = false;
+                        el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
+                        el.withdrawalStatus.classList.remove('visible');
+                    }
+                });
+            } else {
+                el.withdrawalSection.classList.remove('visible');
+                if (status === 'ACTIVE' && isEligible) {
+                    showToast('Withdrawal will be available after the offer ends.', 'warning');
+                }
+            }
+        }
+
+        function showWithdrawalStatus(type, message) {
+            const statusEl = el.withdrawalStatus;
+            statusEl.className = 'withdrawal-status visible ' + type;
+            statusEl.textContent = message;
+        }
+
+        // ============================================================
+        // LOAD USER DATA
+        // ============================================================
+        async function loadUserData(user) {
+            try {
+                currentUserId = user.uid;
+                const userSnap = await get(ref(db, 'users/' + user.uid));
+                if (!userSnap.exists()) {
+                    showToast('User data not found. Please complete registration.', 'error');
+                    el.loadingOverlay.classList.add('hidden');
+                    return;
+                }
+
+                const userData = userSnap.val();
+                const name = userData.name || userData.username || 'User';
+                el.userName.textContent = name;
+                el.userAvatar.textContent = name.charAt(0).toUpperCase();
+
+                directReferrals = await getDirectReferrals(user.uid);
+
+                const referralCode = userData.referralCode || user.uid.substring(0, 8).toUpperCase();
+                const link = getReferralLink(referralCode);
+                el.referralLinkDisplay.textContent = link;
+                el.referralCodeDisplay.textContent = referralCode;
+                el.totalReferralsDisplay.textContent = directReferrals;
+
+                updateUI();
+                startCountdown();
+
+                el.loadingOverlay.classList.add('hidden');
+
+                const status = getCampaignStatus();
+                if (status === 'UPCOMING') {
+                    showToast('📢 Direct Referral Offer starts on 6 September 2026!', 'warning');
+                } else if (status === 'ACTIVE') {
+                    showToast('🎯 Offer is ACTIVE! Refer more to earn more!', 'success');
+                } else if (status === 'ENDED') {
+                    if (directReferrals >= CAMPAIGN.minQualifying) {
+                        showToast('🏆 Offer ended! You are eligible for reward withdrawal.', 'success');
+                    } else {
+                        showToast('⏰ Offer ended. You need at least 5 Direct Referrals to qualify.', 'warning');
+                    }
+                }
+
+                // Real-time listener
+                const userRef = ref(db, 'users/' + currentUserId);
+                onValue(userRef, async (snapshot) => {
+                    if (snapshot.exists()) {
+                        const newDirect = await getDirectReferrals(currentUserId);
+                        if (newDirect !== directReferrals) {
+                            directReferrals = newDirect;
+                            el.totalReferralsDisplay.textContent = directReferrals;
+                            updateUI();
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                showToast('Error loading data: ' + error.message, 'error');
+                el.loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        // ============================================================
+        // COPY REFERRAL LINK
+        // ============================================================
+        async function copyReferralLink() {
+            const link = el.referralLinkDisplay.textContent;
+            if (!link || link === 'Loading...') {
+                showToast('Please wait, referral link is loading...', 'warning');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(link);
+                el.copyReferralBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Copied!';
+                el.copyReferralBtn.classList.add('copied');
+                showToast('✅ Referral link copied!', 'success');
+                setTimeout(() => {
+                    el.copyReferralBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy Referral Link';
+                    el.copyReferralBtn.classList.remove('copied');
+                }, 3000);
+            } catch {
+                const textArea = document.createElement('textarea');
+                textArea.value = link;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                el.copyReferralBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Copied!';
+                showToast('✅ Referral link copied!', 'success');
+                setTimeout(() => {
+                    el.copyReferralBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy Referral Link';
+                }, 3000);
+            }
+        }
+
+        // ============================================================
+        // HANDLE WITHDRAWAL
+        // ============================================================
+        async function handleWithdrawal() {
+            const walletAddress = el.walletAddressInput.value.trim();
+            if (!walletAddress) {
+                showToast('Please enter a BEP-20 USDT wallet address.', 'error');
+                return;
+            }
+            if (!walletAddress.startsWith('0x') || walletAddress.length !== 42) {
+                showToast('Please enter a valid BEP-20 USDT wallet address (0x...).', 'error');
+                return;
+            }
+            if (getCampaignStatus() !== 'ENDED') {
+                showToast('Withdrawal is only available after the offer ends.', 'error');
+                return;
+            }
+            if (directReferrals < CAMPAIGN.minQualifying) {
+                showToast('You are not eligible for this reward.', 'error');
+                return;
+            }
+            const reward = calculateReward(directReferrals);
+            if (reward <= 0) {
+                showToast('You are not eligible for this reward.', 'error');
+                return;
+            }
+
+            const existing = await checkWithdrawalStatus(currentUserId);
+            if (existing && existing.status !== 'rejected') {
+                showToast('You have already submitted a withdrawal request for this campaign.', 'warning');
+                return;
+            }
+
+            el.withdrawBtn.disabled = true;
+            el.withdrawBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+
+            try {
+                const userSnap = await get(ref(db, 'users/' + currentUserId));
+                const userData = userSnap.exists() ? userSnap.val() : {};
+                const result = await createWithdrawalRequest(currentUserId, reward, walletAddress, userData);
+
+                if (result.success) {
+                    showToast('✅ Your withdrawal request has been submitted successfully.', 'success');
+                    el.withdrawBtn.innerHTML = '<i class="bi bi-clock me-2"></i>Pending Approval';
+                    el.withdrawBtn.disabled = true;
+                    showWithdrawalStatus('pending', 'Your withdrawal request is pending admin approval.');
+                    el.walletAddressInput.value = '';
+                } else {
+                    showToast('❌ ' + result.error, 'error');
+                    el.withdrawBtn.disabled = false;
+                    el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
+                }
+            } catch (error) {
+                console.error('Withdrawal error:', error);
+                showToast('❌ Error submitting withdrawal request. Please try again.', 'error');
+                el.withdrawBtn.disabled = false;
+                el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
+            }
+        }
+
+        // ============================================================
+        // LOGOUT
+        // ============================================================
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+                window.location.href = 'login.html';
+            } catch (error) {
+                showToast('Error logging out.', 'error');
+            }
+        }
+
+        // ============================================================
+        // SETUP LISTENERS
+        // ============================================================
+        function setupListeners() {
+            el.copyReferralBtn.addEventListener('click', copyReferralLink);
+            el.logoutBtn.addEventListener('click', handleLogout);
+            el.withdrawBtn.addEventListener('click', handleWithdrawal);
+        }
+
+        // ============================================================
+        // MAIN AUTH HANDLER
+        // ============================================================
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+            await loadUserData(user);
+            setupListeners();
+        });
+
+        // ============================================================
+        // CLEANUP
+        // ============================================================
+        window.addEventListener('beforeunload', () => {
+            if (countdownInterval) clearInterval(countdownInterval);
+        });
+
+        console.log('✅ Direct Offer Page Loaded Successfully!');
+    </script>
 </body>
 </html>

@@ -14,7 +14,7 @@
 
     <style>
         /* ============================================================
-           COMPLETE STYLES - SELF CONTAINED
+           COMPLETE STYLES
            ============================================================ */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -214,6 +214,34 @@
             margin-bottom: 24px;
         }
         .hero-section .date-range i { color: #2ecc71; margin: 0 4px; }
+        .hero-section .campaign-status-badge {
+            display: inline-block;
+            padding: 6px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+        .hero-section .campaign-status-badge.upcoming {
+            background: rgba(96,165,250,0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(96,165,250,0.15);
+        }
+        .hero-section .campaign-status-badge.active {
+            background: rgba(46,204,113,0.15);
+            color: #2ecc71;
+            border: 1px solid rgba(46,204,113,0.15);
+            animation: pulse 2s infinite;
+        }
+        .hero-section .campaign-status-badge.ended {
+            background: rgba(245,158,11,0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245,158,11,0.15);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
 
         /* Countdown */
         .countdown-wrapper {
@@ -279,9 +307,12 @@
         .stat-card .number {
             font-size: 2.2rem;
             font-weight: 800;
-            color: #2ecc71;
             line-height: 1.2;
         }
+        .stat-card .number.green { color: #2ecc71; }
+        .stat-card .number.gold { color: #fbbf24; }
+        .stat-card .number.blue { color: #60a5fa; }
+        .stat-card .number.purple { color: #a78bfa; }
         .stat-card .label {
             font-size: 0.8rem;
             color: #94a3b8;
@@ -292,9 +323,6 @@
             color: #64748b;
             margin-top: 2px;
         }
-        .stat-card .number.gold { color: #fbbf24; }
-        .stat-card .number.blue { color: #60a5fa; }
-        .stat-card .number.purple { color: #a78bfa; }
 
         /* Progress */
         .progress-section {
@@ -470,7 +498,7 @@
             background: #fbbf24;
         }
 
-        /* Withdrawal */
+        /* Withdrawal - UPDATED */
         .withdrawal-section {
             background: rgba(20,27,45,0.6);
             border: 1px solid rgba(46,204,113,0.06);
@@ -581,6 +609,14 @@
         .withdrawal-section .btn-withdraw:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+        .withdrawal-section .btn-withdraw.withdrawal-locked {
+            background: #64748b;
+            cursor: not-allowed;
+        }
+        .withdrawal-section .btn-withdraw.withdrawal-locked:hover {
+            transform: none;
+            background: #64748b;
         }
         .withdrawal-section .withdrawal-status {
             margin-top: 16px;
@@ -702,6 +738,7 @@
             <p class="date-range">
                 <i class="bi bi-calendar-event"></i> 6 September 2026 – 6 October 2026
             </p>
+            <div id="campaignStatusBadge"></div>
             <div id="countdownContainer">
                 <div class="countdown-wrapper" id="countdownWrapper">
                     <div class="countdown-item">
@@ -730,12 +767,13 @@
         <!-- ===== STATS ===== -->
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
-                <div class="number" id="statDirectRefs">0</div>
+                <div class="number green" id="statDirectRefs">0</div>
                 <div class="label">Your Direct Referrals</div>
             </div>
             <div class="stat-card">
                 <div class="number gold" id="statEligibleReward">$0</div>
-                <div class="label">Eligible Reward</div>
+                <div class="label">Your Eligible Reward</div>
+                <div class="sub" id="statRewardNote">You've earned this!</div>
             </div>
             <div class="stat-card">
                 <div class="number blue" id="statNextMilestone">5 → $5</div>
@@ -767,7 +805,7 @@
         <!-- ===== NOT ELIGIBLE ===== -->
         <div class="not-eligible-box" id="notEligibleBox">
             <i class="bi bi-person-x"></i>
-            <h5>Not Eligible</h5>
+            <h5>Not Eligible Yet</h5>
             <p>You need at least <strong>5 Direct Referrals</strong> to qualify for this offer.</p>
         </div>
 
@@ -790,35 +828,44 @@
             </div>
         </div>
 
-        <!-- ===== WITHDRAWAL ===== -->
+        <!-- ===== WITHDRAWAL SECTION ===== -->
         <div class="withdrawal-section" id="withdrawalSection">
-            <div class="title"><i class="bi bi-credit-card"></i> Offer Reward Withdrawal</div>
+            <div class="title"><i class="bi bi-credit-card"></i> 🎁 Offer Reward Withdrawal</div>
             <div class="subtitle">Withdraw your eligible reward in USDT (BEP-20)</div>
+            
             <div class="reward-amount-display">
-                <span class="label">Eligible Reward</span>
+                <span class="label">Your Eligible Reward</span>
                 <span class="amount" id="withdrawAmount">$0.00 USDT</span>
             </div>
+
+            <!-- Withdrawal Status Message -->
+            <div id="withdrawalInfoBox" style="margin-bottom:16px;padding:12px 16px;border-radius:10px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.1);display:none;">
+                <span id="withdrawalInfoText" style="color:#fbbf24;font-size:0.9rem;"></span>
+            </div>
+
             <div class="form-group">
                 <label>
                     <i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address
                     <span class="network-badge ms-2">Network: BNB Smart Chain (BEP-20)</span>
                 </label>
-                <input type="text" class="form-control-custom" id="walletAddressInput" placeholder="Enter your BEP-20 USDT wallet address" />
+                <input type="text" class="form-control-custom" id="walletAddressInput" placeholder="Enter your BEP-20 USDT wallet address (0x...)" />
                 <div class="warning-text">
                     <i class="bi bi-exclamation-triangle me-1"></i>
                     Please enter a valid BEP-20 USDT wallet address. Sending funds to an unsupported network/address may result in loss of funds.
                 </div>
             </div>
+
             <button class="btn-withdraw" id="withdrawBtn">
                 <i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward
             </button>
+
             <div class="withdrawal-status" id="withdrawalStatus"></div>
         </div>
 
     </div>
 
     <!-- ============================================================
-    JAVASCRIPT - COMPLETE SELF CONTAINED
+    JAVASCRIPT - COMPLETE
     ============================================================ -->
     <script type="importmap">
         {
@@ -896,8 +943,10 @@
             countdownSeconds: $('countdownSeconds'),
             countdownWrapper: $('countdownWrapper'),
             campaignEndedMessage: $('campaignEndedMessage'),
+            campaignStatusBadge: $('campaignStatusBadge'),
             statDirectRefs: $('statDirectRefs'),
             statEligibleReward: $('statEligibleReward'),
+            statRewardNote: $('statRewardNote'),
             statNextMilestone: $('statNextMilestone'),
             statNextMilestoneSub: $('statNextMilestoneSub'),
             statMaxReward: $('statMaxReward'),
@@ -917,12 +966,15 @@
             walletAddressInput: $('walletAddressInput'),
             withdrawBtn: $('withdrawBtn'),
             withdrawalStatus: $('withdrawalStatus'),
+            withdrawalInfoBox: $('withdrawalInfoBox'),
+            withdrawalInfoText: $('withdrawalInfoText'),
             notEligibleBox: $('notEligibleBox')
         };
 
         let currentUserId = null;
         let directReferrals = 0;
         let countdownInterval = null;
+        let withdrawalData = null;
 
         // ============================================================
         // TOAST
@@ -955,6 +1007,15 @@
             return 'ENDED';
         }
 
+        function getStatusBadge(status) {
+            const map = {
+                'UPCOMING': { class: 'upcoming', text: '⏳ Upcoming - Starts 6 Sep 2026' },
+                'ACTIVE': { class: 'active', text: '🔥 ACTIVE - Refer & Earn!' },
+                'ENDED': { class: 'ended', text: '🏁 Offer Ended - Withdrawal Available' }
+            };
+            return map[status] || map.UPCOMING;
+        }
+
         // ============================================================
         // COUNTDOWN
         // ============================================================
@@ -983,7 +1044,7 @@
         }
 
         // ============================================================
-        // CALCULATE REWARD
+        // CALCULATE REWARD - ONLY ONE AMOUNT SHOWS
         // ============================================================
         function calculateReward(directCount) {
             if (directCount < CAMPAIGN.minQualifying) return 0;
@@ -1000,6 +1061,16 @@
                 if (m.refs > directCount) return m;
             }
             return null;
+        }
+
+        function getCurrentMilestoneIndex(directCount) {
+            let index = -1;
+            for (let i = 0; i < MILESTONES.length; i++) {
+                if (directCount >= MILESTONES[i].refs) {
+                    index = i;
+                }
+            }
+            return index;
         }
 
         // ============================================================
@@ -1113,13 +1184,18 @@
         function renderMilestones(directCount) {
             const grid = el.milestoneGrid;
             grid.innerHTML = '';
+            let foundNext = false;
+            
             for (const m of MILESTONES) {
                 const achieved = directCount >= m.refs;
-                const isNext = !achieved && (directCount < CAMPAIGN.maxQualifying);
+                const isNext = !achieved && !foundNext && (directCount < CAMPAIGN.maxQualifying);
+                if (isNext) foundNext = true;
+                
                 let statusClass = 'locked';
                 let statusText = 'Locked';
                 if (achieved) { statusClass = 'achieved'; statusText = '✓ Achieved'; }
                 else if (isNext) { statusClass = 'next'; statusText = 'Next Target'; }
+                
                 const card = document.createElement('div');
                 card.className = `milestone-card ${statusClass}`;
                 card.innerHTML = `
@@ -1132,15 +1208,107 @@
         }
 
         // ============================================================
+        // UPDATE WITHDRAWAL UI
+        // ============================================================
+        function updateWithdrawalUI(reward, status) {
+            const campaignStatus = getCampaignStatus();
+            const isEligible = directReferrals >= CAMPAIGN.minQualifying && reward > 0;
+            
+            // Show withdrawal section only if eligible
+            if (isEligible) {
+                el.withdrawalSection.classList.add('visible');
+                el.withdrawAmount.textContent = '$' + reward.toFixed(2) + ' USDT';
+            } else {
+                el.withdrawalSection.classList.remove('visible');
+                return;
+            }
+
+            // Check if withdrawal already requested
+            if (status) {
+                if (status.status === 'pending') {
+                    el.withdrawBtn.disabled = true;
+                    el.withdrawBtn.innerHTML = '<i class="bi bi-clock me-2"></i>Pending Approval';
+                    el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
+                    showWithdrawalStatus('pending', 'Your withdrawal request is pending admin approval.');
+                    el.withdrawalInfoBox.style.display = 'block';
+                    el.withdrawalInfoText.textContent = '⏳ Your withdrawal is under review. You will be notified once approved.';
+                } else if (status.status === 'approved') {
+                    el.withdrawBtn.disabled = true;
+                    el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Approved';
+                    el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
+                    showWithdrawalStatus('approved', 'Your withdrawal has been approved and is being processed.');
+                    el.withdrawalInfoBox.style.display = 'block';
+                    el.withdrawalInfoText.textContent = '✅ Withdrawal approved! Funds will be sent to your wallet.';
+                } else if (status.status === 'paid') {
+                    el.withdrawBtn.disabled = true;
+                    el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Paid';
+                    el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
+                    showWithdrawalStatus('approved', '✅ Payment completed!');
+                    el.withdrawalInfoBox.style.display = 'block';
+                    el.withdrawalInfoText.textContent = '✅ Payment has been sent to your wallet!';
+                } else if (status.status === 'rejected') {
+                    el.withdrawBtn.disabled = false;
+                    el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
+                    el.withdrawBtn.className = 'btn-withdraw';
+                    el.withdrawalStatus.classList.remove('visible');
+                    el.withdrawalInfoBox.style.display = 'block';
+                    el.withdrawalInfoText.textContent = '⚠️ Your previous request was rejected. You can try again with a valid wallet address.';
+                }
+            } else {
+                // No withdrawal request yet
+                if (campaignStatus === 'ENDED') {
+                    el.withdrawBtn.disabled = false;
+                    el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
+                    el.withdrawBtn.className = 'btn-withdraw';
+                    el.withdrawalStatus.classList.remove('visible');
+                    el.withdrawalInfoBox.style.display = 'block';
+                    el.withdrawalInfoText.textContent = '🎉 Offer ended! You can now withdraw your reward.';
+                } else if (campaignStatus === 'ACTIVE') {
+                    el.withdrawBtn.disabled = true;
+                    el.withdrawBtn.innerHTML = '🔒 Withdrawal Available After Offer Ends';
+                    el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
+                    el.withdrawalInfoBox.style.display = 'block';
+                    el.withdrawalInfoText.textContent = '📅 Withdrawal will be available on 6 October 2026 after the offer ends.';
+                } else {
+                    el.withdrawBtn.disabled = true;
+                    el.withdrawBtn.innerHTML = '⏳ Offer Not Started Yet';
+                    el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
+                    el.withdrawalInfoBox.style.display = 'block';
+                    el.withdrawalInfoText.textContent = '📅 Offer starts on 6 September 2026. Start referring to earn!';
+                }
+            }
+        }
+
+        function showWithdrawalStatus(type, message) {
+            const statusEl = el.withdrawalStatus;
+            statusEl.className = 'withdrawal-status visible ' + type;
+            statusEl.textContent = message;
+        }
+
+        // ============================================================
         // UPDATE UI
         // ============================================================
         function updateUI() {
             const directCount = directReferrals;
             const reward = calculateReward(directCount);
             const next = getNextMilestone(directCount);
+            const status = getCampaignStatus();
+            const statusBadge = getStatusBadge(status);
 
+            // Campaign Status Badge
+            el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge ${statusBadge.class}">${statusBadge.text}</span>`;
+
+            // Stats
             el.statDirectRefs.textContent = directCount;
             el.statEligibleReward.textContent = '$' + reward;
+            
+            if (directCount >= CAMPAIGN.minQualifying) {
+                el.statRewardNote.textContent = '🎉 You\'ve earned $' + reward + '!';
+                el.statRewardNote.style.color = '#fbbf24';
+            } else {
+                el.statRewardNote.textContent = 'Need ' + (CAMPAIGN.minQualifying - directCount) + ' more to qualify';
+                el.statRewardNote.style.color = '#64748b';
+            }
 
             if (next) {
                 el.statNextMilestone.textContent = `${next.refs} → $${next.reward}`;
@@ -1150,6 +1318,7 @@
                 el.statNextMilestoneSub.textContent = 'You\'ve hit the maximum!';
             }
 
+            // Progress
             const progress = Math.min((directCount / CAMPAIGN.maxQualifying) * 100, 100);
             el.progressCurrent.textContent = Math.min(directCount, CAMPAIGN.maxQualifying);
             el.progressTarget.textContent = CAMPAIGN.maxQualifying;
@@ -1167,56 +1336,15 @@
 
             renderMilestones(directCount);
 
+            // Not Eligible
             if (directCount < CAMPAIGN.minQualifying) {
                 el.notEligibleBox.classList.add('visible');
             } else {
                 el.notEligibleBox.classList.remove('visible');
             }
 
-            const status = getCampaignStatus();
-            const isEligible = directCount >= CAMPAIGN.minQualifying && reward > 0;
-
-            if (status === 'ENDED' && isEligible) {
-                el.withdrawalSection.classList.add('visible');
-                checkWithdrawalStatus(currentUserId).then(wStatus => {
-                    if (wStatus) {
-                        el.withdrawAmount.textContent = '$' + wStatus.eligibleReward.toFixed(2) + ' USDT';
-                        if (wStatus.status === 'pending') {
-                            el.withdrawBtn.disabled = true;
-                            el.withdrawBtn.innerHTML = '<i class="bi bi-clock me-2"></i>Pending Approval';
-                            showWithdrawalStatus('pending', 'Your withdrawal request is pending admin approval.');
-                        } else if (wStatus.status === 'approved') {
-                            el.withdrawBtn.disabled = true;
-                            el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Approved';
-                            showWithdrawalStatus('approved', 'Your withdrawal has been approved and is being processed.');
-                        } else if (wStatus.status === 'paid') {
-                            el.withdrawBtn.disabled = true;
-                            el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Paid';
-                            showWithdrawalStatus('approved', '✅ Payment completed!');
-                        } else if (wStatus.status === 'rejected') {
-                            el.withdrawBtn.disabled = false;
-                            el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
-                            showWithdrawalStatus('rejected', 'Your previous request was rejected. You can try again.');
-                        }
-                    } else {
-                        el.withdrawAmount.textContent = '$' + reward.toFixed(2) + ' USDT';
-                        el.withdrawBtn.disabled = false;
-                        el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
-                        el.withdrawalStatus.classList.remove('visible');
-                    }
-                });
-            } else {
-                el.withdrawalSection.classList.remove('visible');
-                if (status === 'ACTIVE' && isEligible) {
-                    showToast('Withdrawal will be available after the offer ends.', 'warning');
-                }
-            }
-        }
-
-        function showWithdrawalStatus(type, message) {
-            const statusEl = el.withdrawalStatus;
-            statusEl.className = 'withdrawal-status visible ' + type;
-            statusEl.textContent = message;
+            // Update Withdrawal UI
+            updateWithdrawalUI(reward, withdrawalData);
         }
 
         // ============================================================
@@ -1244,6 +1372,9 @@
                 el.referralLinkDisplay.textContent = link;
                 el.referralCodeDisplay.textContent = referralCode;
                 el.totalReferralsDisplay.textContent = directReferrals;
+
+                // Check withdrawal status
+                withdrawalData = await checkWithdrawalStatus(user.uid);
 
                 updateUI();
                 startCountdown();
@@ -1320,6 +1451,30 @@
         // HANDLE WITHDRAWAL
         // ============================================================
         async function handleWithdrawal() {
+            // Check if offer ended
+            if (getCampaignStatus() !== 'ENDED') {
+                showToast('Withdrawal is only available after the offer ends (6 October 2026).', 'error');
+                return;
+            }
+
+            // Check eligibility
+            if (directReferrals < CAMPAIGN.minQualifying) {
+                showToast('You are not eligible for this reward.', 'error');
+                return;
+            }
+
+            const reward = calculateReward(directReferrals);
+            if (reward <= 0) {
+                showToast('You are not eligible for this reward.', 'error');
+                return;
+            }
+
+            // Check if already requested (not rejected)
+            if (withdrawalData && withdrawalData.status !== 'rejected') {
+                showToast('You have already submitted a withdrawal request for this campaign.', 'warning');
+                return;
+            }
+
             const walletAddress = el.walletAddressInput.value.trim();
             if (!walletAddress) {
                 showToast('Please enter a BEP-20 USDT wallet address.', 'error');
@@ -1327,25 +1482,6 @@
             }
             if (!walletAddress.startsWith('0x') || walletAddress.length !== 42) {
                 showToast('Please enter a valid BEP-20 USDT wallet address (0x...).', 'error');
-                return;
-            }
-            if (getCampaignStatus() !== 'ENDED') {
-                showToast('Withdrawal is only available after the offer ends.', 'error');
-                return;
-            }
-            if (directReferrals < CAMPAIGN.minQualifying) {
-                showToast('You are not eligible for this reward.', 'error');
-                return;
-            }
-            const reward = calculateReward(directReferrals);
-            if (reward <= 0) {
-                showToast('You are not eligible for this reward.', 'error');
-                return;
-            }
-
-            const existing = await checkWithdrawalStatus(currentUserId);
-            if (existing && existing.status !== 'rejected') {
-                showToast('You have already submitted a withdrawal request for this campaign.', 'warning');
                 return;
             }
 
@@ -1359,9 +1495,8 @@
 
                 if (result.success) {
                     showToast('✅ Your withdrawal request has been submitted successfully.', 'success');
-                    el.withdrawBtn.innerHTML = '<i class="bi bi-clock me-2"></i>Pending Approval';
-                    el.withdrawBtn.disabled = true;
-                    showWithdrawalStatus('pending', 'Your withdrawal request is pending admin approval.');
+                    withdrawalData = await checkWithdrawalStatus(currentUserId);
+                    updateUI();
                     el.walletAddressInput.value = '';
                 } else {
                     showToast('❌ ' + result.error, 'error');

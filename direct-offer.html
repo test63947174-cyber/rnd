@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>RND Direct Referral Offer</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+
+    <style>
+        /* ============================================================
+           DIRECT OFFER PAGE - COMPLETE STYLES
+           ============================================================ */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0e1a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #141b2d; }
+        ::-webkit-scrollbar-thumb { background: #2ecc71; border-radius: 10px; }
+
+        /* ===== LOADING OVERLAY ===== */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0e1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        #loadingOverlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(46, 204, 113, 0.1);
+            border-top: 4px solid #2ecc71;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ===== NAVBAR ===== */
+        .navbar-custom {
+            background: rgba(10, 14, 26, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(46, 204, 113, 0.08);
+            padding: 12px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .navbar-custom .brand {
+            font-weight: 800;
+            font-size: 1.4rem;
+            color: #fff;
+            text-decoration: none;
+        }
+        .navbar-custom .brand span {
+            color: #2ecc71;
+        }
+        .navbar-custom .brand small {
+            font-weight: 400;
+            font-size: 0.65rem;
+            color: #94a3b8;
+            display: block;
+        }
+        .navbar-custom .nav-link {
+            color: #94a3b8;
+            font-weight: 500;
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .navbar-custom .nav-link:hover,
+        .navbar-custom .nav-link.active {
+            color: #fff;
+            background: rgba(46, 204, 113, 0.1);
+        }
+        .navbar-custom .nav-link i {
+            margin-right: 6px;
+        }
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(46, 204, 113, 0.08);
+            padding: 6px 14px 6px 10px;
+            border-radius: 30px;
+            border: 1px solid rgba(46, 204, 113, 0.1);
+        }
+        .user-badge .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #2ecc71;
+            color: #0a0e1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .user-badge .name {
+            color: #e2e8f0;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .user-badge .logout-btn {
+            color: #94a3b8;
+            background: none;
+            border: none;
+            font-size: 1rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        .user-badge .logout-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* ===== TOAST CONTAINER ===== */
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .toast-custom {
+            padding: 14px 20px;
+            border-radius: 12px;
+            background: #141b2d;
+            border: 1px solid rgba(46, 204, 113, 0.15);
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform: translateX(0);
+            opacity: 1;
+            transition: all 0.3s ease;
+            animation: slideIn 0.4s ease;
+        }
+        .toast-custom.success { border-left: 4px solid #2ecc71; }
+        .toast-custom.error { border-left: 4px solid #ef4444; }
+        .toast-custom.warning { border-left: 4px solid #f59e0b; }
+        .toast-custom i { font-size: 1.2rem; }
+        .toast-custom .toast-msg { flex: 1; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px 60px;
+        }
+
+        /* ===== HERO SECTION ===== */
+        .hero-section {
+            background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(46, 204, 113, 0.02));
+            border: 1px solid rgba(46, 204, 113, 0.08);
+            border-radius: 24px;
+            padding: 50px 40px;
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(46, 204, 113, 0.05), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .hero-section .badge-campaign {
+            display: inline-block;
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+            padding: 4px 16px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+        .hero-section h1 {
+            font-size: 2.8rem;
+            font-weight: 900;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .hero-section h1 span {
+            background: linear-gradient(135deg, #2ecc71, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-section .subtitle {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            margin-bottom: 12px;
+        }
+        .hero-section .date-range {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+        .hero-section .date-range i {
+            color: #2ecc71;
+            margin: 0 4px;
+        }
+
+        /* ===== COUNTDOWN ===== */
+        .countdown-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .countdown-item {
+            background: rgba(20, 27, 45, 0.8);
+            border: 1px solid rgba(46, 204, 113, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            min-width: 80px;
+            text-align: center;
+        }
+        .countdown-item .number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #2ecc71;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.2;
+        }
+        .countdown-item .label {
+            font-size: 0.65rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+        .countdown-item .separator {
+            color: #2ecc71;
+            font-size: 2rem;
+            font-weight: 300;
+            display: none;
+        }
+        .campaign-ended-text {
+            font-size: 1.2rem;
+            color: #f59e0b;
+            font-weight: 600;
+            padding: 16px 24px;
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+            border-radius: 12px;
+            display: inline-block;
+        }
+        .campaign-ended-text i {
+            margin-right: 10px;
+        }
+
+        /* ===== STATS CARDS ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: rgba(20, 27, 45, 0.6);
+            border: 1px solid rgba(46, 204, 113, 0.06);
+            border-radius: 16px;
+            padding: 20px 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            border-color: rgba(46, 204, 113, 0.15);
+            transform: translateY(-2px);
+        }
+        .stat-card .number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #2ecc71;
+            line-height: 1.2;
+        }
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .stat-card .sub {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 2px;
+        }
+        .stat-card .number.gold { color: #fbbf24; }
+        .stat-card .number.blue { color: #60a5fa; }
+        .stat-card .number.purple { color: #a78bfa; }
+
+        /* ===== PROGRESS SECTION ===== */
+        .progress-section {
+            background: rgba(20, 27, 45, 0.6);
+            border: 1px solid rgba(46, 204, 113, 0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+        }
+        .progress-section .label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .progress-section .label-row .title {
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .progress-section .label-row .value {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        .progress-section .label-row .value strong {
+            color: #2ecc71;
+        }
+        .progress-bar-track {
+            width: 100%;
+            height: 10px;
+            background: rgba(46, 204, 113, 0.06);
+            border-radius: 30px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar-track .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2ecc71, #10b981);
+            border-radius: 30px;
+            transition: width 0.6s ease;
+            width: 0%;
+        }
+        .progress-section .next-milestone {
+            margin-top: 16px;
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+        .progress-section .next-milestone strong {
+            color: #fbbf24;
+        }
+
+        /* ===== MILESTONE CARDS ===== */
+        .milestone-section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 20px;
+        }
+        .milestone-section-title i {
+            color: #2ecc71;
+            margin-right: 10px;
+        }
+        .milestone-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+        .milestone-card {
+            background: rgba(20, 27, 45, 0.5);
+            border: 1px solid rgba(46, 204, 113, 0.06);
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .milestone-card .refs {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .milestone-card .refs small {
+            font-size: 0.7rem;
+            color: #64748b;
+            font-weight: 400;
+        }
+        .milestone-card .reward {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fbbf24;
+            margin-top: 4px;
+        }
+        .milestone-card .status-badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 2px 12px;
+            border-radius: 30px;
+            margin-top: 8px;
+            letter-spacing: 0.3px;
+        }
+        .milestone-card .status-badge.achieved {
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+        }
+        .milestone-card .status-badge.next {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+        }
+        .milestone-card .status-badge.locked {
+            background: rgba(100, 116, 139, 0.1);
+            color: #64748b;
+        }
+        .milestone-card.achieved {
+            border-color: rgba(46, 204, 113, 0.2);
+            background: rgba(46, 204, 113, 0.04);
+        }
+        .milestone-card.next {
+            border-color: rgba(251, 191, 36, 0.2);
+            background: rgba(251, 191, 36, 0.04);
+        }
+
+        /* ===== REFERRAL LINK SECTION ===== */
+        .referral-section {
+            background: rgba(20, 27, 45, 0.6);
+            border: 1px solid rgba(46, 204, 113, 0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+        }
+        .referral-section .title {
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 12px;
+        }
+        .referral-section .title i {
+            color: #2ecc71;
+            margin-right: 8px;
+        }
+        .referral-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            border: 1px solid rgba(46, 204, 113, 0.06);
+        }
+        .referral-box code {
+            flex: 1;
+            color: #60a5fa;
+            font-size: 0.8rem;
+            word-break: break-all;
+            background: transparent;
+            padding: 0;
+            font-family: 'Inter', monospace;
+        }
+        .referral-box .copy-btn {
+            background: #2ecc71;
+            color: #0a0e1a;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        .referral-box .copy-btn:hover {
+            background: #10b981;
+            transform: scale(1.02);
+        }
+        .referral-box .copy-btn.copied {
+            background: #fbbf24;
+        }
+
+        /* ===== WITHDRAWAL SECTION ===== */
+        .withdrawal-section {
+            background: rgba(20, 27, 45, 0.6);
+            border: 1px solid rgba(46, 204, 113, 0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 40px;
+            display: none;
+        }
+        .withdrawal-section.visible {
+            display: block;
+        }
+        .withdrawal-section .title {
+            font-weight: 700;
+            color: #e2e8f0;
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+        }
+        .withdrawal-section .title i {
+            color: #fbbf24;
+            margin-right: 10px;
+        }
+        .withdrawal-section .subtitle {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        .withdrawal-section .reward-amount-display {
+            background: rgba(46, 204, 113, 0.05);
+            border: 1px solid rgba(46, 204, 113, 0.1);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .withdrawal-section .reward-amount-display .label {
+            color: #94a3b8;
+        }
+        .withdrawal-section .reward-amount-display .amount {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #fbbf24;
+        }
+        .withdrawal-section .form-group {
+            margin-bottom: 16px;
+        }
+        .withdrawal-section .form-group label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .withdrawal-section .form-group .network-badge {
+            display: inline-block;
+            background: rgba(251, 191, 36, 0.08);
+            color: #fbbf24;
+            padding: 2px 14px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: 1px solid rgba(251, 191, 36, 0.1);
+        }
+        .withdrawal-section .form-control-custom {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(46, 204, 113, 0.08);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        .withdrawal-section .form-control-custom:focus {
+            outline: none;
+            border-color: #2ecc71;
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+        }
+        .withdrawal-section .form-control-custom::placeholder {
+            color: #475569;
+        }
+        .withdrawal-section .warning-text {
+            font-size: 0.75rem;
+            color: #f59e0b;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(245, 158, 11, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid #f59e0b;
+        }
+        .withdrawal-section .btn-withdraw {
+            background: #fbbf24;
+            color: #0a0e1a;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        .withdrawal-section .btn-withdraw:hover:not(:disabled) {
+            background: #f59e0b;
+            transform: scale(1.01);
+        }
+        .withdrawal-section .btn-withdraw:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .withdrawal-section .withdrawal-status {
+            margin-top: 16px;
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        .withdrawal-section .withdrawal-status.visible {
+            display: block;
+        }
+        .withdrawal-section .withdrawal-status.pending {
+            background: rgba(251, 191, 36, 0.05);
+            border: 1px solid rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+        }
+        .withdrawal-section .withdrawal-status.approved {
+            background: rgba(46, 204, 113, 0.05);
+            border: 1px solid rgba(46, 204, 113, 0.1);
+            color: #2ecc71;
+        }
+        .withdrawal-section .withdrawal-status.rejected {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        /* ===== NOT ELIGIBLE / LOCKED ===== */
+        .not-eligible-box {
+            background: rgba(20, 27, 45, 0.6);
+            border: 1px solid rgba(239, 68, 68, 0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            text-align: center;
+            margin-bottom: 40px;
+            display: none;
+        }
+        .not-eligible-box.visible {
+            display: block;
+        }
+        .not-eligible-box i {
+            font-size: 2.5rem;
+            color: #64748b;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .not-eligible-box h5 {
+            color: #e2e8f0;
+            margin-bottom: 4px;
+        }
+        .not-eligible-box p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 30px 20px;
+            }
+            .hero-section h1 {
+                font-size: 1.8rem;
+            }
+            .hero-section .subtitle {
+                font-size: 1rem;
+            }
+            .countdown-wrapper {
+                gap: 10px;
+            }
+            .countdown-item {
+                padding: 12px 16px;
+                min-width: 60px;
+            }
+            .countdown-item .number {
+                font-size: 1.6rem;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .milestone-grid {
+                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+                gap: 8px;
+            }
+            .milestone-card {
+                padding: 12px 8px;
+            }
+            .milestone-card .refs {
+                font-size: 1rem;
+            }
+            .milestone-card .reward {
+                font-size: 0.9rem;
+            }
+            .progress-section,
+            .referral-section,
+            .withdrawal-section {
+                padding: 20px 16px;
+            }
+            .referral-box {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .referral-box code {
+                font-size: 0.7rem;
+            }
+            .withdrawal-section .reward-amount-display .amount {
+                font-size: 1.2rem;
+            }
+            .navbar-custom .brand {
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .stat-card {
+                padding: 14px 12px;
+            }
+            .stat-card .number {
+                font-size: 1.6rem;
+            }
+            .countdown-item {
+                padding: 10px 12px;
+                min-width: 50px;
+            }
+            .countdown-item .number {
+                font-size: 1.3rem;
+            }
+            .milestone-grid {
+                grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== LOADING OVERLAY ===== -->
+    <div id="loadingOverlay">
+        <div class="loader-spinner"></div>
+    </div>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div id="toastContainer"></div>
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar-custom">
+        <div class="container">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <a href="dashboard.html" class="brand">
+                    RND<span>Stake</span>
+                    <small>Direct Referral Offer</small>
+                </a>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <a href="dashboard.html" class="nav-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+                    <a href="direct-offer.html" class="nav-link active"><i class="bi bi-gift"></i>Direct Offer</a>
+                    <div class="user-badge" id="userBadge">
+                        <div class="avatar" id="userAvatar">U</div>
+                        <span class="name" id="userName">Loading...</span>
+                        <button class="logout-btn" id="logoutBtn" title="Logout"><i class="bi bi-box-arrow-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <div class="main-content">
+
+        <!-- ===== HERO SECTION ===== -->
+        <div class="hero-section">
+            <div class="badge-campaign"><i class="bi bi-fire"></i> Limited Time Offer</div>
+            <h1>RND <span>Direct Referral</span> Offer</h1>
+            <p class="subtitle">Refer More. Earn More.</p>
+            <p class="date-range">
+                <i class="bi bi-calendar-event"></i> 6 September 2026 – 6 October 2026
+            </p>
+
+            <!-- Countdown -->
+            <div id="countdownContainer">
+                <div class="countdown-wrapper" id="countdownWrapper">
+                    <div class="countdown-item">
+                        <div class="number" id="countdownDays">00</div>
+                        <div class="label">Days</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="number" id="countdownHours">00</div>
+                        <div class="label">Hours</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="number" id="countdownMinutes">00</div>
+                        <div class="label">Minutes</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="number" id="countdownSeconds">00</div>
+                        <div class="label">Seconds</div>
+                    </div>
+                </div>
+                <div id="campaignEndedMessage" style="display:none;">
+                    <span class="campaign-ended-text"><i class="bi bi-clock-history"></i> The Direct Referral Offer has ended.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== STATS CARDS ===== -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="number" id="statDirectRefs">0</div>
+                <div class="label">Your Direct Referrals</div>
+            </div>
+            <div class="stat-card">
+                <div class="number gold" id="statEligibleReward">$0</div>
+                <div class="label">Eligible Reward</div>
+            </div>
+            <div class="stat-card">
+                <div class="number blue" id="statNextMilestone">5 → $5</div>
+                <div class="label">Next Milestone</div>
+                <div class="sub" id="statNextMilestoneSub">0 more needed</div>
+            </div>
+            <div class="stat-card">
+                <div class="number purple" id="statMaxReward">$100</div>
+                <div class="label">Maximum Reward</div>
+                <div class="sub">100 Direct Referrals</div>
+            </div>
+        </div>
+
+        <!-- ===== PROGRESS SECTION ===== -->
+        <div class="progress-section" id="progressSection">
+            <div class="label-row">
+                <span class="title"><i class="bi bi-graph-up-arrow" style="color:#2ecc71;margin-right:8px;"></i>Your Progress</span>
+                <span class="value"><strong id="progressCurrent">0</strong> / <span id="progressTarget">100</span> Direct Referrals</span>
+            </div>
+            <div class="progress-bar-track">
+                <div class="fill" id="progressFill" style="width:0%;"></div>
+            </div>
+            <div class="next-milestone" id="nextMilestoneText">
+                <i class="bi bi-bullseye" style="color:#fbbf24;"></i>
+                Need <strong id="needMore">5</strong> more Direct referrals to reach <strong id="nextReward">$5</strong> milestone.
+            </div>
+        </div>
+
+        <!-- ===== NOT ELIGIBLE ===== -->
+        <div class="not-eligible-box" id="notEligibleBox">
+            <i class="bi bi-person-x"></i>
+            <h5>Not Eligible</h5>
+            <p>You need at least <strong>5 Direct Referrals</strong> to qualify for this offer.</p>
+        </div>
+
+        <!-- ===== MILESTONE CARDS ===== -->
+        <div class="milestone-section-title">
+            <i class="bi bi-trophy"></i> Reward Milestones
+        </div>
+        <div class="milestone-grid" id="milestoneGrid">
+            <!-- Generated by JavaScript -->
+        </div>
+
+        <!-- ===== REFERRAL LINK SECTION ===== -->
+        <div class="referral-section" id="referralSection">
+            <div class="title"><i class="bi bi-link-45deg"></i> Your Referral Link</div>
+            <div class="referral-box">
+                <code id="referralLinkDisplay">Loading...</code>
+                <button class="copy-btn" id="copyReferralBtn"><i class="bi bi-clipboard me-1"></i>Copy Referral Link</button>
+            </div>
+            <div class="mt-2">
+                <span class="text-muted small"><i class="bi bi-people me-1"></i>Total Referrals: <strong style="color:#2ecc71;" id="totalReferralsDisplay">0</strong></span>
+                <span class="text-muted small ms-3"><i class="bi bi-code me-1"></i>Your Code: <strong style="color:#2ecc71;" id="referralCodeDisplay">---</strong></span>
+            </div>
+        </div>
+
+        <!-- ===== WITHDRAWAL SECTION ===== -->
+        <div class="withdrawal-section" id="withdrawalSection">
+            <div class="title"><i class="bi bi-credit-card"></i> Offer Reward Withdrawal</div>
+            <div class="subtitle">Withdraw your eligible reward in USDT (BEP-20)</div>
+
+            <div class="reward-amount-display">
+                <span class="label">Eligible Reward</span>
+                <span class="amount" id="withdrawAmount">$0.00 USDT</span>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address
+                    <span class="network-badge ms-2">Network: BNB Smart Chain (BEP-20)</span>
+                </label>
+                <input type="text" class="form-control-custom" id="walletAddressInput" placeholder="Enter your BEP-20 USDT wallet address" />
+                <div class="warning-text">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Please enter a valid BEP-20 USDT wallet address. Sending funds to an unsupported network/address may result in loss of funds.
+                </div>
+            </div>
+
+            <button class="btn-withdraw" id="withdrawBtn">
+                <i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward
+            </button>
+
+            <div class="withdrawal-status" id="withdrawalStatus"></div>
+        </div>
+
+    </div>
+
+    <!-- ============================================================
+    JAVASCRIPT - SEPARATE FILE REFERENCE
+    ============================================================ -->
+    <script src="direct-offer.js"></script>
+
+</body>
+</html>

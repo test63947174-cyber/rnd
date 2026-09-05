@@ -1419,75 +1419,126 @@
         let campaignRewardSnapshot = null;
         let isWithdrawalFinalized = false;
         let isProcessingWithdrawal = false;
+        let referralRefreshInterval = null;
+        let firebaseServerOffset = 0;
 
         // ============================================================
-        // PART 1: CANONICAL ACTIVE USER CHECK
+        // FIX 5: FIREBASE SERVER-ADJUSTED TIME
+        // ============================================================
+        async function syncFirebaseServerTime() {
+            try {
+                const snap = await get(ref(db, '.info/serverTimeOffset'));
+                firebaseServerOffset = snap.exists() ? Number(snap.val() || 0) : 0;
+            } catch (error) {
+                console.error('Unable to read Firebase server time offset:', error);
+                firebaseServerOffset = 0;
+            }
+        }
+
+        function getCampaignNow() {
+            return new Date(Date.now() + firebaseServerOffset);
+        }
+
+        // ============================================================
+        // FIX 1: CANONICAL ACTIVE USER CHECK
         // Registration alone NEVER means active.
         // User becomes active only when at least one eligible package
         // has status === 'active'.
         // ============================================================
         function isUserActive(userData) {
-            try {
-                if (!userData || typeof userData !== 'object') {
-                    return false;
-                }
-
-                const packages = userData.packages || {};
-
-                for (const packageId of Object.keys(packages)) {
-                    const pkg = packages[packageId];
-
-                    if (!pkg || typeof pkg !== 'object') continue;
-
-                    // ONLY active package qualifies
-                    if (
-                        String(pkg.status || '').toLowerCase() === 'active' &&
-                        Number(pkg.usdtAmount || 0) > 0
-                    ) {
-                        return true;
-                    }
-                }
-
-                return false;
-            } catch (error) {
-                console.error('isUserActive error:', error);
+            if (!userData || typeof userData !== 'object') {
                 return false;
             }
+
+            const packages = userData.packages || {};
+
+            for (const packageId of Object.keys(packages)) {
+                const pkg = packages[packageId];
+
+                if (!pkg || typeof pkg !== 'object') continue;
+
+                // ONLY active package qualifies
+                if (
+                    String(pkg.status || '').toLowerCase() === 'active' &&
+                    Number(pkg.usdtAmount || 0) > 0
+                ) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // ============================================================
-        // PART 2: CANONICAL PACKAGE ACTIVATION TIME
+        // FIX 2: NORMALIZE TIMESTAMP HELPER
+        // ============================================================
+        function normalizeTimestamp(value) {
+            if (value === null || value === undefined || value === '') {
+                return null;
+            }
+
+            // Firebase numeric timestamp
+            if (typeof value === 'number') {
+                return Number.isFinite(value) && value > 0 ? value : null;
+            }
+
+            // Numeric string timestamp
+            if (/^\d+$/.test(String(value))) {
+                const n = Number(value);
+                return Number.isFinite(n) && n > 0 ? n : null;
+            }
+
+            // ISO/date string
+            const parsed = new Date(value).getTime();
+
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        }
+
+        // ============================================================
+        // FIX 2: CANONICAL PACKAGE ACTIVATION TIME
         // ============================================================
         function getPackageActivationTime(pkg) {
-            if (!pkg || typeof pkg !== 'object') return null;
+            if (!pkg || typeof pkg !== 'object') {
+                return null;
+            }
 
-            const possibleTimes = [
+            // Actual activation fields have highest priority.
+            const activationFields = [
                 pkg.activationAt,
                 pkg.activatedAt,
-                pkg.activeAt,
-                pkg.purchaseDate,
-                pkg.createdAt
+                pkg.activeAt
             ];
 
-            for (const value of possibleTimes) {
-                if (value === null || value === undefined || value === '') {
-                    continue;
-                }
+            for (const value of activationFields) {
+                const ts = normalizeTimestamp(value);
+                if (ts) return ts;
+            }
 
-                const timestamp = typeof value === 'number'
-                    ? value
-                    : new Date(value).getTime();
+            /*
+             IMPORTANT:
 
-                if (Number.isFinite(timestamp) && timestamp > 0) {
-                    return timestamp;
-                }
+             Do not use USER createdAt.
+
+             Package purchaseDate/createdAt may only be used for legacy packages
+             if the production purchase system creates the package directly as ACTIVE.
+
+             If package can exist as pending before activation, the purchase code
+             must save activationAt = Date.now() exactly when status changes to active.
+            */
+
+            if (String(pkg.status || '').toLowerCase() === 'active') {
+                const purchaseTime =
+                    normalizeTimestamp(pkg.purchaseDate) ||
+                    normalizeTimestamp(pkg.createdAt);
+
+                return purchaseTime;
             }
 
             return null;
         }
 
         // ============================================================
-        // PART 3: CAMPAIGN ELIGIBLE ACTIVE PACKAGE CHECK
+        // FIX 3: CAMPAIGN ELIGIBLE ACTIVE PACKAGE CHECK
         // ============================================================
         function hasCampaignActivePackage(userData) {
             if (!isUserActive(userData)) {
@@ -1528,41 +1579,25 @@
         }
 
         // ============================================================
-        // PART 4 & 5: CANONICAL CAMPAIGN DIRECT REFERRALS
-        //
-        // RULE:
-        // 1. Current user must be ACTIVE.
-        // 2. Referral must be directly sponsored by current user.
-        // 3. Referral must have an ACTIVE eligible package.
-        // 4. Activation must happen during campaign.
-        // 5. Registration alone NEVER counts.
-        // 6. Each UID counts maximum once.
+        // FIX 4: CANONICAL CAMPAIGN DIRECT REFERRALS
         // ============================================================
         async function getCampaignDirectReferrals(userId) {
             try {
                 if (!db || !userId) return 0;
 
-                // --------------------------------------------------------
-                // 1. CURRENT USER MUST BE ACTIVE
-                // --------------------------------------------------------
-                const currentUserSnap = await get(
-                    ref(db, 'users/' + userId)
-                );
+                const ownerSnap = await get(ref(db, 'users/' + userId));
 
-                if (!currentUserSnap.exists()) {
+                if (!ownerSnap.exists()) {
                     return 0;
                 }
 
-                const currentUserData = currentUserSnap.val();
+                const owner = ownerSnap.val();
 
-                // If owner is inactive, they cannot qualify in the offer.
-                if (!isUserActive(currentUserData)) {
+                // Sponsor himself must be active to participate.
+                if (!isUserActive(owner)) {
                     return 0;
                 }
 
-                // --------------------------------------------------------
-                // 2. LOAD USERS
-                // --------------------------------------------------------
                 const usersSnap = await get(ref(db, 'users'));
 
                 if (!usersSnap.exists()) {
@@ -1570,80 +1605,74 @@
                 }
 
                 const users = usersSnap.val() || {};
-
                 const counted = new Set();
 
-                // --------------------------------------------------------
-                // 3. CHECK EVERY USER
-                // --------------------------------------------------------
-                for (const candidateUid of Object.keys(users)) {
-                    if (candidateUid === userId) continue;
-                    if (counted.has(candidateUid)) continue;
+                for (const [candidateUid, candidate] of Object.entries(users)) {
 
-                    const candidate = users[candidateUid];
-
-                    if (!candidate || typeof candidate !== 'object') {
+                    if (
+                        !candidate ||
+                        typeof candidate !== 'object' ||
+                        candidateUid === userId
+                    ) {
                         continue;
                     }
 
-                    // ----------------------------------------------------
-                    // 4. MUST BE DIRECT REFERRAL
-                    //
-                    // Prefer canonical sponsorUid.
-                    // Fallback only for existing legacy records.
-                    // ----------------------------------------------------
-                    const sponsorUid =
-                        candidate.sponsorUid ||
-                        candidate.referredByUid ||
-                        candidate.referredBy ||
-                        candidate.sponsor ||
-                        null;
-
                     let isDirect = false;
 
-                    if (sponsorUid === userId) {
+                    // CANONICAL UID
+                    if (
+                        candidate.sponsorUid &&
+                        String(candidate.sponsorUid) === String(userId)
+                    ) {
                         isDirect = true;
                     }
 
-                    // Legacy referral-code compatibility
-                    if (!isDirect && sponsorUid) {
-                        if (String(sponsorUid) === String(currentUserData.referralCode || '')) {
+                    // Legacy UID
+                    if (
+                        !isDirect &&
+                        candidate.referredByUid &&
+                        String(candidate.referredByUid) === String(userId)
+                    ) {
+                        isDirect = true;
+                    }
+
+                    /*
+                     Legacy systems may store referralCode / username
+                     instead of UID.
+                    */
+                    if (!isDirect) {
+                        const legacySponsor =
+                            candidate.referredBy ||
+                            candidate.sponsor ||
+                            null;
+
+                        if (
+                            legacySponsor &&
+                            (
+                                String(legacySponsor) === String(userId) ||
+                                String(legacySponsor) === String(owner.referralCode || '') ||
+                                String(legacySponsor) === String(owner.username || '')
+                            )
+                        ) {
                             isDirect = true;
                         }
                     }
 
-                    if (!isDirect) {
-                        continue;
-                    }
+                    if (!isDirect) continue;
 
-                    // ----------------------------------------------------
-                    // 5. REGISTRATION IS NOT ACTIVATION
-                    // ----------------------------------------------------
-                    if (!isUserActive(candidate)) {
-                        continue;
-                    }
+                    // Registration only MUST NOT count.
+                    if (!isUserActive(candidate)) continue;
 
-                    // ----------------------------------------------------
-                    // 6. MUST HAVE CAMPAIGN-ACTIVE PACKAGE
-                    // ----------------------------------------------------
-                    if (!hasCampaignActivePackage(candidate)) {
-                        continue;
-                    }
+                    // Package must qualify for this campaign.
+                    if (!hasCampaignActivePackage(candidate)) continue;
 
-                    // ----------------------------------------------------
-                    // 7. COUNT UID ONLY ONCE
-                    // ----------------------------------------------------
                     counted.add(candidateUid);
                 }
 
-                return counted.size;
+                return Math.min(counted.size, CAMPAIGN.maxQualifying);
 
             } catch (error) {
-                console.error(
-                    '❌ Error calculating campaign direct referrals:',
-                    error
-                );
-
+                console.error('Campaign direct referral calculation failed:', error);
                 return 0;
             }
         }
@@ -1669,19 +1698,26 @@
         }
 
         // ============================================================
-        // GET CAMPAIGN STATUS
+        // FIX 5: GET CAMPAIGN STATUS WITH SERVER TIME
         // ============================================================
         function getCampaignStatus() {
-            const now = new Date();
-            if (now < CAMPAIGN.startDate) return 'UPCOMING';
-            if (now >= CAMPAIGN.startDate && now <= CAMPAIGN.endDate) return 'ACTIVE';
+            const now = getCampaignNow();
+
+            if (now < CAMPAIGN.startDate) {
+                return 'UPCOMING';
+            }
+
+            if (now >= CAMPAIGN.startDate && now <= CAMPAIGN.endDate) {
+                return 'ACTIVE';
+            }
+
             return 'ENDED';
         }
 
         function getTimeRemaining() {
-            const now = new Date();
+            const now = getCampaignNow();
             const status = getCampaignStatus();
-            
+
             if (status === 'UPCOMING') {
                 const diff = CAMPAIGN.startDate - now;
                 if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
@@ -1729,11 +1765,17 @@
         }
 
         // ============================================================
-        // PART 7: FINALIZE CAMPAIGN REWARD WITH TRANSACTION
+        // FIX 6: FINALIZE CAMPAIGN REWARD WITH TRANSACTION
         // ============================================================
         async function finalizeCampaignReward(userId) {
             try {
                 if (!db || !userId) return null;
+
+                // FIX 6: Only finalize after campaign end
+                if (getCampaignStatus() !== 'ENDED') {
+                    console.warn('Campaign cannot be finalized before end time.');
+                    return null;
+                }
 
                 // Already finalized?
                 const existing = await getCampaignRewardSnapshot(userId);
@@ -1744,24 +1786,17 @@
 
                 // IMPORTANT:
                 // Always calculate fresh from Firebase.
-                const finalDirectCount =
-                    await getCampaignDirectReferrals(userId);
-
-                const finalReward =
-                    calculateReward(finalDirectCount);
+                const finalDirectCount = await getCampaignDirectReferrals(userId);
+                const finalReward = calculateReward(finalDirectCount);
 
                 const snapshotData = {
                     campaignId: CAMPAIGN.campaignId,
                     userId: userId,
-
                     finalDirectCount: finalDirectCount,
                     finalReward: finalReward,
-
                     snapshotAt: Date.now(),
-
                     status: 'available',
                     isFinalized: true,
-
                     walletAddress: null,
                     withdrawalId: null,
                     transactionId: null,
@@ -1769,44 +1804,28 @@
                     paidAt: null
                 };
 
-                // Transaction prevents two browser tabs from
-                // creating two different snapshots.
+                // Transaction prevents two browser tabs from creating two different snapshots.
                 const result = await runTransaction(
-                    ref(
-                        db,
-                        `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`
-                    ),
+                    ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`),
                     (currentData) => {
-
                         // Someone already finalized it.
                         if (currentData) {
                             return currentData;
                         }
-
                         return snapshotData;
                     }
                 );
 
-                if (
-                    result.committed &&
-                    result.snapshot.exists()
-                ) {
-                    campaignRewardSnapshot =
-                        result.snapshot.val();
-
+                if (result.committed && result.snapshot.exists()) {
+                    campaignRewardSnapshot = result.snapshot.val();
                     isWithdrawalFinalized = true;
-
                     return campaignRewardSnapshot;
                 }
 
                 return null;
 
             } catch (error) {
-                console.error(
-                    '❌ Error finalizing campaign reward:',
-                    error
-                );
-
+                console.error('❌ Error finalizing campaign reward:', error);
                 return null;
             }
         }
@@ -1849,57 +1868,92 @@
         }
 
         // ============================================================
-        // ATOMIC WITHDRAWAL CREATION WITH DUPLICATE PROTECTION
+        // FIX 7: ATOMIC WITHDRAWAL CREATION WITH TRANSACTION LOCK
         // ============================================================
-        async function createAtomicWithdrawal(userId, userData, walletAddress, rewardAmount) {
-            // Prevent duplicate processing
+        async function createAtomicWithdrawal(userId, userData, walletAddress) {
             if (isProcessingWithdrawal) {
                 throw new Error('Withdrawal already in progress');
-            }
-
-            // Check if withdrawal already exists
-            const existing = await checkWithdrawalStatus(userId);
-            if (existing && ['pending', 'approved', 'paid'].includes(existing.status)) {
-                throw new Error('A withdrawal request is already in progress');
             }
 
             isProcessingWithdrawal = true;
 
             try {
-                // Re-read campaign snapshot to ensure final reward
-                const snapshot = await getCampaignRewardSnapshot(userId);
-                const finalReward = snapshot ? snapshot.finalReward : rewardAmount;
-
-                if (finalReward <= 0) {
-                    throw new Error('No eligible reward to withdraw');
+                if (getCampaignStatus() !== 'ENDED') {
+                    throw new Error('Campaign has not ended yet');
                 }
 
+                if (!isUserActive(userData)) {
+                    throw new Error('Your ID is not active');
+                }
+
+                if (!validateBEP20Wallet(walletAddress)) {
+                    throw new Error('Invalid BEP-20 wallet address');
+                }
+
+                const campaignRef = ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`);
                 const withdrawalId = generateWithdrawalId();
                 const txId = generateTxId();
                 const timestamp = Date.now();
-                const date = new Date().toISOString().split('T')[0];
 
-                const campaignData = {
-                    campaignId: CAMPAIGN.campaignId,
-                    campaignName: 'RND Direct Referral Special Offer',
-                    userId: userId,
-                    username: userData.username || userData.referralCode || userId,
-                    email: userData.email || '',
-                    finalDirectCount: snapshot ? snapshot.finalDirectCount : directReferrals,
-                    finalReward: finalReward,
-                    status: 'pending',
-                    walletAddress: walletAddress,
-                    requestedAt: timestamp,
-                    updatedAt: timestamp,
-                    withdrawalId: withdrawalId,
-                    transactionId: txId,
-                    txHash: null,
-                    paidAt: null,
-                    isFinalized: true
-                };
+                /*
+                 FIRST:
+                 claim/lock the one campaign reward record atomically.
+                */
+                const lockResult = await runTransaction(
+                    campaignRef,
+                    current => {
+
+                        if (!current) {
+                            return; // abort
+                        }
+
+                        if (!current.isFinalized) {
+                            return;
+                        }
+
+                        const reward = Number(current.finalReward || 0);
+
+                        if (reward <= 0) {
+                            return;
+                        }
+
+                        if (['pending', 'approved', 'paid'].includes(current.status)) {
+                            return;
+                        }
+
+                        return {
+                            ...current,
+                            status: 'pending',
+                            walletAddress: walletAddress,
+                            withdrawalId: withdrawalId,
+                            transactionId: txId,
+                            requestedAt: timestamp,
+                            updatedAt: timestamp
+                        };
+                    }
+                );
+
+                if (!lockResult.committed) {
+                    throw new Error('Withdrawal already submitted or reward unavailable');
+                }
+
+                const lockedCampaign = lockResult.snapshot.val();
+
+                if (!lockedCampaign || lockedCampaign.withdrawalId !== withdrawalId) {
+                    throw new Error('Withdrawal request could not be locked');
+                }
+
+                const finalReward = Number(lockedCampaign.finalReward || 0);
+
+                if (finalReward <= 0) {
+                    throw new Error('No eligible reward');
+                }
+
+                const date = new Date(timestamp).toISOString().split('T')[0];
 
                 const adminData = {
-                    ...campaignData,
+                    ...lockedCampaign,
+                    campaignName: 'RND Direct Referral Special Offer',
                     type: 'direct_offer_withdrawal',
                     asset: 'USDT',
                     network: 'BEP-20 / BNB Smart Chain',
@@ -1929,16 +1983,26 @@
                     username: userData.username || userData.referralCode || userId
                 };
 
-                // Atomic multi-path update
-                const updates = {
-                    [`campaign_rewards/${userId}/${CAMPAIGN.campaignId}`]: campaignData,
-                    [`admin/withdrawals/${withdrawalId}`]: adminData,
-                    [`users/${userId}/transactions/${txId}`]: transactionData,
-                    [`transactions/${txId}`]: globalTxData
+                /*
+                 Campaign record is ALREADY locked.
+
+                 Now write related records.
+                */
+                await update(
+                    ref(db),
+                    {
+                        [`admin/withdrawals/${withdrawalId}`]: adminData,
+                        [`users/${userId}/transactions/${txId}`]: transactionData,
+                        [`transactions/${txId}`]: globalTxData
+                    }
+                );
+
+                return {
+                    success: true,
+                    withdrawalId,
+                    txId
                 };
 
-                await update(ref(db), updates);
-                return { success: true, withdrawalId, txId };
             } finally {
                 isProcessingWithdrawal = false;
             }
@@ -1973,17 +2037,17 @@
             const grid = el.milestoneGrid;
             grid.innerHTML = '';
             let foundNext = false;
-            
+
             for (const m of MILESTONES) {
                 const achieved = directCount >= m.refs;
                 const isNext = !achieved && !foundNext && (directCount < CAMPAIGN.maxQualifying);
                 if (isNext) foundNext = true;
-                
+
                 let statusClass = 'locked';
                 let statusText = 'Locked';
                 if (achieved) { statusClass = 'achieved'; statusText = '✓ Achieved'; }
                 else if (isNext) { statusClass = 'next'; statusText = 'Next Target'; }
-                
+
                 const card = document.createElement('div');
                 card.className = `milestone-card ${statusClass}`;
                 card.innerHTML = `
@@ -2006,7 +2070,7 @@
             // Determine the authoritative reward amount
             let displayReward = reward;
             if (campaignStatus === 'ENDED' && campaignRewardSnapshot) {
-                displayReward = campaignRewardSnapshot.finalReward || reward;
+                displayReward = Number(campaignRewardSnapshot.finalReward ?? 0);
             }
 
             el.withdrawAmount.textContent = '$' + displayReward.toFixed(2) + ' USDT';
@@ -2103,7 +2167,32 @@
         }
 
         // ============================================================
-        // UPDATE UI
+        // FIX 9: REFRESH CAMPAIGN DIRECT COUNT
+        // ============================================================
+        async function refreshCampaignDirectCount() {
+            if (!currentUserId || getCampaignStatus() !== 'ACTIVE' || isWithdrawalFinalized) {
+                return;
+            }
+
+            const latest = await getCampaignDirectReferrals(currentUserId);
+
+            if (latest !== directReferrals) {
+                directReferrals = latest;
+                el.totalReferralsDisplay.textContent = directReferrals;
+                updateUI();
+            }
+        }
+
+        function startReferralRefresh() {
+            if (referralRefreshInterval) {
+                clearInterval(referralRefreshInterval);
+            }
+
+            referralRefreshInterval = setInterval(refreshCampaignDirectCount, 60000);
+        }
+
+        // ============================================================
+        // FIX 10: UPDATE UI WITH PROPER ZERO HANDLING
         // ============================================================
         function updateUI() {
             const campaignStatus = getCampaignStatus();
@@ -2115,14 +2204,14 @@
 
             el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge ${statusBadge.class}">${statusBadge.text}</span>`;
 
-            // Determine authoritative values
+            // Determine authoritative values with proper zero handling
             let displayReward = calculateReward(directReferrals);
             let displayDirectCount = directReferrals;
             let isFinal = false;
 
             if (campaignStatus === 'ENDED' && campaignRewardSnapshot) {
-                displayReward = campaignRewardSnapshot.finalReward || displayReward;
-                displayDirectCount = campaignRewardSnapshot.finalDirectCount || displayDirectCount;
+                displayReward = Number(campaignRewardSnapshot.finalReward ?? 0);
+                displayDirectCount = Number(campaignRewardSnapshot.finalDirectCount ?? 0);
                 isFinal = true;
                 isWithdrawalFinalized = true;
             }
@@ -2243,7 +2332,7 @@
                     <div class="popup-days">${formatTimeRemaining(time)}</div>
                 `;
             } else if (campaignStatus === 'ENDED') {
-                const finalReward = campaignRewardSnapshot ? campaignRewardSnapshot.finalReward : reward;
+                const finalReward = campaignRewardSnapshot ? Number(campaignRewardSnapshot.finalReward ?? 0) : reward;
                 if (finalReward > 0) {
                     el.popupIcon.textContent = '🎉';
                     el.popupTitle.textContent = 'Offer Ended!';
@@ -2275,16 +2364,18 @@
         // ============================================================
         function handleWithdrawClick() {
             const status = getCampaignStatus();
-            
+
             if (status !== 'ENDED') {
                 showDaysPopup();
                 return;
             }
 
             // Use final snapshot reward if available
-            let reward = calculateReward(directReferrals);
+            let reward = 0;
             if (campaignRewardSnapshot) {
-                reward = campaignRewardSnapshot.finalReward || reward;
+                reward = Number(campaignRewardSnapshot.finalReward ?? 0);
+            } else {
+                reward = calculateReward(directReferrals);
             }
 
             if (reward <= 0) {
@@ -2317,11 +2408,11 @@
         }
 
         // ============================================================
-        // PART 10: PROCESS WITHDRAWAL WITH SAFETY CHECKS
+        // FIX 8: PROCESS WITHDRAWAL WITH FINAL SNAPSHOT ONLY
         // ============================================================
         async function processWithdrawal() {
             const walletAddress = el.walletAddressInput.value.trim();
-            
+
             if (!validateBEP20Wallet(walletAddress)) {
                 showToast('Please enter a valid BEP-20 USDT wallet address.', 'error');
                 return;
@@ -2332,7 +2423,7 @@
                 return;
             }
 
-            // PART 10: Check user is still active
+            // Check user is still active
             const userSnap = await get(ref(db, 'users/' + currentUserId));
             if (!userSnap.exists()) {
                 showToast('User data not found.', 'error');
@@ -2341,23 +2432,24 @@
 
             const latestUserData = userSnap.val();
 
-            // User must have an active package
             if (!isUserActive(latestUserData)) {
-                showToast(
-                    'You are not eligible because your ID is not active.',
-                    'error'
-                );
+                showToast('You are not eligible because your ID is not active.', 'error');
                 return;
             }
 
-            // Use final snapshot reward
-            let reward = 0;
-            if (campaignRewardSnapshot) {
-                reward = Number(campaignRewardSnapshot.finalReward || 0);
-            } else {
-                const latestDirectCount = await getCampaignDirectReferrals(currentUserId);
-                reward = calculateReward(latestDirectCount);
+            // FIX 8: Withdrawal must use final snapshot
+            let snapshot = await getCampaignRewardSnapshot(currentUserId);
+
+            if (!snapshot) {
+                snapshot = await finalizeCampaignReward(currentUserId);
             }
+
+            if (!snapshot || !snapshot.isFinalized || Number(snapshot.finalReward || 0) <= 0) {
+                showToast('No finalized eligible reward is available.', 'error');
+                return;
+            }
+
+            const reward = Number(snapshot.finalReward ?? 0);
 
             if (reward <= 0) {
                 showToast('You are not eligible for this reward.', 'error');
@@ -2373,9 +2465,7 @@
             el.confirmSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
             try {
-                const userData = userSnap.exists() ? userSnap.val() : {};
-
-                const result = await createAtomicWithdrawal(currentUserId, userData, walletAddress, reward);
+                const result = await createAtomicWithdrawal(currentUserId, latestUserData, walletAddress);
 
                 if (result.success) {
                     showToast('✅ Your withdrawal request has been submitted successfully.', 'success');
@@ -2396,7 +2486,7 @@
         }
 
         // ============================================================
-        // PART 8 & 9: LOAD USER DATA WITH ACTIVE CHECK
+        // LOAD USER DATA WITH ACTIVE CHECK
         // ============================================================
         async function loadUserData(user) {
             try {
@@ -2424,9 +2514,7 @@
 
                 const userIsActive = isUserActive(currentUserData);
 
-                // ------------------------------------------------------------
                 // INACTIVE USER = ZERO OFFER COUNT
-                // ------------------------------------------------------------
                 if (!userIsActive) {
                     directReferrals = 0;
                     console.log('ℹ️ User inactive - offer count forced to 0');
@@ -2434,15 +2522,13 @@
                     directReferrals = await getCampaignDirectReferrals(user.uid);
                 }
 
-                // ------------------------------------------------------------
                 // FINALIZE ONLY AFTER CAMPAIGN END
-                // ------------------------------------------------------------
                 if (getCampaignStatus() === 'ENDED' && !campaignRewardSnapshot) {
                     campaignRewardSnapshot = await finalizeCampaignReward(user.uid);
 
                     if (campaignRewardSnapshot) {
                         isWithdrawalFinalized = true;
-                        directReferrals = Number(campaignRewardSnapshot.finalDirectCount || 0);
+                        directReferrals = Number(campaignRewardSnapshot.finalDirectCount ?? 0);
                     }
                 }
 
@@ -2468,6 +2554,8 @@
                 } else if (status === 'ACTIVE') {
                     if (userIsActive) {
                         showToast('🎯 Offer is ACTIVE! Refer active users to earn more!', 'success');
+                        // FIX 9: Start referral refresh
+                        startReferralRefresh();
                     } else {
                         showToast('ℹ️ Activate your ID by purchasing an eligible package to participate in this offer.', 'info');
                     }
@@ -2479,20 +2567,12 @@
                     }
                 }
 
-                // Real-time listener for referral updates
-                if (status === 'ACTIVE') {
-                    const userRef = ref(db, 'users/' + currentUserId);
-                    onValue(userRef, async () => {
-                        const newDirect = await getCampaignDirectReferrals(currentUserId);
-                        if (newDirect !== directReferrals) {
-                            directReferrals = newDirect;
-                            el.totalReferralsDisplay.textContent = directReferrals;
-                            if (!isWithdrawalFinalized) {
-                                updateUI();
-                            }
-                        }
-                    });
-                }
+                // FIX 9: Visibility change listener
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        refreshCampaignDirectCount();
+                    }
+                });
 
             } catch (error) {
                 console.error('Error loading user data:', error);
@@ -2506,16 +2586,16 @@
         // ============================================================
         function startCountdown() {
             if (countdownInterval) clearInterval(countdownInterval);
-            
+
             function update() {
                 const time = getTimeRemaining();
                 const status = getCampaignStatus();
-                
+
                 if (status === 'ENDED') {
                     el.countdownWrapper.style.display = 'none';
                     el.campaignEndedMessage.style.display = 'block';
                     if (countdownInterval) clearInterval(countdownInterval);
-                    
+
                     if (!isWithdrawalFinalized && currentUserId) {
                         finalizeCampaignReward(currentUserId).then(() => {
                             updateUI();
@@ -2524,13 +2604,13 @@
                     updateUI();
                     return;
                 }
-                
+
                 el.countdownDays.textContent = String(time.days).padStart(2, '0');
                 el.countdownHours.textContent = String(time.hours).padStart(2, '0');
                 el.countdownMinutes.textContent = String(time.minutes).padStart(2, '0');
                 el.countdownSeconds.textContent = String(time.seconds).padStart(2, '0');
             }
-            
+
             update();
             countdownInterval = setInterval(update, 1000);
         }
@@ -2542,14 +2622,14 @@
             el.walletAddressInput.addEventListener('input', () => {
                 const value = el.walletAddressInput.value.trim();
                 const msg = el.walletValidationMsg;
-                
+
                 if (!value) {
                     el.walletAddressInput.className = 'form-control-custom';
                     msg.className = 'wallet-validation-msg';
                     msg.textContent = '';
                     return;
                 }
-                
+
                 if (validateBEP20Wallet(value)) {
                     el.walletAddressInput.className = 'form-control-custom valid';
                     msg.className = 'wallet-validation-msg valid';
@@ -2631,9 +2711,17 @@
                 }
             });
             el.confirmSubmit.addEventListener('click', processWithdrawal);
-            
+
             setupWalletValidation();
         }
+
+        // ============================================================
+        // CLEANUP
+        // ============================================================
+        window.addEventListener('beforeunload', () => {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (referralRefreshInterval) clearInterval(referralRefreshInterval);
+        });
 
         // ============================================================
         // MAIN AUTH HANDLER
@@ -2643,15 +2731,12 @@
                 window.location.href = 'login.html';
                 return;
             }
+
+            // FIX 5: Sync server time first
+            await syncFirebaseServerTime();
+
             await loadUserData(user);
             setupListeners();
-        });
-
-        // ============================================================
-        // CLEANUP
-        // ============================================================
-        window.addEventListener('beforeunload', () => {
-            if (countdownInterval) clearInterval(countdownInterval);
         });
 
         console.log('✅ Direct Offer Page Loaded Successfully!');
@@ -2662,7 +2747,9 @@
         console.log('✅ sponsorUid used as canonical referral source');
         console.log('✅ Countdown: UPCOMING=startDate, ACTIVE=endDate');
         console.log('✅ Campaign finalization uses transaction for safety');
-        console.log('✅ Withdrawal requires active status check');
+        console.log('✅ Withdrawal requires final snapshot only');
+        console.log('✅ Firebase server time sync implemented');
+        console.log('✅ Zero values handled correctly');
     </script>
 </body>
 </html>

@@ -44,29 +44,19 @@
         }
         .header-subtitle { color: #94a3b8; font-size: 0.9rem; }
         .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            color: #2ecc71;
-            text-decoration: none;
-            font-size: 0.9rem;
-            margin-bottom: 12px;
-            transition: all 0.2s;
+            display: inline-flex; align-items: center; gap: 6px;
+            color: #2ecc71; text-decoration: none; font-size: 0.9rem;
+            margin-bottom: 12px; transition: all 0.2s;
         }
         .back-btn:hover { color: #27ae60; transform: translateX(-4px); }
         .wallet-balance-box {
             background: rgba(46, 204, 113, 0.08);
             border: 1px solid rgba(46, 204, 113, 0.2);
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 20px;
+            border-radius: 12px; padding: 16px; margin-bottom: 20px;
         }
         .wallet-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);
         }
         .wallet-row:last-child { border-bottom: none; }
         .wallet-label { color: #94a3b8; font-size: 0.9rem; }
@@ -75,90 +65,60 @@
             background: rgba(30, 41, 59, 0.6);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(148, 163, 184, 0.1);
-            border-radius: 16px;
-            padding: 28px;
+            border-radius: 16px; padding: 28px;
         }
         .form-label-custom {
-            display: block;
-            margin-bottom: 8px;
-            color: #94a3b8;
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            display: block; margin-bottom: 8px; color: #94a3b8;
+            font-size: 0.85rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
         .form-control-custom {
-            width: 100%;
-            padding: 14px 16px;
+            width: 100%; padding: 14px 16px;
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 10px;
-            color: #e2e8f0;
-            font-size: 1rem;
-            transition: all 0.2s;
+            border-radius: 10px; color: #e2e8f0;
+            font-size: 1rem; transition: all 0.2s;
         }
         .form-control-custom:focus {
-            outline: none;
-            border-color: #2ecc71;
+            outline: none; border-color: #2ecc71;
             box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
         }
         .form-control-custom::placeholder { color: #64748b; }
         select.form-control-custom { cursor: pointer; }
         select.form-control-custom option { background: #1e293b; color: #e2e8f0; }
         .btn-send {
-            width: 100%;
-            padding: 16px;
+            width: 100%; padding: 16px;
             background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 16px;
+            color: white; border: none; border-radius: 12px;
+            font-size: 1.1rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s; margin-top: 16px;
         }
         .btn-send:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(46, 204, 113, 0.3);
         }
         .btn-send:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
+            opacity: 0.5; cursor: not-allowed; transform: none;
         }
         .info-box {
             background: rgba(59, 130, 246, 0.08);
             border: 1px solid rgba(59, 130, 246, 0.2);
-            border-radius: 10px;
-            padding: 14px;
-            margin-top: 20px;
-            font-size: 0.85rem;
-            color: #94a3b8;
-            line-height: 1.6;
+            border-radius: 10px; padding: 14px;
+            margin-top: 20px; font-size: 0.85rem;
+            color: #94a3b8; line-height: 1.6;
         }
         .info-box i { color: #60a5fa; margin-right: 6px; }
         .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            position: fixed; top: 20px; right: 20px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 10px;
         }
         .toast-custom {
             background: rgba(30, 41, 59, 0.95);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 10px;
-            padding: 14px 20px;
-            color: #e2e8f0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 280px;
-            max-width: 400px;
+            border-radius: 10px; padding: 14px 20px;
+            color: #e2e8f0; display: flex; align-items: center; gap: 10px;
+            min-width: 280px; max-width: 400px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
             animation: slideIn 0.3s ease;
         }
@@ -170,28 +130,17 @@
             to { transform: translateX(0); opacity: 1; }
         }
         .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
+            display: inline-block; width: 16px; height: 16px;
             border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: white;
-            border-radius: 50%;
+            border-top-color: white; border-radius: 50%;
             animation: spin 0.6s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .recent-transfers {
-            margin-top: 20px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
+        .recent-transfers { margin-top: 20px; max-height: 400px; overflow-y: auto; }
         .transfer-item {
-            background: rgba(15, 23, 42, 0.4);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            background: rgba(15, 23, 42, 0.4); border-radius: 8px;
+            padding: 12px; margin-bottom: 8px;
+            display: flex; justify-content: space-between; align-items: center;
             font-size: 0.85rem;
         }
         .transfer-sent { color: #ef4444; }
@@ -203,26 +152,20 @@
         .btn-send.sending { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
         .btn-send.verifying { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
 
-        /* Modal Styles */
+        /* Modal */
         .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.75);
             backdrop-filter: blur(8px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            padding: 20px;
+            display: none; align-items: center; justify-content: center;
+            z-index: 10000; padding: 20px;
         }
         .modal-overlay.active { display: flex; }
         .modal-box {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 16px;
-            padding: 32px;
-            max-width: 460px;
-            width: 100%;
+            border-radius: 16px; padding: 32px;
+            max-width: 460px; width: 100%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             animation: modalIn 0.3s ease;
         }
@@ -231,63 +174,67 @@
             to { transform: scale(1); opacity: 1; }
         }
         .modal-icon {
-            text-align: center;
-            font-size: 3rem;
-            color: #2ecc71;
-            margin-bottom: 16px;
+            text-align: center; font-size: 3rem;
+            color: #2ecc71; margin-bottom: 16px;
         }
         .modal-title {
-            text-align: center;
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #e2e8f0;
-            margin-bottom: 8px;
+            text-align: center; font-size: 1.3rem;
+            font-weight: 700; color: #e2e8f0; margin-bottom: 8px;
         }
         .modal-subtitle {
-            text-align: center;
-            font-size: 0.85rem;
-            color: #94a3b8;
-            margin-bottom: 24px;
-            line-height: 1.5;
+            text-align: center; font-size: 0.85rem;
+            color: #94a3b8; margin-bottom: 24px; line-height: 1.5;
         }
         .modal-info {
             background: rgba(59, 130, 246, 0.08);
             border: 1px solid rgba(59, 130, 246, 0.2);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 20px;
-            font-size: 0.8rem;
-            color: #94a3b8;
-            line-height: 1.5;
+            border-radius: 8px; padding: 12px;
+            margin-bottom: 20px; font-size: 0.8rem;
+            color: #94a3b8; line-height: 1.5;
         }
         .modal-info i { color: #60a5fa; }
-        .modal-input {
-            width: 100%;
-            padding: 14px 16px;
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 10px;
-            color: #e2e8f0;
-            font-size: 1rem;
+
+        /* Password input wrapper with eye button */
+        .password-wrapper {
+            position: relative;
             margin-bottom: 12px;
         }
+        .password-wrapper .modal-input {
+            margin-bottom: 0;
+            padding-right: 50px;
+        }
+        .password-eye {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 4px 8px;
+            transition: color 0.2s;
+        }
+        .password-eye:hover { color: #2ecc71; }
+
+        .modal-input {
+            width: 100%; padding: 14px 16px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px; color: #e2e8f0;
+            font-size: 1rem; margin-bottom: 12px;
+        }
         .modal-input:focus {
-            outline: none;
-            border-color: #2ecc71;
+            outline: none; border-color: #2ecc71;
             box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
         }
         .modal-btn {
-            width: 100%;
-            padding: 14px;
+            width: 100%; padding: 14px;
             background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 8px;
-            transition: all 0.2s;
+            color: white; border: none; border-radius: 10px;
+            font-size: 1rem; font-weight: 700;
+            cursor: pointer; margin-top: 8px; transition: all 0.2s;
         }
         .modal-btn:hover:not(:disabled) {
             transform: translateY(-2px);
@@ -297,20 +244,15 @@
         .modal-btn-cancel {
             background: transparent;
             border: 1px solid rgba(148, 163, 184, 0.3);
-            color: #94a3b8;
-            margin-top: 8px;
+            color: #94a3b8; margin-top: 8px;
         }
         .modal-btn-cancel:hover:not(:disabled) {
             background: rgba(148, 163, 184, 0.1);
-            box-shadow: none;
-            transform: none;
+            box-shadow: none; transform: none;
         }
         .modal-error {
-            color: #ef4444;
-            font-size: 0.85rem;
-            text-align: center;
-            margin-top: 12px;
-            display: none;
+            color: #ef4444; font-size: 0.85rem;
+            text-align: center; margin-top: 12px; display: none;
         }
         .modal-error.show { display: block; }
     </style>
@@ -319,24 +261,30 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- ============================================================ -->
-<!-- Modal 1: Password Setup (पहली बार) -->
-<!-- ============================================================ -->
+<!-- Setup Modal -->
 <div class="modal-overlay" id="setupModal">
     <div class="modal-box">
         <div class="modal-icon"><i class="bi bi-shield-lock"></i></div>
         <div class="modal-title">Set Transfer Password</div>
         <div class="modal-subtitle">
             पहली बार Transfer करने से पहले एक password सेट करें।
-            यह password हर Transfer पर पूछा जाएगा।
         </div>
         <div class="modal-info">
             <i class="bi bi-info-circle me-1"></i>
-            Password को hash करके safe तरीके से save किया जाएगा। 
-            इसे भूलें नहीं — बाद में बदलने के लिए support से संपर्क करें।
+            Password को hash करके safe तरीके से save किया जाएगा।
         </div>
-        <input type="password" id="setupPassword" class="modal-input" placeholder="Password (min 6 characters)" autocomplete="new-password">
-        <input type="password" id="setupPasswordConfirm" class="modal-input" placeholder="Confirm Password" autocomplete="new-password">
+        <div class="password-wrapper">
+            <input type="password" id="setupPassword" class="modal-input" placeholder="Password (min 6 characters)" autocomplete="new-password">
+            <button type="button" class="password-eye" onclick="togglePassword('setupPassword', this)">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>
+        <div class="password-wrapper">
+            <input type="password" id="setupPasswordConfirm" class="modal-input" placeholder="Confirm Password" autocomplete="new-password">
+            <button type="button" class="password-eye" onclick="togglePassword('setupPasswordConfirm', this)">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>
         <button class="modal-btn" id="setupBtn">
             <i class="bi bi-check-circle me-2"></i>Set Password
         </button>
@@ -344,9 +292,7 @@
     </div>
 </div>
 
-<!-- ============================================================ -->
-<!-- Modal 2: Password Verification (हर transfer पर) -->
-<!-- ============================================================ -->
+<!-- Verify Modal -->
 <div class="modal-overlay" id="verifyModal">
     <div class="modal-box">
         <div class="modal-icon"><i class="bi bi-lock-fill"></i></div>
@@ -355,7 +301,12 @@
             Transfer confirm करने के लिए अपना password डालें।
         </div>
         <div class="modal-info" id="verifyDetails"></div>
-        <input type="password" id="verifyPassword" class="modal-input" placeholder="Password" autocomplete="current-password">
+        <div class="password-wrapper">
+            <input type="password" id="verifyPassword" class="modal-input" placeholder="Password" autocomplete="current-password">
+            <button type="button" class="password-eye" onclick="togglePassword('verifyPassword', this)">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>
         <button class="modal-btn" id="verifyBtn">
             <i class="bi bi-shield-check me-2"></i>Verify & Send
         </button>
@@ -437,7 +388,6 @@
         <div class="info-box">
             <i class="bi bi-shield-check"></i>
             <strong>सुरक्षा सूचना:</strong> हर transfer पर password पूछा जाएगा।
-            अगर network slow है, तो <strong>दोबारा Send न दबाएँ</strong>।
         </div>
 
         <div style="margin-top: 24px;">

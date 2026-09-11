@@ -92,6 +92,7 @@
         }
         .form-control-custom::placeholder { color: #64748b; }
         select.form-control-custom { cursor: pointer; }
+        select.form-control-custom option { background: #1e293b; color: #e2e8f0; }
         .btn-send {
             width: 100%;
             padding: 16px;
@@ -185,6 +186,17 @@
         .transfer-received { color: #2ecc71; }
         .transfer-amount { font-weight: 700; }
         .transfer-date { font-size: 0.7rem; color: #64748b; }
+        
+        /* बटन के विभिन्न states */
+        .btn-send.sending {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        .btn-send.verifying {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+        .btn-send.locked {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        }
     </style>
 </head>
 <body>
@@ -205,6 +217,7 @@
         </div>
     </div>
 
+    <!-- ✅ Balance Box — id names यहाँ perfectly match हैं -->
     <div class="wallet-balance-box">
         <div class="wallet-row">
             <span class="wallet-label"><i class="bi bi-wallet2 me-1"></i> Deposit Wallet (USDT)</span>

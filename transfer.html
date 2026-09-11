@@ -26,23 +26,24 @@
             color: #e2e8f0;
             min-height: 100vh;
         }
-        .page-wrapper {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 20px;
-        }
 
         /* ============================================
-           TOP BAR with 3-dot menu
+           TOP BAR — with 3-dot menu (right side)
            ============================================ */
         .top-bar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 24px;
+            padding: 16px 20px;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .page-title {
-            font-size: 1.4rem;
+        .top-bar-title {
+            font-size: 1.1rem;
             font-weight: 700;
             color: #2ecc71;
             display: flex;
@@ -69,7 +70,7 @@
         }
 
         /* ============================================
-           SIDEBAR
+           SIDEBAR (dashboard style — slides from RIGHT)
            ============================================ */
         .sidebar-overlay {
             position: fixed;
@@ -88,13 +89,14 @@
         .sidebar-panel {
             position: fixed;
             top: 0;
-            left: 0;
+            right: 0;
             bottom: 0;
-            width: 280px;
+            width: 300px;
+            max-width: 85vw;
             background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-            border-right: 1px solid rgba(148, 163, 184, 0.15);
+            border-left: 1px solid rgba(148, 163, 184, 0.15);
             z-index: 1000;
-            transform: translateX(-100%);
+            transform: translateX(100%);
             transition: transform 0.3s ease;
             display: flex;
             flex-direction: column;
@@ -103,25 +105,74 @@
         .sidebar-panel.open {
             transform: translateX(0);
         }
+
+        /* Sidebar Header */
         .sidebar-header {
-            padding: 24px 20px;
+            padding: 20px;
             border-bottom: 1px solid rgba(148, 163, 184, 0.1);
             display: flex;
             align-items: center;
-            gap: 12px;
+            justify-content: space-between;
+        }
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .sidebar-brand-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.1rem;
+        }
+        .sidebar-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(148, 163, 184, 0.15);
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .sidebar-close:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        /* User Info Block */
+        .sidebar-user-block {
+            padding: 20px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
         .sidebar-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
             background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: 700;
-            font-size: 1.2rem;
+            font-size: 1.4rem;
             flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
         }
         .sidebar-user-info {
             flex: 1;
@@ -129,93 +180,94 @@
         }
         .sidebar-name {
             font-weight: 700;
-            font-size: 0.95rem;
+            font-size: 1rem;
             color: #e2e8f0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .sidebar-uid {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: #94a3b8;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            margin-top: 2px;
+            margin-top: 4px;
         }
-        .sidebar-close {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            background: rgba(148, 163, 184, 0.1);
-            border: none;
-            color: #94a3b8;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-        .sidebar-close:hover {
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-        }
+
+        /* Nav Items */
         .sidebar-nav {
             flex: 1;
-            padding: 16px 12px;
+            padding: 12px 8px;
         }
-        .sidebar-link {
+        .nav-item {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
             padding: 14px 16px;
             border-radius: 10px;
             color: #cbd5e1;
             text-decoration: none;
             font-size: 0.95rem;
             font-weight: 500;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             transition: all 0.2s;
         }
-        .sidebar-link:hover {
+        .nav-item:hover {
             background: rgba(46, 204, 113, 0.1);
             color: #2ecc71;
         }
-        .sidebar-link.active {
+        .nav-item.active {
             background: linear-gradient(135deg, rgba(46, 204, 113, 0.2) 0%, rgba(46, 204, 113, 0.1) 100%);
             color: #2ecc71;
-            border: 1px solid rgba(46, 204, 113, 0.3);
+            border-left: 3px solid #2ecc71;
         }
-        .sidebar-link i {
-            font-size: 1.2rem;
-            width: 24px;
+        .nav-item i {
+            font-size: 1.15rem;
+            width: 22px;
             text-align: center;
+            flex-shrink: 0;
         }
-        .sidebar-divider {
-            height: 1px;
-            background: rgba(148, 163, 184, 0.1);
-            margin: 12px 16px;
-        }
+
+        /* Sidebar Footer / Logout */
         .sidebar-footer {
             padding: 16px 20px;
             border-top: 1px solid rgba(148, 163, 184, 0.1);
         }
-        .sidebar-logout {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 16px;
-            border-radius: 10px;
+        .sidebar-footer .nav-item {
             color: #ef4444;
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 600;
-            transition: all 0.2s;
             background: rgba(239, 68, 68, 0.08);
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
-        .sidebar-logout:hover {
+        .sidebar-footer .nav-item:hover {
             background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        /* ============================================
+           PAGE WRAPPER
+           ============================================ */
+        .page-wrapper {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 20px;
+        }
+
+        .page-header {
+            margin-bottom: 24px;
+        }
+        .page-header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #2ecc71;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .page-header p {
+            color: #94a3b8;
+            font-size: 0.9rem;
         }
 
         /* ============================================
@@ -223,7 +275,7 @@
            ============================================ */
         .wallet-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -414,7 +466,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ============================================
-           MODALS (same as before)
+           MODALS
            ============================================ */
         .modal-overlay {
             position: fixed; inset: 0;
@@ -519,10 +571,11 @@
 
         /* Mobile */
         @media (max-width: 600px) {
-            .page-wrapper { padding: 12px; }
+            .page-wrapper { padding: 16px 12px; }
             .form-card { padding: 20px; }
             .wallet-grid { grid-template-columns: 1fr; gap: 12px; }
             .wallet-amount { font-size: 1.3rem; }
+            .sidebar-panel { width: 260px; }
         }
     </style>
 </head>
@@ -531,76 +584,130 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ============================================ -->
-<!-- SIDEBAR -->
+<!-- SIDEBAR (dashboard style, slides from RIGHT) -->
 <!-- ============================================ -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <aside class="sidebar-panel" id="sidebarPanel">
+    <!-- Header -->
     <div class="sidebar-header">
-        <div class="sidebar-avatar" id="sidebarAvatar">U</div>
-        <div class="sidebar-user-info">
-            <div class="sidebar-name" id="sidebarName">User</div>
-            <div class="sidebar-uid" id="sidebarUid">ID: ...</div>
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-icon">
+                <i class="bi bi-grid-3x3-gap-fill"></i>
+            </div>
+            <span>Menu</span>
         </div>
         <button class="sidebar-close" id="sidebarCloseBtn">
             <i class="bi bi-x-lg"></i>
         </button>
     </div>
 
+    <!-- User Info -->
+    <div class="sidebar-user-block">
+        <div class="sidebar-avatar" id="sidebarAvatar">U</div>
+        <div class="sidebar-user-info">
+            <div class="sidebar-name" id="sidebarName">User</div>
+            <div class="sidebar-uid" id="sidebarUid">ID: ...</div>
+        </div>
+    </div>
+
+    <!-- Nav Items -->
     <nav class="sidebar-nav">
-        <a href="dashboard.html" class="sidebar-link">
-            <i class="bi bi-house-door"></i> Dashboard
-        </a>
-        <a href="transfer.html" class="sidebar-link active">
-            <i class="bi bi-arrow-left-right"></i> Transfer
-        </a>
-        <a href="deposit.html" class="sidebar-link">
-            <i class="bi bi-arrow-down-circle"></i> Deposit
-        </a>
-        <a href="withdrawal.html" class="sidebar-link">
-            <i class="bi bi-arrow-up-circle"></i> Withdraw
-        </a>
-        <a href="referrals.html" class="sidebar-link">
-            <i class="bi bi-people"></i> Referrals
-        </a>
-        <a href="buy-package.html" class="sidebar-link">
-            <i class="bi bi-box-seam"></i> Buy Package
+        <a href="dashboard.html" class="nav-item">
+            <i class="bi bi-speedometer2"></i>
+            <span>Dashboard</span>
         </a>
 
-        <div class="sidebar-divider"></div>
-
-        <a href="profile.html" class="sidebar-link">
-            <i class="bi bi-person"></i> Profile
+        <a href="deposit.html" class="nav-item">
+            <i class="bi bi-arrow-down-circle"></i>
+            <span>Deposit</span>
         </a>
-        <a href="history.html" class="sidebar-link">
-            <i class="bi bi-clock-history"></i> History
+
+        <a href="withdrawal.html" class="nav-item">
+            <i class="bi bi-arrow-up-circle"></i>
+            <span>Withdraw</span>
+        </a>
+
+        <a href="transfer.html" class="nav-item active">
+            <i class="bi bi-arrow-left-right"></i>
+            <span>Transfer</span>
+        </a>
+
+        <a href="referrals.html" class="nav-item">
+            <i class="bi bi-people"></i>
+            <span>Referrals</span>
+        </a>
+
+        <a href="buy-package.html" class="nav-item">
+            <i class="bi bi-box-seam"></i>
+            <span>Buy Package</span>
+        </a>
+
+        <a href="rank-reward.html" class="nav-item">
+            <i class="bi bi-trophy"></i>
+            <span>Rank Reward</span>
+        </a>
+
+        <a href="transactions.html" class="nav-item">
+            <i class="bi bi-receipt"></i>
+            <span>Transactions</span>
+        </a>
+
+        <a href="direct-offer.html" class="nav-item" id="directOfferNav">
+            <i class="bi bi-gift"></i>
+            <span>Direct Offer</span>
+        </a>
+
+        <a href="invoice.html" class="nav-item">
+            <i class="bi bi-file-text"></i>
+            <span>Invoice</span>
+        </a>
+
+        <a href="profile.html" class="nav-item">
+            <i class="bi bi-person"></i>
+            <span>Profile</span>
+        </a>
+
+        <a href="support.html" class="nav-item">
+            <i class="bi bi-headset"></i>
+            <span>Support Center</span>
         </a>
     </nav>
 
+    <!-- Footer / Logout -->
     <div class="sidebar-footer">
-        <a href="#" class="sidebar-logout" id="sidebarLogout">
-            <i class="bi bi-box-arrow-right"></i> Logout
+        <a href="#" class="nav-item" id="logoutBtnSidebar">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Logout</span>
         </a>
     </div>
 </aside>
 
 <!-- ============================================ -->
-<!-- PAGE -->
+<!-- TOP BAR with menu button -->
+<!-- ============================================ -->
+<div class="top-bar">
+    <div class="top-bar-title">
+        <i class="bi bi-arrow-left-right"></i>
+        Send Money
+    </div>
+    <button class="menu-toggle-btn" id="menuToggleBtn" title="Menu">
+        <i class="bi bi-list"></i>
+    </button>
+</div>
+
+<!-- ============================================ -->
+<!-- MAIN CONTENT -->
 <!-- ============================================ -->
 <div class="page-wrapper">
 
-    <!-- Top bar with 3-dot menu -->
-    <div class="top-bar">
-        <div class="page-title">
-            <i class="bi bi-arrow-left-right"></i> Send Money
-        </div>
-        <button class="menu-toggle-btn" id="menuToggleBtn" title="Menu">
-            <i class="bi bi-list"></i>
-        </button>
+    <div class="page-header">
+        <h1>
+            <i class="bi bi-send"></i> Send Money
+        </h1>
+        <p>अपने RND Staking वॉलेट से दूसरे यूज़र को पैसे भेजें</p>
     </div>
 
-    <!-- ============================================ -->
-    <!-- WALLET CARDS (dashboard style) -->
-    <!-- ============================================ -->
+    <!-- WALLET CARDS -->
     <div class="wallet-grid">
         <div class="wallet-card-new deposit">
             <div class="wallet-icon-new deposit">
@@ -630,9 +737,7 @@
         </div>
     </div>
 
-    <!-- ============================================ -->
     <!-- FORM CARD -->
-    <!-- ============================================ -->
     <div class="form-card">
         <div class="card-title-new">
             <i class="bi bi-send" style="color: #2ecc71;"></i> Transfer Details
@@ -682,9 +787,7 @@
         </div>
     </div>
 
-    <!-- ============================================ -->
     <!-- RECENT TRANSFERS -->
-    <!-- ============================================ -->
     <div class="form-card">
         <div class="card-title-new">
             <i class="bi bi-clock-history" style="color: #60a5fa;"></i> Recent Transfers
@@ -699,7 +802,7 @@
 </div>
 
 <!-- ============================================ -->
-<!-- MODALS (SAME AS BEFORE) -->
+<!-- MODALS -->
 <!-- ============================================ -->
 
 <div class="modal-overlay" id="setupModal">
@@ -815,10 +918,9 @@
 <script type="module" src="transfer.js"></script>
 
 <!-- ============================================ -->
-<!-- SIDEBAR SCRIPT (small, separate) -->
+<!-- SIDEBAR SCRIPT -->
 <!-- ============================================ -->
 <script>
-    // Sidebar open/close
     const sidebarPanel = document.getElementById('sidebarPanel');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const menuToggleBtn = document.getElementById('menuToggleBtn');
@@ -827,24 +929,29 @@
     function openSidebar() {
         sidebarPanel.classList.add('open');
         sidebarOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
     }
     function closeSidebar() {
         sidebarPanel.classList.remove('open');
         sidebarOverlay.classList.remove('active');
+        document.body.style.overflow = '';
     }
 
     menuToggleBtn.addEventListener('click', openSidebar);
     sidebarCloseBtn.addEventListener('click', closeSidebar);
     sidebarOverlay.addEventListener('click', closeSidebar);
 
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeSidebar();
+    });
+
     // Logout
-    document.getElementById('sidebarLogout').addEventListener('click', async (e) => {
+    document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
         e.preventDefault();
         try {
             const { getAuth, signOut } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
             const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
             
-            // Get existing app if initialized
             let app;
             if (getApps().length > 0) {
                 app = getApps()[0];
@@ -869,7 +976,7 @@
         }
     });
 
-    // Fill sidebar user info (wait for transfer.js to set it, or fetch independently)
+    // Fill sidebar user info
     setTimeout(async () => {
         try {
             const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
@@ -891,14 +998,14 @@
                     const u = snap.val();
                     const name = u.name || u.username || u.referralCode || 'User';
                     document.getElementById('sidebarName').textContent = name;
-                    document.getElementById('sidebarUid').textContent = 'ID: ' + (u.username || user.uid.substring(0, 12)) + '...';
+                    document.getElementById('sidebarUid').textContent = 'ID: ' + (u.username || user.uid.substring(0, 16)) + '...';
                     document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
                 }
             }
         } catch (err) {
             console.warn('Sidebar fill error:', err);
         }
-    }, 500);
+    }, 600);
 </script>
 
 </body>

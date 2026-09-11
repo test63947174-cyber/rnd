@@ -33,14 +33,11 @@
             backdrop-filter: blur(20px);
             border: 1px solid rgba(148, 163, 184, 0.1);
             border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
+            padding: 24px; margin-bottom: 24px;
         }
         .header-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #2ecc71;
-            margin-bottom: 8px;
+            font-size: 1.5rem; font-weight: 700;
+            color: #2ecc71; margin-bottom: 8px;
         }
         .header-subtitle { color: #94a3b8; font-size: 0.9rem; }
         .back-btn {
@@ -168,6 +165,7 @@
             max-width: 460px; width: 100%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             animation: modalIn 0.3s ease;
+            max-height: 90vh; overflow-y: auto;
         }
         @keyframes modalIn {
             from { transform: scale(0.9); opacity: 0; }
@@ -193,27 +191,19 @@
             color: #94a3b8; line-height: 1.5;
         }
         .modal-info i { color: #60a5fa; }
+        .modal-info.warn {
+            background: rgba(245, 158, 11, 0.08);
+            border-color: rgba(245, 158, 11, 0.2);
+        }
+        .modal-info.warn i { color: #f59e0b; }
 
-        /* Password input wrapper with eye button */
-        .password-wrapper {
-            position: relative;
-            margin-bottom: 12px;
-        }
-        .password-wrapper .modal-input {
-            margin-bottom: 0;
-            padding-right: 50px;
-        }
+        .password-wrapper { position: relative; margin-bottom: 12px; }
+        .password-wrapper .modal-input { margin-bottom: 0; padding-right: 50px; }
         .password-eye {
-            position: absolute;
-            right: 14px;
-            top: 50%;
+            position: absolute; right: 14px; top: 50%;
             transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #94a3b8;
-            cursor: pointer;
-            font-size: 1.1rem;
-            padding: 4px 8px;
+            background: none; border: none; color: #94a3b8;
+            cursor: pointer; font-size: 1.1rem; padding: 4px 8px;
             transition: color 0.2s;
         }
         .password-eye:hover { color: #2ecc71; }
@@ -255,6 +245,22 @@
             text-align: center; margin-top: 12px; display: none;
         }
         .modal-error.show { display: block; }
+        .forgot-link {
+            display: block;
+            text-align: center;
+            margin-top: 16px;
+            color: #60a5fa;
+            font-size: 0.85rem;
+            text-decoration: none;
+            cursor: pointer;
+            background: none;
+            border: none;
+            width: 100%;
+            padding: 8px;
+        }
+        .forgot-link:hover { color: #3b82f6; text-decoration: underline; }
+        .modal-step { display: none; }
+        .modal-step.active { display: block; }
     </style>
 </head>
 <body>
@@ -313,7 +319,68 @@
         <button class="modal-btn modal-btn-cancel" id="verifyCancelBtn">
             Cancel
         </button>
+        <button class="forgot-link" id="forgotPasswordBtn">
+            🔑 Forgot Password?
+        </button>
         <div class="modal-error" id="verifyError"></div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Forgot Password Modal — 2 STEP -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="forgotModal">
+    <div class="modal-box">
+        <div class="modal-icon" style="color: #f59e0b;"><i class="bi bi-key"></i></div>
+        <div class="modal-title">Reset Transfer Password</div>
+
+        <!-- STEP 1: Firebase password verify -->
+        <div class="modal-step active" id="forgotStep1">
+            <div class="modal-subtitle">
+                पहले अपना <strong>account password</strong> डालें (जो login के लिए use करते हैं)।
+                यह confirm करेगा कि आप असली owner हैं।
+            </div>
+            <div class="modal-info warn">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                यह आपके <strong>login password</strong> है, transfer password नहीं।
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="forgotAccountPassword" class="modal-input" placeholder="Account password" autocomplete="current-password">
+                <button type="button" class="password-eye" onclick="togglePassword('forgotAccountPassword', this)">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+            <button class="modal-btn" id="forgotVerifyBtn">
+                <i class="bi bi-shield-check me-2"></i>Verify
+            </button>
+            <button class="modal-btn modal-btn-cancel" id="forgotCancelBtn1">
+                Cancel
+            </button>
+            <div class="modal-error" id="forgotError1"></div>
+        </div>
+
+        <!-- STEP 2: New transfer password -->
+        <div class="modal-step" id="forgotStep2">
+            <div class="modal-subtitle">
+                ✅ Verified! अब नया transfer password सेट करें।
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="forgotNewPassword" class="modal-input" placeholder="New password (min 6 characters)" autocomplete="new-password">
+                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPassword', this)">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="forgotNewPasswordConfirm" class="modal-input" placeholder="Confirm new password" autocomplete="new-password">
+                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPasswordConfirm', this)">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+            <button class="modal-btn" id="forgotResetBtn">
+                <i class="bi bi-check-circle me-2"></i>Set New Password
+            </button>
+            <div class="modal-error" id="forgotError2"></div>
+        </div>
     </div>
 </div>
 

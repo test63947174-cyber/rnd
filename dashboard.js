@@ -1,11 +1,11 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (FINAL SAFE v8)
+// RND STAKING PLATFORM - DASHBOARD.JS (v9 - Transfer UI Removed)
 // ============================================================
-// ✅ Transfer: TRUE atomic, idempotent, network-safe
-// ✅ Recovery: Financial fields SAFE (backup se restore nahi)
-// ✅ Commission: Atomic, duplicate-proof
-// ✅ Daily Release: Manual trigger (dashboard load par nahi)
-// ✅ Backward compatible with existing database
+// ✅ Transfer section dashboard UI se HATA diya
+//    (Transfer ab alag page transfer.html par hota hai)
+// ✅ Baaki saara logic same
+// ✅ handleTransfer() aur atomicTransfer() functions rakhe hain
+//    (agar kisi aur page se call ho sakte hain)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -70,6 +70,7 @@ const WALLET_PRECISION = {
 // ============================================================
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast-custom ${type}`;
     const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
@@ -151,27 +152,30 @@ const sidebarToggle = document.getElementById('sidebarToggle');
 const sidebarClose = document.getElementById('sidebarClose');
 
 function openSidebar() {
-    sidebarPanel.classList.add('open');
-    sidebarOverlay.classList.add('active');
+    if (sidebarPanel) sidebarPanel.classList.add('open');
+    if (sidebarOverlay) sidebarOverlay.classList.add('active');
     document.body.style.overflow = 'hidden';
 }
 
 function closeSidebar() {
-    sidebarPanel.classList.remove('open');
-    sidebarOverlay.classList.remove('active');
+    if (sidebarPanel) sidebarPanel.classList.remove('open');
+    if (sidebarOverlay) sidebarOverlay.classList.remove('active');
     document.body.style.overflow = '';
 }
 
-sidebarToggle.addEventListener('click', openSidebar);
-sidebarClose.addEventListener('click', closeSidebar);
-sidebarOverlay.addEventListener('click', closeSidebar);
+if (sidebarToggle) sidebarToggle.addEventListener('click', openSidebar);
+if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
 
-document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
-    e.preventDefault();
-    await signOut(auth);
-    window.location.href = 'login.html';
-});
+const logoutBtn = document.getElementById('logoutBtnSidebar');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await signOut(auth);
+        window.location.href = 'login.html';
+    });
+}
 
 // ============================================================
 // FETCH LIVE RATE
@@ -196,7 +200,7 @@ async function fetchLiveRate() {
 }
 
 // ============================================================
-// GET USER BY IDENTIFIER (UID / Username / Referral Code)
+// GET USER BY IDENTIFIER
 // ============================================================
 async function getUserByIdentifier(identifier) {
     try {
@@ -234,7 +238,7 @@ async function getUserByIdentifier(identifier) {
 }
 
 // ============================================================
-// BACKUP SYSTEM (Only non-financial metadata)
+// BACKUP SYSTEM
 // ============================================================
 async function createBackup(userId, action, data) {
     try {
@@ -259,7 +263,6 @@ async function createBackup(userId, action, data) {
     }
 }
 
-// ⚠️ SAFE: Backup sirf metadata ka, financial fields ka nahi
 async function createMetadataBackup(userId, action) {
     try {
         const userSnap = await get(ref(db, 'users/' + userId));
@@ -267,7 +270,6 @@ async function createMetadataBackup(userId, action) {
         
         const userData = userSnap.val();
         
-        // ✅ Only non-financial fields backed up
         const backupData = {
             uid: userData.uid,
             email: userData.email,
@@ -281,9 +283,6 @@ async function createMetadataBackup(userId, action) {
             backupCreatedAt: Date.now(),
             backupAction: action
         };
-        
-        // ❌ NO financial fields (depositWallet, referralWallet, etc.)
-        // ❌ NO transactions, transferHistory, packages
         
         return await createBackup(userId, action, backupData);
     } catch (error) {
@@ -332,8 +331,7 @@ async function checkUserExists(userId) {
 }
 
 // ============================================================
-// ✅ SAFE RECOVER USER DATA
-// Financial fields NEVER restored from backup
+// SAFE RECOVER USER DATA
 // ============================================================
 async function recoverUserData(userId, authUser) {
     try {
@@ -341,11 +339,9 @@ async function recoverUserData(userId, authUser) {
         
         const userSnap = await get(ref(db, 'users/' + userId));
         
-        // Agar user exist karta hai → kuch mat karo
         if (userSnap.exists()) {
             const existingData = userSnap.val();
             
-            // Sirf missing metadata fields fill karo
             const updates = {};
             if (!existingData.uid) updates.uid = userId;
             if (!existingData.email) updates.email = authUser.email || '';
@@ -368,13 +364,10 @@ async function recoverUserData(userId, authUser) {
                 console.log('✅ Metadata fields filled');
             }
             
-            // Fresh read
             const freshSnap = await get(ref(db, 'users/' + userId));
             return freshSnap.exists() ? freshSnap.val() : existingData;
         }
         
-        // 🔴 User record nahi hai — bilkul naya banao
-        // Financial fields = 0 (NEVER restore from backup)
         console.log('🆕 Creating new user record (financial fields = 0)');
         
         const newUserData = {
@@ -385,7 +378,6 @@ async function recoverUserData(userId, authUser) {
             name: authUser.displayName || 'User',
             createdAt: Date.now(),
             lastLogin: Date.now(),
-            // 💰 Financial fields START AT 0
             depositWallet: 0,
             referralWallet: 0,
             rndWallet: 0,
@@ -406,7 +398,6 @@ async function recoverUserData(userId, authUser) {
             lastReleaseDate: null
         };
         
-        // URL se referral code
         const urlParams = new URLSearchParams(window.location.search);
         const refCode = urlParams.get('ref');
         if (refCode) {
@@ -433,7 +424,7 @@ async function recoverUserData(userId, authUser) {
 }
 
 // ============================================================
-// ✅ SAFE DAILY RELEASE (Manual trigger only)
+// SAFE DAILY RELEASE
 // ============================================================
 async function processDailyRelease(userId) {
     if (releaseInProgress) {
@@ -561,8 +552,7 @@ async function processDailyRelease(userId) {
 }
 
 // ============================================================
-// ✅ ATOMIC COMMISSION PROCESSING
-// commissionProcessed flag SAME transaction mein set hota hai
+// ATOMIC COMMISSION PROCESSING
 // ============================================================
 async function processReferralCommission(userId, packageId, packageData) {
     if (commissionInProgress) {
@@ -597,13 +587,11 @@ async function processReferralCommission(userId, packageId, packageData) {
             { level: 5, percent: 0.01 }
         ];
         
-        // ✅ STEP 1: Mark package as processing ATOMICALLY
-        // Agar already marked hai → skip
         const pkgRef = ref(db, `users/${userId}/packages/${packageId}`);
         const markResult = await runTransaction(pkgRef, (pkg) => {
             if (!pkg) return pkg;
-            if (pkg.commissionProcessed === true) return pkg; // abort
-            if (pkg.commissionProcessing === true) return pkg; // abort
+            if (pkg.commissionProcessed === true) return pkg;
+            if (pkg.commissionProcessing === true) return pkg;
             pkg.commissionProcessing = true;
             pkg.commissionProcessingAt = Date.now();
             return pkg;
@@ -614,13 +602,11 @@ async function processReferralCommission(userId, packageId, packageData) {
             return null;
         }
         
-        // Double-check karo ki hamara lock successfully laga
         const checkPkg = await get(pkgRef);
         if (!checkPkg.exists() || checkPkg.val().commissionProcessed === true) {
             return null;
         }
         
-        // ✅ STEP 2: Process commission chain
         let currentRefCode = referralCode;
         let level = 1;
         const processedTxIds = [];
@@ -636,16 +622,14 @@ async function processReferralCommission(userId, packageId, packageData) {
             const commissionAmount = roundToPrecision(packageAmount * commissionPercent, 8);
             
             if (commissionAmount > 0) {
-                // ✅ Deterministic txId — same package+level ke liye same
                 const commissionTxId = `comm_${packageId}_L${level}`;
                 
                 await runTransaction(ref(db, 'users/' + uid), (currentData) => {
                     if (!currentData) return currentData;
                     
                     const commissionHistory = currentData.commissionHistory || [];
-                    // ✅ Duplicate check by txId
                     const existing = commissionHistory.find(h => h.txId === commissionTxId);
-                    if (existing) return currentData; // already processed
+                    if (existing) return currentData;
                     
                     currentData.referralWallet = roundToPrecision(
                         (currentData.referralWallet || 0) + commissionAmount, 2
@@ -702,7 +686,6 @@ async function processReferralCommission(userId, packageId, packageData) {
             level++;
         }
         
-        // ✅ STEP 3: Mark package as completed ATOMICALLY
         await runTransaction(pkgRef, (pkg) => {
             if (!pkg) return pkg;
             pkg.commissionProcessed = true;
@@ -717,7 +700,6 @@ async function processReferralCommission(userId, packageId, packageData) {
         
     } catch (error) {
         console.error('❌ Commission error:', error);
-        // Cleanup processing flag on error
         try {
             await update(ref(db, `users/${userId}/packages/${packageId}`), {
                 commissionProcessing: false
@@ -755,7 +737,7 @@ function calculateUserStats(userData) {
 }
 
 // ============================================================
-// ✅ FIXED: TRUE ATOMIC TRANSFER
+// ATOMIC TRANSFER (rakha hai — agar kahin se call ho)
 // ============================================================
 async function atomicTransfer(senderUid, recipientUid, recipientData, amount, walletType, currency, requestId) {
     if (!senderUid || !recipientUid) {
@@ -774,7 +756,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
     const safeAmount = amountCheck.value;
     const precision = WALLET_PRECISION[walletType];
 
-    // ---- Idempotency check ----
     const requestRef = ref(db, `transferRequests/${requestId}`);
     try {
         const existingReq = await get(requestRef);
@@ -792,7 +773,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         return { status: TRANSFER_STATUS.UNKNOWN, error: 'Could not verify request state' };
     }
 
-    // ---- Read sender ----
     let senderData;
     try {
         const senderSnap = await get(ref(db, `users/${senderUid}`));
@@ -804,7 +784,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         return { status: TRANSFER_STATUS.UNKNOWN, error: 'Network error reading sender' };
     }
 
-    // ---- Balance check ----
     const senderBalance = roundToPrecision(senderData[walletType] || 0, precision);
     if (senderBalance < safeAmount) {
         return {
@@ -813,18 +792,15 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         };
     }
 
-    // ---- Compute new balances ----
     const newSenderBalance = roundToPrecision(senderBalance - safeAmount, precision);
     const recipientBalance = roundToPrecision(recipientData[walletType] || 0, precision);
     const newRecipientBalance = roundToPrecision(recipientBalance + safeAmount, precision);
 
-    // ---- Deterministic txId ----
     const txId = 'TX_' + requestId.replace(/-/g, '').slice(0, 20);
     const now = Date.now();
     const senderUsername = senderData.username || senderData.referralCode || senderUid.slice(0, 8);
     const recipientUsername = recipientData.username || recipientData.referralCode || recipientUid.slice(0, 8);
 
-    // ---- Build ATOMIC multi-path update ----
     const updates = {};
 
     updates[`transferRequests/${requestId}`] = {
@@ -834,7 +810,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         createdAt: now, completedAt: now
     };
 
-    // Sender
     updates[`users/${senderUid}/${walletType}`] = newSenderBalance;
     updates[`users/${senderUid}/transferHistory/${txId}`] = {
         type: 'sent', to: recipientUsername, toUid: recipientUid,
@@ -849,7 +824,6 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         timestamp: now, date: getTodayDate(), txId, requestId, status: 'completed'
     };
 
-    // Recipient
     updates[`users/${recipientUid}/${walletType}`] = newRecipientBalance;
     updates[`users/${recipientUid}/transferHistory/${txId}`] = {
         type: 'received', from: senderUsername, fromUid: senderUid,
@@ -864,27 +838,22 @@ async function atomicTransfer(senderUid, recipientUid, recipientData, amount, wa
         timestamp: now, date: getTodayDate(), txId, requestId, status: 'completed'
     };
 
-    // ---- EXECUTE ATOMIC ----
     try {
         await update(ref(db), updates);
         console.log('✅ Transfer committed atomically:', txId);
         return { status: TRANSFER_STATUS.SUCCESS, txId };
     } catch (err) {
         console.error('❌ Transfer failed:', err);
-
-        // Reconciliation
         try {
             const checkReq = await get(requestRef);
             if (checkReq.exists()) {
                 const reqData = checkReq.val();
                 if (reqData.status === TRANSFER_STATUS.SUCCESS) {
-                    console.log('✅ Reconciliation: succeeded');
                     return { status: TRANSFER_STATUS.SUCCESS, txId: reqData.txId };
                 }
             }
             return { status: TRANSFER_STATUS.FAILED, error: err.message || 'Transfer failed' };
         } catch (reconErr) {
-            console.warn('⚠️ UNKNOWN status');
             try {
                 await set(requestRef, {
                     requestId, txId, senderUid, recipientUid,
@@ -1026,7 +995,7 @@ function updateDashboardUI(u, stats) {
 }
 
 // ============================================================
-// RENDER DASHBOARD
+// ✅ RENDER DASHBOARD — Transfer section HATA diya
 // ============================================================
 function renderDashboard(u) {
     const username = u.username || u.referralCode || 'USER';
@@ -1091,9 +1060,6 @@ function renderDashboard(u) {
     
     const referralLink = `${REGISTER_URL}?ref=${u.referralCode}`;
     const rankClass = isMember ? 'rank-badge member' : 'rank-badge';
-    
-    const transferHistory = normalizeTransferHistory(u.transferHistory);
-    const sortedHistory = [...transferHistory].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 5);
 
     document.getElementById('dashboardContent').innerHTML = `
         <div class="row g-4">
@@ -1279,55 +1245,10 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <div class="col-12">
-                <div class="card-glass">
-                    <div class="card-title"><i class="bi bi-arrow-left-right text-success me-2"></i>Send Money</div>
-                    <form id="transferForm">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <input type="text" id="transferUserId" class="form-control form-control-custom" placeholder="Recipient User ID / Username / Referral Code" required>
-                            </div>
-                            <div class="col-md-3">
-                                <input type="number" id="transferAmount" class="form-control form-control-custom" placeholder="Amount" min="0.01" step="0.01" required>
-                            </div>
-                            <div class="col-md-3">
-                                <select id="transferWallet" class="form-select form-select-custom">
-                                    <option value="depositWallet">💰 Deposit Wallet (USDT)</option>
-                                    <option value="referralWallet">💳 Referral Wallet (USDT)</option>
-                                    <option value="rndWallet">📊 RND Wallet (RND)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <button type="submit" class="btn-primary-custom w-100"><i class="bi bi-send me-1"></i>Send</button>
-                            </div>
-                        </div>
-                    </form>
-                    
-                    <div class="mt-3">
-                        <small class="text-muted">Recent Transfers</small>
-                        <div class="transfer-history">
-                            ${sortedHistory.length === 0 ? `
-                                <div class="text-center text-muted py-2" style="font-size:0.8rem;">
-                                    <i class="bi bi-clock me-1"></i> No transfers yet
-                                </div>
-                            ` : sortedHistory.map(t => `
-                                <div class="transfer-item">
-                                    <div>
-                                        ${t.type === 'sent' ? 
-                                            `<span class="sent"><i class="bi bi-arrow-up-right"></i> Sent to <span class="user">${t.to || 'unknown'}</span> (${t.toUid ? t.toUid.substring(0, 8) : ''})</span>` :
-                                            `<span class="received"><i class="bi bi-arrow-down-left"></i> Received from <span class="user">${t.from || 'unknown'}</span> (${t.fromUid ? t.fromUid.substring(0, 8) : ''})</span>`
-                                        }
-                                    </div>
-                                    <div>
-                                        <span class="amount ${t.type === 'sent' ? 'sent' : 'received'}">${t.type === 'sent' ? '-' : '+'}${t.amount} ${t.currency || 'RND'}</span>
-                                        <div class="date">${new Date(t.timestamp).toLocaleString('hi-IN')}</div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- ============================================ -->
+            <!-- ✅ Transfer section YAHAN SE HATA DIYA      -->
+            <!-- Ab transfer alag page (transfer.html) par    -->
+            <!-- ============================================ -->
             
             <div class="col-12">
                 <div class="card-glass">
@@ -1335,6 +1256,7 @@ function renderDashboard(u) {
                     <div class="d-flex flex-wrap gap-2">
                         <a href="deposit.html" class="btn-primary-custom"><i class="bi bi-arrow-down-circle me-1"></i>Deposit</a>
                         <a href="withdrawal.html" class="btn-outline-custom"><i class="bi bi-arrow-up-circle me-1"></i>Withdraw</a>
+                        <a href="transfer.html" class="btn-outline-custom"><i class="bi bi-arrow-left-right me-1"></i>Transfer</a>
                         <a href="referrals.html" class="btn-outline-custom"><i class="bi bi-people me-1"></i>Referrals</a>
                         <a href="buy-package.html" class="btn-outline-custom"><i class="bi bi-box-seam me-1"></i>Buy Package</a>
                         <a href="profile.html" class="btn-outline-custom"><i class="bi bi-person me-1"></i>Profile</a>
@@ -1351,11 +1273,6 @@ function renderDashboard(u) {
                 setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy'; }, 2000);
             });
         });
-    });
-    
-    document.getElementById('transferForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await handleTransfer();
     });
 }
 
@@ -1377,7 +1294,7 @@ window.copyUserId = function(username) {
 };
 
 // ============================================================
-// ✅ TRANSFER HANDLER
+// TRANSFER HANDLER (rakha hai — transfer.html se call hoga)
 // ============================================================
 async function handleTransfer() {
     if (transferLock) {
@@ -1385,10 +1302,19 @@ async function handleTransfer() {
         return;
     }
 
-    const recipientIdentifier = document.getElementById('transferUserId').value.trim();
-    const amountRaw = document.getElementById('transferAmount').value;
-    const walletType = document.getElementById('transferWallet').value;
+    const recipientInput = document.getElementById('transferUserId');
+    const amountInput = document.getElementById('transferAmount');
+    const walletSelect = document.getElementById('transferWallet');
     const btn = document.querySelector('#transferForm button[type="submit"]');
+    
+    // Agar form nahi hai toh silently return
+    if (!recipientInput || !amountInput || !walletSelect) {
+        return;
+    }
+    
+    const recipientIdentifier = recipientInput.value.trim();
+    const amountRaw = amountInput.value;
+    const walletType = walletSelect.value;
     
     if (!recipientIdentifier) {
         showToast('❌ Please enter recipient ID', 'error');
@@ -1420,8 +1346,10 @@ async function handleTransfer() {
     const requestId = generateRequestId();
 
     transferLock = true;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+    }
 
     await markPending(user.uid, requestId);
 
@@ -1441,8 +1369,8 @@ async function handleTransfer() {
 
         if (result.status === TRANSFER_STATUS.SUCCESS) {
             showToast(`✅ ${amount} ${currency} sent to ${recipientName}!`, 'success');
-            document.getElementById('transferUserId').value = '';
-            document.getElementById('transferAmount').value = '';
+            recipientInput.value = '';
+            amountInput.value = '';
             await clearPending(user.uid, requestId);
             await loadDashboardData(user.uid);
         } else if (result.status === TRANSFER_STATUS.UNKNOWN) {
@@ -1450,10 +1378,12 @@ async function handleTransfer() {
                 '⚠️ Transfer status could not be confirmed. Please DO NOT submit again. Checking...',
                 'error'
             );
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Verifying...';
+            if (btn) btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Verifying...';
             setTimeout(() => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+                }
                 transferLock = false;
                 loadDashboardData(user.uid);
             }, 15000);
@@ -1467,22 +1397,21 @@ async function handleTransfer() {
         showToast('❌ Error. Status will be verified on next load.', 'error');
     }
     
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+    }
     transferLock = false;
 }
 
 // ============================================================
 // LOAD DASHBOARD DATA
-// ✅ Financial operations ab dashboard load par NAHI chalti
-// ✅ Sirf reconciliation hoti hai
 // ============================================================
 async function loadDashboardData(userId) {
     if (isDashboardLoading) return;
     isDashboardLoading = true;
     
     try {
-        // Reconciliation only
         try {
             const reconciliations = await reconcilePendingTransfers(userId);
             for (const r of reconciliations) {
@@ -1509,21 +1438,15 @@ async function loadDashboardData(userId) {
         
         const u = userSnap.val();
         
-        // ⚠️ NOTE: Daily release aur commission ab dashboard load par nahi hote
-        // Yeh kaam alag trigger se honge (manual button ya scheduled job)
-        
-        // Sirf missing commission packages process karo (best-effort, background)
         const packages = u.packages || {};
         for (let [key, pkg] of Object.entries(packages)) {
             if (pkg.status === 'active' && !pkg.commissionProcessed && !pkg.commissionProcessing) {
-                // Fire and forget (background)
                 processReferralCommission(userId, key, pkg).catch(err => 
                     console.warn('Background commission failed:', err)
                 );
             }
         }
         
-        // Fresh read
         const updatedSnap = await get(ref(db, 'users/' + userId));
         const updatedData = updatedSnap.exists() ? updatedSnap.val() : u;
         const stats = calculateUserStats(updatedData);
@@ -1536,14 +1459,17 @@ async function loadDashboardData(userId) {
         
     } catch (error) {
         console.error('Error loading dashboard:', error);
-        document.getElementById('dashboardContent').innerHTML = `
-            <div class="text-center py-5">
-                <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
-                <h4>Error Loading Dashboard</h4>
-                <p class="text-muted">${error.message || 'Please check connection.'}</p>
-                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
-            </div>
-        `;
+        const dc = document.getElementById('dashboardContent');
+        if (dc) {
+            dc.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+                    <h4>Error Loading Dashboard</h4>
+                    <p class="text-muted">${error.message || 'Please check connection.'}</p>
+                    <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
+                </div>
+            `;
+        }
     } finally {
         isDashboardLoading = false;
     }
@@ -1555,7 +1481,6 @@ async function loadDashboardData_internal(userId, authUser) {
     if (checkResult.exists) {
         const recovered = await recoverUserData(userId, authUser);
         if (recovered) {
-            // ❌ NO automatic daily release / commission on first load
             const stats = calculateUserStats(recovered);
             currentUserData = recovered;
             currentUserId = userId;
@@ -1611,14 +1536,17 @@ onAuthStateChanged(auth, async (user) => {
                     }
                     
                     if (emailExists) {
-                        document.getElementById('dashboardContent').innerHTML = `
-                            <div class="text-center py-5">
-                                <i class="bi bi-exclamation-triangle text-warning fs-1 d-block mb-3"></i>
-                                <h4>Account Already Exists</h4>
-                                <p class="text-muted">This email is registered with another account.</p>
-                                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Try Again</button>
-                            </div>
-                        `;
+                        const dc = document.getElementById('dashboardContent');
+                        if (dc) {
+                            dc.innerHTML = `
+                                <div class="text-center py-5">
+                                    <i class="bi bi-exclamation-triangle text-warning fs-1 d-block mb-3"></i>
+                                    <h4>Account Already Exists</h4>
+                                    <p class="text-muted">This email is registered with another account.</p>
+                                    <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Try Again</button>
+                                </div>
+                            `;
+                        }
                         return;
                     }
                 }
@@ -1641,14 +1569,17 @@ onAuthStateChanged(auth, async (user) => {
 
     } catch (error) {
         console.error('Auth handler error:', error);
-        document.getElementById('dashboardContent').innerHTML = `
-            <div class="text-center py-5">
-                <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
-                <h4>Authentication Error</h4>
-                <p class="text-muted">${error.message || 'Please try again.'}</p>
-                <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
-            </div>
-        `;
+        const dc = document.getElementById('dashboardContent');
+        if (dc) {
+            dc.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
+                    <h4>Authentication Error</h4>
+                    <p class="text-muted">${error.message || 'Please try again.'}</p>
+                    <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
+                </div>
+            `;
+        }
     }
 });
 

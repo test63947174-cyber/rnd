@@ -6,6 +6,19 @@
     <title>Transfer - RND Staking</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- ✅ यह नया है — Firebase SDK load करने के लिए import map -->
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js",
+        "firebase/functions": "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js"
+      }
+    }
+    </script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -187,16 +200,9 @@
         .transfer-amount { font-weight: 700; }
         .transfer-date { font-size: 0.7rem; color: #64748b; }
         
-        /* बटन के विभिन्न states */
-        .btn-send.sending {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        }
-        .btn-send.verifying {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        }
-        .btn-send.locked {
-            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
-        }
+        .btn-send.sending { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .btn-send.verifying { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .btn-send.locked { background: linear-gradient(135deg, #64748b 0%, #475569 100%); }
     </style>
 </head>
 <body>
@@ -217,7 +223,6 @@
         </div>
     </div>
 
-    <!-- ✅ Balance Box — id names यहाँ perfectly match हैं -->
     <div class="wallet-balance-box">
         <div class="wallet-row">
             <span class="wallet-label"><i class="bi bi-wallet2 me-1"></i> Deposit Wallet (USDT)</span>

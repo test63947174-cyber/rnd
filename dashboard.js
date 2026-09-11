@@ -1,14 +1,11 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (PRODUCTION READY v6)
+// RND STAKING PLATFORM - DASHBOARD.JS (FINAL SAFE v8)
 // ============================================================
-// 📌 ALL BUSINESS LOGIC HERE:
-// Firebase Init | Auth | Login | Logout | Dashboard Load
-// Wallet | Referral | Team | Transactions | Packages
-// Transfer (UPDATED - UID + Username + Referral Code Search)
-// Daily Release (Pending Days) | Commission (Duplicate Proof)
-// Backup (Comprehensive) | Recovery (Referral Chain Verify)
-// Validation | Security | Real-time Listener (Debounced)
-// RANK + RANK REWARD SYSTEM (NEW - v6)
+// ✅ Transfer: TRUE atomic, idempotent, network-safe
+// ✅ Recovery: Financial fields SAFE (backup se restore nahi)
+// ✅ Commission: Atomic, duplicate-proof
+// ✅ Daily Release: Manual trigger (dashboard load par nahi)
+// ✅ Backward compatible with existing database
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -16,7 +13,7 @@ import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getDatabase, ref, get, update, runTransaction, onValue, set, query, orderByChild, equalTo, limitToLast } from "firebase/database";
 
 // ============================================================
-// FIREBASE CONFIG - UPDATED WITH NEW FIREBASE
+// FIREBASE CONFIG
 // ============================================================
 const firebaseConfig = {
     apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -48,6 +45,25 @@ let listenerTimeout = null;
 let releaseInProgress = false;
 let commissionInProgress = false;
 let updateTimer = null;
+let transferLock = false;
+
+const TRANSFER_STATUS = {
+    SUCCESS: 'success',
+    FAILED: 'failed',
+    UNKNOWN: 'unknown'
+};
+
+const WALLET_CURRENCY = {
+    depositWallet: 'USDT',
+    referralWallet: 'USDT',
+    rndWallet: 'RND'
+};
+
+const WALLET_PRECISION = {
+    depositWallet: 2,
+    referralWallet: 2,
+    rndWallet: 8
+};
 
 // ============================================================
 // UTILITY FUNCTIONS
@@ -90,6 +106,40 @@ function getDaysBetween(date1, date2) {
     const d2 = new Date(date2);
     const diffTime = Math.abs(d2 - d1);
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function generateRequestId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11) +
+           Math.random().toString(36).slice(2, 11);
+}
+
+function roundToPrecision(value, precision) {
+    const factor = Math.pow(10, precision);
+    return Math.round(value * factor) / factor;
+}
+
+function validateAmount(amount, walletType) {
+    if (typeof amount !== 'number' || !isFinite(amount) || Number.isNaN(amount)) {
+        return { valid: false, error: 'Amount must be a valid number' };
+    }
+    if (amount <= 0) {
+        return { valid: false, error: 'Amount must be greater than 0' };
+    }
+    const precision = WALLET_PRECISION[walletType] || 8;
+    const rounded = roundToPrecision(amount, precision);
+    if (Math.abs(rounded - amount) > 1e-10) {
+        return { valid: false, error: `Amount exceeds ${precision} decimal precision` };
+    }
+    return { valid: true, value: rounded };
+}
+
+function normalizeTransferHistory(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    return Object.values(raw).filter(Boolean);
 }
 
 // ============================================================
@@ -146,7 +196,7 @@ async function fetchLiveRate() {
 }
 
 // ============================================================
-// 🔥 GET USER BY USERNAME, UID OR REFERRAL CODE (UPDATED)
+// GET USER BY IDENTIFIER (UID / Username / Referral Code)
 // ============================================================
 async function getUserByIdentifier(identifier) {
     try {
@@ -154,14 +204,12 @@ async function getUserByIdentifier(identifier) {
         
         const usersRef = ref(db, 'users');
         
-        // 1. Try by UID (Direct lookup)
         const uidSnap = await get(ref(db, 'users/' + identifier));
         if (uidSnap.exists()) {
             const data = uidSnap.val();
             return { uid: identifier, data: data, source: 'uid' };
         }
         
-        // 2. Try by Username
         const usernameQuery = query(usersRef, orderByChild('username'), equalTo(identifier));
         const usernameSnap = await get(usernameQuery);
         if (usernameSnap.exists()) {
@@ -170,7 +218,6 @@ async function getUserByIdentifier(identifier) {
             return { uid: uid, data: data[uid], source: 'username' };
         }
         
-        // 3. Try by Referral Code
         const referralQuery = query(usersRef, orderByChild('referralCode'), equalTo(identifier));
         const referralSnap = await get(referralQuery);
         if (referralSnap.exists()) {
@@ -187,7 +234,7 @@ async function getUserByIdentifier(identifier) {
 }
 
 // ============================================================
-// BACKUP SYSTEM (Comprehensive)
+// BACKUP SYSTEM (Only non-financial metadata)
 // ============================================================
 async function createBackup(userId, action, data) {
     try {
@@ -212,16 +259,15 @@ async function createBackup(userId, action, data) {
     }
 }
 
-async function createComprehensiveBackup(userId, action) {
+// ⚠️ SAFE: Backup sirf metadata ka, financial fields ka nahi
+async function createMetadataBackup(userId, action) {
     try {
         const userSnap = await get(ref(db, 'users/' + userId));
-        if (!userSnap.exists()) {
-            console.log('⚠️ User data not found for backup');
-            return null;
-        }
+        if (!userSnap.exists()) return null;
         
         const userData = userSnap.val();
         
+        // ✅ Only non-financial fields backed up
         const backupData = {
             uid: userData.uid,
             email: userData.email,
@@ -229,36 +275,19 @@ async function createComprehensiveBackup(userId, action) {
             referralCode: userData.referralCode,
             referredBy: userData.referredBy,
             createdAt: userData.createdAt,
+            name: userData.name,
             rank: userData.rank,
-            depositWallet: userData.depositWallet || 0,
-            referralWallet: userData.referralWallet || 0,
-            rndWallet: userData.rndWallet || 0,
-            lockedRND: userData.lockedRND || 0,
-            releaseWallet: userData.releaseWallet || 0,
-            totalReleased: userData.totalReleased || 0,
-            packages: userData.packages || {},
-            totalReferrals: userData.totalReferrals || 0,
-            teamBusiness: userData.teamBusiness || 0,
-            teamStructure: userData.teamStructure || { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 },
-            referralEarnings: userData.referralEarnings || 0,
-            level1Earnings: userData.level1Earnings || 0,
-            level2Earnings: userData.level2Earnings || 0,
-            level3Earnings: userData.level3Earnings || 0,
-            level4Earnings: userData.level4Earnings || 0,
-            level5Earnings: userData.level5Earnings || 0,
-            commissionHistory: userData.commissionHistory || [],
-            transactions: userData.transactions || {},
-            transferHistory: userData.transferHistory || [],
-            lastReleaseDate: userData.lastReleaseDate || null,
+            teamStructure: userData.teamStructure || {},
             backupCreatedAt: Date.now(),
             backupAction: action
         };
         
-        const backupId = await createBackup(userId, action, backupData);
-        console.log(`✅ Comprehensive backup created: ${backupId} for action: ${action}`);
-        return backupId;
+        // ❌ NO financial fields (depositWallet, referralWallet, etc.)
+        // ❌ NO transactions, transferHistory, packages
+        
+        return await createBackup(userId, action, backupData);
     } catch (error) {
-        console.error('❌ Comprehensive backup failed:', error);
+        console.error('❌ Metadata backup failed:', error);
         return null;
     }
 }
@@ -281,35 +310,13 @@ async function getLatestBackup(userId) {
 }
 
 // ============================================================
-// CHECK USER EXISTENCE (With Recovery Check)
+// CHECK USER EXISTENCE
 // ============================================================
 async function checkUserExists(userId) {
     try {
         const userSnap = await get(ref(db, 'users/' + userId));
         if (userSnap.exists()) {
             return { exists: true, data: userSnap.val(), source: 'main' };
-        }
-        
-        const backupSnap = await get(ref(db, 'backups/' + userId));
-        if (backupSnap.exists()) {
-            const backups = backupSnap.val();
-            const keys = Object.keys(backups);
-            if (keys.length > 0) {
-                const latestKey = keys.reduce((a, b) => {
-                    return backups[a].timestamp > backups[b].timestamp ? a : b;
-                });
-                return { exists: true, data: backups[latestKey].data, source: 'backup', backupId: latestKey };
-            }
-        }
-        
-        const txSnap = await get(ref(db, 'users/' + userId + '/transactions'));
-        if (txSnap.exists()) {
-            return { exists: true, data: { transactions: txSnap.val() }, source: 'transactions' };
-        }
-        
-        const pkgSnap = await get(ref(db, 'users/' + userId + '/packages'));
-        if (pkgSnap.exists()) {
-            return { exists: true, data: { packages: pkgSnap.val() }, source: 'packages' };
         }
         
         const refSnap = await get(ref(db, 'referrals/' + userId));
@@ -325,153 +332,50 @@ async function checkUserExists(userId) {
 }
 
 // ============================================================
-// RECOVER USER DATA (With Referral Chain Verification)
+// ✅ SAFE RECOVER USER DATA
+// Financial fields NEVER restored from backup
 // ============================================================
 async function recoverUserData(userId, authUser) {
     try {
         console.log('🔄 Starting recovery process for:', userId);
         
-        const checkResult = await checkUserExists(userId);
+        const userSnap = await get(ref(db, 'users/' + userId));
         
-        if (checkResult.exists) {
-            console.log('✅ Found existing data from:', checkResult.source);
+        // Agar user exist karta hai → kuch mat karo
+        if (userSnap.exists()) {
+            const existingData = userSnap.val();
             
-            let recoveredData = {};
-            
-            const userSnap = await get(ref(db, 'users/' + userId));
-            if (userSnap.exists()) {
-                recoveredData = userSnap.val();
-                console.log('✅ Main user data found');
+            // Sirf missing metadata fields fill karo
+            const updates = {};
+            if (!existingData.uid) updates.uid = userId;
+            if (!existingData.email) updates.email = authUser.email || '';
+            if (!existingData.username) {
+                updates.username = authUser.email 
+                    ? authUser.email.split('@')[0] 
+                    : 'user_' + userId.substring(0, 8);
+            }
+            if (!existingData.referralCode) {
+                updates.referralCode = userId.substring(0, 8).toUpperCase();
+            }
+            if (!existingData.name) updates.name = authUser.displayName || 'User';
+            if (!existingData.createdAt) updates.createdAt = Date.now();
+            if (!existingData.teamStructure) {
+                updates.teamStructure = { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
             }
             
-            if (checkResult.source === 'backup' && checkResult.data) {
-                const backupData = checkResult.data;
-                
-                const protectedFields = ['referralCode', 'referredBy', 'uid', 'createdAt'];
-                for (let field of protectedFields) {
-                    if (backupData[field]) {
-                        recoveredData[field] = backupData[field];
-                    }
-                }
-                
-                const mergeFields = [
-                    'depositWallet', 'referralWallet', 'rndWallet', 'lockedRND',
-                    'releaseWallet', 'totalReleased', 'packages', 'transactions',
-                    'transferHistory', 'commissionHistory', 'teamStructure',
-                    'totalReferrals', 'teamBusiness', 'referralEarnings',
-                    'level1Earnings', 'level2Earnings', 'level3Earnings',
-                    'level4Earnings', 'level5Earnings', 'lastReleaseDate'
-                ];
-                
-                for (let field of mergeFields) {
-                    if (backupData[field] !== undefined && backupData[field] !== null) {
-                        if (typeof backupData[field] === 'object' && !Array.isArray(backupData[field])) {
-                            recoveredData[field] = { ...(recoveredData[field] || {}), ...backupData[field] };
-                        } else {
-                            recoveredData[field] = backupData[field];
-                        }
-                    }
-                }
-                
-                console.log('✅ Restored from backup with referral chain preserved');
+            if (Object.keys(updates).length > 0) {
+                await update(ref(db, 'users/' + userId), updates);
+                console.log('✅ Metadata fields filled');
             }
             
-            // ============================================================
-            // CRITICAL: Verify Referral Chain
-            // ============================================================
-            if (recoveredData.referralCode) {
-                console.log('✅ Referral Code preserved:', recoveredData.referralCode);
-            } else {
-                console.warn('⚠️ Referral Code missing, generating new one');
-                recoveredData.referralCode = userId.substring(0, 8).toUpperCase();
-            }
-            
-            if (recoveredData.referredBy) {
-                console.log('✅ Referred By preserved:', recoveredData.referredBy);
-                const referrer = await getUserByIdentifier(recoveredData.referredBy);
-                if (!referrer) {
-                    console.warn('⚠️ Referrer not found, keeping referral code anyway');
-                }
-            }
-            
-            if (!recoveredData.teamStructure) {
-                recoveredData.teamStructure = { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
-            }
-            
-            if (!recoveredData.commissionHistory) {
-                recoveredData.commissionHistory = [];
-            }
-            
-            // Verify packages
-            const packages = recoveredData.packages || {};
-            for (let key in packages) {
-                const pkg = packages[key];
-                if (pkg.status === 'completed' && pkg.commissionProcessed === undefined) {
-                    pkg.commissionProcessed = true;
-                }
-            }
-            recoveredData.packages = packages;
-            
-            if (!recoveredData.uid) recoveredData.uid = userId;
-            if (!recoveredData.email) recoveredData.email = authUser.email || '';
-            if (!recoveredData.name) recoveredData.name = authUser.displayName || 'User';
-            
-            const defaultFields = {
-                username: authUser.email ? authUser.email.split('@')[0] : 'user_' + userId.substring(0, 8),
-                depositWallet: 0,
-                referralWallet: 0,
-                rndWallet: 0,
-                lockedRND: 0,
-                releaseWallet: 0,
-                totalReleased: 0,
-                activePackages: 0,
-                totalStake: 0,
-                totalReferrals: 0,
-                teamBusiness: 0,
-                rank: 'Member',
-                packages: {},
-                transactions: {},
-                transferHistory: [],
-                commissionHistory: [],
-                teamStructure: { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 },
-                lastReleaseDate: null
-            };
-            
-            for (let key in defaultFields) {
-                if (recoveredData[key] === undefined || recoveredData[key] === null) {
-                    recoveredData[key] = defaultFields[key];
-                }
-            }
-            
-            const updateData = {};
-            for (let key in recoveredData) {
-                if (recoveredData[key] !== undefined && recoveredData[key] !== null) {
-                    updateData[key] = recoveredData[key];
-                }
-            }
-            
-            await update(ref(db, 'users/' + userId), updateData);
-            console.log('✅ User data recovered successfully with referral chain intact');
-            
-            return recoveredData;
+            // Fresh read
+            const freshSnap = await get(ref(db, 'users/' + userId));
+            return freshSnap.exists() ? freshSnap.val() : existingData;
         }
         
-        // Check if email exists in any user record (prevent duplicate)
-        const email = authUser.email;
-        if (email) {
-            const usersSnap = await get(ref(db, 'users'));
-            if (usersSnap.exists()) {
-                const users = usersSnap.val();
-                for (let uid in users) {
-                    if (users[uid].email === email && uid !== userId) {
-                        console.warn('⚠️ Email already exists with different UID:', uid);
-                        return null;
-                    }
-                }
-            }
-        }
-        
-        console.log('🆕 Creating new user record for:', userId);
+        // 🔴 User record nahi hai — bilkul naya banao
+        // Financial fields = 0 (NEVER restore from backup)
+        console.log('🆕 Creating new user record (financial fields = 0)');
         
         const newUserData = {
             uid: userId,
@@ -481,6 +385,7 @@ async function recoverUserData(userId, authUser) {
             name: authUser.displayName || 'User',
             createdAt: Date.now(),
             lastLogin: Date.now(),
+            // 💰 Financial fields START AT 0
             depositWallet: 0,
             referralWallet: 0,
             rndWallet: 0,
@@ -501,6 +406,7 @@ async function recoverUserData(userId, authUser) {
             lastReleaseDate: null
         };
         
+        // URL se referral code
         const urlParams = new URLSearchParams(window.location.search);
         const refCode = urlParams.get('ref');
         if (refCode) {
@@ -516,7 +422,7 @@ async function recoverUserData(userId, authUser) {
         }
         
         await set(ref(db, 'users/' + userId), newUserData);
-        console.log('✅ New user created successfully');
+        console.log('✅ New user created (all balances = 0)');
         
         return newUserData;
         
@@ -527,7 +433,7 @@ async function recoverUserData(userId, authUser) {
 }
 
 // ============================================================
-// PROCESS DAILY RELEASE (With Pending Days Calculation) - FIXED
+// ✅ SAFE DAILY RELEASE (Manual trigger only)
 // ============================================================
 async function processDailyRelease(userId) {
     if (releaseInProgress) {
@@ -546,25 +452,17 @@ async function processDailyRelease(userId) {
             
             const lastReleaseDate = currentData.lastReleaseDate || '';
             
-            // Calculate pending days
             let pendingDays = 0;
             if (lastReleaseDate) {
                 const daysDiff = getDaysBetween(lastReleaseDate, today);
-                if (daysDiff === 0) {
-                    return currentData;
-                }
+                if (daysDiff === 0) return currentData;
                 pendingDays = Math.max(0, daysDiff - 1);
-            }
-            
-            if (!lastReleaseDate) {
-                pendingDays = 0;
             }
             
             const packages = currentData.packages || {};
             let updatedPackages = {};
             let releaseTransactions = [];
-            let totalReleaseToday = 0;
-            let totalReleaseAmountAll = 0; // ✅ FIX: Total including pending
+            let totalReleaseAmountAll = 0;
             let hasActivePackages = false;
             
             for (const [pkgKey, pkg] of Object.entries(packages)) {
@@ -599,8 +497,7 @@ async function processDailyRelease(userId) {
                 }
                 
                 updatedPackages[pkgKey] = pkg;
-                totalReleaseToday += todayReleaseAmount;
-                totalReleaseAmountAll += totalReleaseAmount; // ✅ FIX: Add total including pending
+                totalReleaseAmountAll += totalReleaseAmount;
                 
                 releaseTransactions.push({
                     type: 'daily_release',
@@ -611,7 +508,7 @@ async function processDailyRelease(userId) {
                     timestamp: Date.now(),
                     date: today,
                     status: 'completed',
-                    description: `Daily release of ${todayReleaseAmount.toFixed(4)} RND from ${pkg.planName || 'Package'}`
+                    description: `Daily release of ${todayReleaseAmount.toFixed(4)} RND`
                 });
                 
                 if (pendingDays > 0) {
@@ -625,7 +522,7 @@ async function processDailyRelease(userId) {
                         timestamp: Date.now(),
                         date: today,
                         status: 'completed',
-                        description: `Pending release of ${pendingAmount.toFixed(4)} RND from ${pkg.planName || 'Package'} (${pendingDays} days pending)`
+                        description: `Pending release of ${pendingAmount.toFixed(4)} RND (${pendingDays} days)`
                     });
                 }
             }
@@ -635,7 +532,6 @@ async function processDailyRelease(userId) {
                 return currentData;
             }
             
-            // ✅ FIX: Use totalReleaseAmountAll (includes pending) instead of totalReleaseToday
             currentData.rndWallet = (currentData.rndWallet || 0) + totalReleaseAmountAll;
             currentData.lockedRND = (currentData.lockedRND || 0) - totalReleaseAmountAll;
             currentData.totalReleased = (currentData.totalReleased || 0) + totalReleaseAmountAll;
@@ -652,13 +548,12 @@ async function processDailyRelease(userId) {
         });
         
         if (result.committed && result.snapshot.exists()) {
-            const data = result.snapshot.val();
-            console.log('✅ Daily release processed successfully');
-            return data;
+            console.log('✅ Daily release processed');
+            return result.snapshot.val();
         }
         return null;
     } catch (error) {
-        console.error('❌ Error processing daily release:', error);
+        console.error('❌ Daily release error:', error);
         return null;
     } finally {
         releaseInProgress = false;
@@ -666,11 +561,12 @@ async function processDailyRelease(userId) {
 }
 
 // ============================================================
-// PROCESS REFERRAL COMMISSION (Duplicate Proof with Lock)
+// ✅ ATOMIC COMMISSION PROCESSING
+// commissionProcessed flag SAME transaction mein set hota hai
 // ============================================================
 async function processReferralCommission(userId, packageId, packageData) {
     if (commissionInProgress) {
-        console.log('⏳ Commission already in progress, skipping...');
+        console.log('⏳ Commission in progress, skipping...');
         return null;
     }
     
@@ -678,139 +574,155 @@ async function processReferralCommission(userId, packageId, packageData) {
     
     try {
         if (packageData.commissionProcessed === true) {
-            console.log('⚠️ Commission already processed for package:', packageId);
             return null;
         }
-        if (packageData.status !== 'active') {
-            console.log('⚠️ Package not active, skipping commission:', packageId);
-            return null;
-        }
-        
-        // Lock the package to prevent duplicate processing
-        const lockRef = ref(db, `processing_locks/${packageId}`);
-        const lockSnap = await get(lockRef);
-        
-        if (lockSnap.exists()) {
-            console.log('⚠️ Package is being processed by another instance:', packageId);
+        if (packageData.status !== 'active' && packageData.status !== 'completed') {
             return null;
         }
         
-        await set(lockRef, {
-            lockedAt: Date.now(),
-            userId: userId,
-            packageId: packageId
+        const userSnapshot = await get(ref(db, 'users/' + userId));
+        if (!userSnapshot.exists()) return null;
+        
+        const userData = userSnapshot.val();
+        const referralCode = userData.referralCode;
+        const packageAmount = packageData.usdtAmount || 0;
+        
+        if (packageAmount <= 0) return null;
+        
+        const commissionLevels = [
+            { level: 1, percent: 0.08 },
+            { level: 2, percent: 0.04 },
+            { level: 3, percent: 0.02 },
+            { level: 4, percent: 0.01 },
+            { level: 5, percent: 0.01 }
+        ];
+        
+        // ✅ STEP 1: Mark package as processing ATOMICALLY
+        // Agar already marked hai → skip
+        const pkgRef = ref(db, `users/${userId}/packages/${packageId}`);
+        const markResult = await runTransaction(pkgRef, (pkg) => {
+            if (!pkg) return pkg;
+            if (pkg.commissionProcessed === true) return pkg; // abort
+            if (pkg.commissionProcessing === true) return pkg; // abort
+            pkg.commissionProcessing = true;
+            pkg.commissionProcessingAt = Date.now();
+            return pkg;
         });
         
-        try {
-            const userSnapshot = await get(ref(db, 'users/' + userId));
-            if (!userSnapshot.exists()) {
-                console.log('❌ User not found for commission:', userId);
-                return null;
-            }
-            
-            const userData = userSnapshot.val();
-            const referralCode = userData.referralCode;
-            const packageAmount = packageData.usdtAmount || 0;
-            
-            if (packageAmount <= 0) {
-                console.log('⚠️ Package amount is 0, skipping commission');
-                return null;
-            }
-            
-            const commissionLevels = [
-                { level: 1, percent: 0.08 },
-                { level: 2, percent: 0.04 },
-                { level: 3, percent: 0.02 },
-                { level: 4, percent: 0.01 },
-                { level: 5, percent: 0.01 }
-            ];
-            
-            let currentRefCode = referralCode;
-            let level = 1;
-            let commissionProcessed = false;
-            
-            while (currentRefCode && level <= 5) {
-                const refResult = await getUserByIdentifier(currentRefCode);
-                
-                if (!refResult || refResult.uid === userId) break;
-                
-                const referrerData = refResult.data;
-                const uid = refResult.uid;
-                
-                const commissionPercent = commissionLevels.find(l => l.level === level)?.percent || 0;
-                const commissionAmount = packageAmount * commissionPercent;
-                
-                if (commissionAmount > 0) {
-                    const referrerRef = ref(db, 'users/' + uid);
-                    await runTransaction(referrerRef, (currentData) => {
-                        if (!currentData) return currentData;
-                        
-                        currentData.referralWallet = (currentData.referralWallet || 0) + commissionAmount;
-                        const levelKey = `level${level}Earnings`;
-                        currentData[levelKey] = (currentData[levelKey] || 0) + commissionAmount;
-                        currentData.referralEarnings = (currentData.referralEarnings || 0) + commissionAmount;
-                        currentData.teamBusiness = (currentData.teamBusiness || 0) + packageAmount;
-                        
-                        const commissionHistory = currentData.commissionHistory || [];
-                        const existing = commissionHistory.find(h => 
-                            h.packageId === packageId && h.level === level && h.fromUser === (userData.username || userData.referralCode || userId)
-                        );
-                        
-                        if (!existing) {
-                            commissionHistory.push({
-                                type: 'referral_commission',
-                                level: level,
-                                percent: commissionPercent * 100,
-                                amount: commissionAmount,
-                                fromUser: userData.username || userData.referralCode || userId,
-                                fromUid: userId,
-                                packageId: packageId,
-                                timestamp: Date.now(),
-                                date: getTodayDate(),
-                                description: `${commissionPercent * 100}% commission from Level ${level} referral`
-                            });
-                            currentData.commissionHistory = commissionHistory;
-                            
-                            const transactions = currentData.transactions || {};
-                            transactions[generateTxId()] = {
-                                type: 'referral_commission',
-                                amount: commissionAmount,
-                                currency: 'USDT',
-                                level: level,
-                                percent: commissionPercent * 100,
-                                fromUser: userData.username || userData.referralCode || userId,
-                                fromUid: userId,
-                                timestamp: Date.now(),
-                                date: getTodayDate(),
-                                status: 'completed',
-                                description: `Received ${commissionPercent * 100}% commission ($${commissionAmount.toFixed(2)}) from Level ${level} referral`
-                            };
-                            currentData.transactions = transactions;
-                        }
-                        
-                        return currentData;
-                    });
-                    commissionProcessed = true;
-                }
-                
-                currentRefCode = referrerData.referredBy || null;
-                level++;
-            }
-            
-            await update(ref(db, 'users/' + userId + '/packages/' + packageId), {
-                commissionProcessed: true,
-                commissionProcessedAt: Date.now()
-            });
-            
-            console.log('✅ Commission processed for package ' + packageId);
-            return true;
-            
-        } finally {
-            await set(lockRef, null);
+        if (!markResult.committed) {
+            console.log('⚠️ Commission already processed or processing');
+            return null;
         }
         
+        // Double-check karo ki hamara lock successfully laga
+        const checkPkg = await get(pkgRef);
+        if (!checkPkg.exists() || checkPkg.val().commissionProcessed === true) {
+            return null;
+        }
+        
+        // ✅ STEP 2: Process commission chain
+        let currentRefCode = referralCode;
+        let level = 1;
+        const processedTxIds = [];
+        
+        while (currentRefCode && level <= 5) {
+            const refResult = await getUserByIdentifier(currentRefCode);
+            if (!refResult || refResult.uid === userId) break;
+            
+            const referrerData = refResult.data;
+            const uid = refResult.uid;
+            
+            const commissionPercent = commissionLevels.find(l => l.level === level)?.percent || 0;
+            const commissionAmount = roundToPrecision(packageAmount * commissionPercent, 8);
+            
+            if (commissionAmount > 0) {
+                // ✅ Deterministic txId — same package+level ke liye same
+                const commissionTxId = `comm_${packageId}_L${level}`;
+                
+                await runTransaction(ref(db, 'users/' + uid), (currentData) => {
+                    if (!currentData) return currentData;
+                    
+                    const commissionHistory = currentData.commissionHistory || [];
+                    // ✅ Duplicate check by txId
+                    const existing = commissionHistory.find(h => h.txId === commissionTxId);
+                    if (existing) return currentData; // already processed
+                    
+                    currentData.referralWallet = roundToPrecision(
+                        (currentData.referralWallet || 0) + commissionAmount, 2
+                    );
+                    const levelKey = `level${level}Earnings`;
+                    currentData[levelKey] = roundToPrecision(
+                        (currentData[levelKey] || 0) + commissionAmount, 2
+                    );
+                    currentData.referralEarnings = roundToPrecision(
+                        (currentData.referralEarnings || 0) + commissionAmount, 2
+                    );
+                    currentData.teamBusiness = roundToPrecision(
+                        (currentData.teamBusiness || 0) + packageAmount, 2
+                    );
+                    
+                    commissionHistory.push({
+                        type: 'referral_commission',
+                        level: level,
+                        percent: commissionPercent * 100,
+                        amount: commissionAmount,
+                        fromUser: userData.username || userData.referralCode || userId,
+                        fromUid: userId,
+                        packageId: packageId,
+                        txId: commissionTxId,
+                        timestamp: Date.now(),
+                        date: getTodayDate(),
+                        description: `${commissionPercent * 100}% from Level ${level}`
+                    });
+                    currentData.commissionHistory = commissionHistory;
+                    
+                    const transactions = currentData.transactions || {};
+                    transactions[commissionTxId] = {
+                        type: 'referral_commission',
+                        amount: commissionAmount,
+                        currency: 'USDT',
+                        level: level,
+                        percent: commissionPercent * 100,
+                        fromUser: userData.username || userData.referralCode || userId,
+                        fromUid: userId,
+                        timestamp: Date.now(),
+                        date: getTodayDate(),
+                        status: 'completed',
+                        txId: commissionTxId
+                    };
+                    currentData.transactions = transactions;
+                    
+                    return currentData;
+                });
+                
+                processedTxIds.push(commissionTxId);
+            }
+            
+            currentRefCode = referrerData.referredBy || null;
+            level++;
+        }
+        
+        // ✅ STEP 3: Mark package as completed ATOMICALLY
+        await runTransaction(pkgRef, (pkg) => {
+            if (!pkg) return pkg;
+            pkg.commissionProcessed = true;
+            pkg.commissionProcessedAt = Date.now();
+            pkg.commissionProcessing = false;
+            pkg.commissionTxIds = processedTxIds;
+            return pkg;
+        });
+        
+        console.log('✅ Commission processed for:', packageId);
+        return true;
+        
     } catch (error) {
-        console.error('❌ Error processing commission:', error);
+        console.error('❌ Commission error:', error);
+        // Cleanup processing flag on error
+        try {
+            await update(ref(db, `users/${userId}/packages/${packageId}`), {
+                commissionProcessing: false
+            });
+        } catch (_) {}
         return null;
     } finally {
         commissionInProgress = false;
@@ -839,137 +751,209 @@ function calculateUserStats(userData) {
         totalReleased += (pkg.releasedRND || 0);
     }
     
-    return {
-        totalLockedRND,
-        totalDailyRelease,
-        activePackages,
-        totalStake,
-        totalReleased
-    };
+    return { totalLockedRND, totalDailyRelease, activePackages, totalStake, totalReleased };
 }
 
 // ============================================================
-// 🔥 ATOMIC TRANSFER (UPDATED - UID + Username + Referral Code Search)
+// ✅ FIXED: TRUE ATOMIC TRANSFER
 // ============================================================
-async function atomicTransfer(senderUid, recipientUid, recipientData, amount, walletType, currency, senderUsername, senderUidForHistory) {
-    if (amount <= 0) return { success: false, error: 'Invalid amount' };
-    
-    const senderRef = ref(db, 'users/' + senderUid);
-    const timestamp = Date.now();
-    const date = getTodayDate();
-    const txId = generateTxId();
-    
-    // Get recipient username and UID
-    const recipientUsername = recipientData.username || recipientData.referralCode || recipientUid;
-    const recipientUidForHistory = recipientUid;
-    
-    // Create comprehensive backups
-    await createComprehensiveBackup(senderUid, 'transfer_sender');
-    await createComprehensiveBackup(recipientUid, 'transfer_recipient');
-    
-    const senderResult = await runTransaction(senderRef, (currentData) => {
-        if (!currentData) return currentData;
-        const balance = currentData[walletType] || 0;
-        if (balance < amount) {
-            return currentData;
+async function atomicTransfer(senderUid, recipientUid, recipientData, amount, walletType, currency, requestId) {
+    if (!senderUid || !recipientUid) {
+        return { status: TRANSFER_STATUS.FAILED, error: 'Missing user IDs' };
+    }
+    if (senderUid === recipientUid) {
+        return { status: TRANSFER_STATUS.FAILED, error: 'Cannot transfer to yourself' };
+    }
+    if (!WALLET_CURRENCY[walletType]) {
+        return { status: TRANSFER_STATUS.FAILED, error: 'Invalid wallet type' };
+    }
+    const amountCheck = validateAmount(amount, walletType);
+    if (!amountCheck.valid) {
+        return { status: TRANSFER_STATUS.FAILED, error: amountCheck.error };
+    }
+    const safeAmount = amountCheck.value;
+    const precision = WALLET_PRECISION[walletType];
+
+    // ---- Idempotency check ----
+    const requestRef = ref(db, `transferRequests/${requestId}`);
+    try {
+        const existingReq = await get(requestRef);
+        if (existingReq.exists()) {
+            const reqData = existingReq.val();
+            console.log('♻️ Idempotent replay:', requestId);
+            return {
+                status: reqData.status === 'success' ? TRANSFER_STATUS.SUCCESS : reqData.status,
+                txId: reqData.txId,
+                error: reqData.error,
+                replayed: true
+            };
         }
-        currentData[walletType] = balance - amount;
-        
-        const transferHistory = currentData.transferHistory || [];
-        transferHistory.push({
-            type: 'sent',
-            to: recipientUsername,
-            toUid: recipientUidForHistory,
-            amount: amount,
-            from: senderUsername,
-            fromUid: senderUidForHistory || senderUid,
-            currency: currency,
-            timestamp: timestamp,
-            txId: txId,
-            status: 'completed'
-        });
-        currentData.transferHistory = transferHistory;
-        
-        const transactions = currentData.transactions || {};
-        transactions[txId] = {
-            type: 'transfer_sent',
-            amount: amount,
-            currency: currency,
-            to: recipientUsername,
-            toUid: recipientUidForHistory,
-            from: senderUsername,
-            fromUid: senderUidForHistory || senderUid,
-            timestamp: timestamp,
-            date: date,
-            status: 'completed'
-        };
-        currentData.transactions = transactions;
-        
-        return currentData;
-    });
-    
-    if (!senderResult.committed) {
-        return { success: false, error: 'Insufficient balance or sender update failed' };
+    } catch (err) {
+        return { status: TRANSFER_STATUS.UNKNOWN, error: 'Could not verify request state' };
     }
-    
-    const recipientRef = ref(db, 'users/' + recipientUid);
-    const recipientResult = await runTransaction(recipientRef, (currentData) => {
-        if (!currentData) return currentData;
-        currentData[walletType] = (currentData[walletType] || 0) + amount;
-        
-        const transferHistory = currentData.transferHistory || [];
-        transferHistory.push({
-            type: 'received',
-            from: senderUsername,
-            fromUid: senderUidForHistory || senderUid,
-            to: recipientUsername,
-            toUid: recipientUidForHistory,
-            amount: amount,
-            currency: currency,
-            timestamp: timestamp,
-            txId: txId,
-            status: 'completed'
-        });
-        currentData.transferHistory = transferHistory;
-        
-        const transactions = currentData.transactions || {};
-        transactions[txId] = {
-            type: 'transfer_received',
-            amount: amount,
-            currency: currency,
-            from: senderUsername,
-            fromUid: senderUidForHistory || senderUid,
-            to: recipientUsername,
-            toUid: recipientUidForHistory,
-            timestamp: timestamp,
-            date: date,
-            status: 'completed'
+
+    // ---- Read sender ----
+    let senderData;
+    try {
+        const senderSnap = await get(ref(db, `users/${senderUid}`));
+        if (!senderSnap.exists()) {
+            return { status: TRANSFER_STATUS.FAILED, error: 'Sender not found' };
+        }
+        senderData = senderSnap.val();
+    } catch (err) {
+        return { status: TRANSFER_STATUS.UNKNOWN, error: 'Network error reading sender' };
+    }
+
+    // ---- Balance check ----
+    const senderBalance = roundToPrecision(senderData[walletType] || 0, precision);
+    if (senderBalance < safeAmount) {
+        return {
+            status: TRANSFER_STATUS.FAILED,
+            error: `Insufficient balance. Available: ${senderBalance} ${currency}`
         };
-        currentData.transactions = transactions;
-        
-        return currentData;
-    });
-    
-    if (!recipientResult.committed) {
-        // Rollback sender
-        await runTransaction(senderRef, (currentData) => {
-            if (!currentData) return currentData;
-            currentData[walletType] = (currentData[walletType] || 0) + amount;
-            const transactions = currentData.transactions || {};
-            if (transactions[txId]) {
-                transactions[txId].status = 'rolled_back';
+    }
+
+    // ---- Compute new balances ----
+    const newSenderBalance = roundToPrecision(senderBalance - safeAmount, precision);
+    const recipientBalance = roundToPrecision(recipientData[walletType] || 0, precision);
+    const newRecipientBalance = roundToPrecision(recipientBalance + safeAmount, precision);
+
+    // ---- Deterministic txId ----
+    const txId = 'TX_' + requestId.replace(/-/g, '').slice(0, 20);
+    const now = Date.now();
+    const senderUsername = senderData.username || senderData.referralCode || senderUid.slice(0, 8);
+    const recipientUsername = recipientData.username || recipientData.referralCode || recipientUid.slice(0, 8);
+
+    // ---- Build ATOMIC multi-path update ----
+    const updates = {};
+
+    updates[`transferRequests/${requestId}`] = {
+        requestId, txId, senderUid, recipientUid,
+        amount: safeAmount, currency, walletType,
+        status: TRANSFER_STATUS.SUCCESS,
+        createdAt: now, completedAt: now
+    };
+
+    // Sender
+    updates[`users/${senderUid}/${walletType}`] = newSenderBalance;
+    updates[`users/${senderUid}/transferHistory/${txId}`] = {
+        type: 'sent', to: recipientUsername, toUid: recipientUid,
+        amount: safeAmount, currency, walletType,
+        from: senderUsername, fromUid: senderUid,
+        timestamp: now, txId, requestId, status: 'completed'
+    };
+    updates[`users/${senderUid}/transactions/${txId}`] = {
+        type: 'transfer_sent', amount: safeAmount, currency, walletType,
+        to: recipientUsername, toUid: recipientUid,
+        from: senderUsername, fromUid: senderUid,
+        timestamp: now, date: getTodayDate(), txId, requestId, status: 'completed'
+    };
+
+    // Recipient
+    updates[`users/${recipientUid}/${walletType}`] = newRecipientBalance;
+    updates[`users/${recipientUid}/transferHistory/${txId}`] = {
+        type: 'received', from: senderUsername, fromUid: senderUid,
+        to: recipientUsername, toUid: recipientUid,
+        amount: safeAmount, currency, walletType,
+        timestamp: now, txId, requestId, status: 'completed'
+    };
+    updates[`users/${recipientUid}/transactions/${txId}`] = {
+        type: 'transfer_received', amount: safeAmount, currency, walletType,
+        from: senderUsername, fromUid: senderUid,
+        to: recipientUsername, toUid: recipientUid,
+        timestamp: now, date: getTodayDate(), txId, requestId, status: 'completed'
+    };
+
+    // ---- EXECUTE ATOMIC ----
+    try {
+        await update(ref(db), updates);
+        console.log('✅ Transfer committed atomically:', txId);
+        return { status: TRANSFER_STATUS.SUCCESS, txId };
+    } catch (err) {
+        console.error('❌ Transfer failed:', err);
+
+        // Reconciliation
+        try {
+            const checkReq = await get(requestRef);
+            if (checkReq.exists()) {
+                const reqData = checkReq.val();
+                if (reqData.status === TRANSFER_STATUS.SUCCESS) {
+                    console.log('✅ Reconciliation: succeeded');
+                    return { status: TRANSFER_STATUS.SUCCESS, txId: reqData.txId };
+                }
             }
-            currentData.transactions = transactions;
-            return currentData;
-        });
-        return { success: false, error: 'Recipient update failed, funds returned' };
+            return { status: TRANSFER_STATUS.FAILED, error: err.message || 'Transfer failed' };
+        } catch (reconErr) {
+            console.warn('⚠️ UNKNOWN status');
+            try {
+                await set(requestRef, {
+                    requestId, txId, senderUid, recipientUid,
+                    amount: safeAmount, currency, walletType,
+                    status: TRANSFER_STATUS.UNKNOWN,
+                    createdAt: now,
+                    error: 'Network ambiguity'
+                });
+            } catch (_) {}
+            return {
+                status: TRANSFER_STATUS.UNKNOWN,
+                txId,
+                error: 'Transfer status could not be confirmed. Please do not submit again.'
+            };
+        }
     }
-    
-    return { success: true, txId: txId };
 }
 
 // ============================================================
-// REAL-TIME LISTENER (Debounced - No Duplicate)
+// RECONCILE PENDING TRANSFERS
+// ============================================================
+async function reconcilePendingTransfers(uid) {
+    try {
+        const pendingRef = ref(db, `users/${uid}/pendingTransfers`);
+        const snap = await get(pendingRef);
+        if (!snap.exists()) return [];
+
+        const results = [];
+        const pending = snap.val();
+        for (const requestId of Object.keys(pending)) {
+            try {
+                const reqSnap = await get(ref(db, `transferRequests/${requestId}`));
+                if (reqSnap.exists()) {
+                    const reqData = reqSnap.val();
+                    results.push({ requestId, status: reqData.status, txId: reqData.txId });
+                    if (reqData.status === TRANSFER_STATUS.SUCCESS || reqData.status === TRANSFER_STATUS.FAILED) {
+                        await set(ref(db, `users/${uid}/pendingTransfers/${requestId}`), null);
+                    }
+                } else {
+                    await set(ref(db, `users/${uid}/pendingTransfers/${requestId}`), null);
+                }
+            } catch (err) {
+                console.warn('Reconcile item failed:', requestId, err);
+            }
+        }
+        return results;
+    } catch (err) {
+        console.error('Reconciliation error:', err);
+        return [];
+    }
+}
+
+async function markPending(uid, requestId) {
+    try {
+        await set(ref(db, `users/${uid}/pendingTransfers/${requestId}`), {
+            requestId,
+            createdAt: Date.now()
+        });
+    } catch (_) {}
+}
+
+async function clearPending(uid, requestId) {
+    try {
+        await set(ref(db, `users/${uid}/pendingTransfers/${requestId}`), null);
+    } catch (_) {}
+}
+
+// ============================================================
+// REAL-TIME LISTENER
 // ============================================================
 function setupRealtimeListener(userId) {
     if (listenerOff) {
@@ -1005,7 +989,7 @@ function setupRealtimeListener(userId) {
 }
 
 // ============================================================
-// UPDATE DASHBOARD UI (Safe - No Database Writes) - FIXED UI BINDING
+// UPDATE DASHBOARD UI
 // ============================================================
 function updateDashboardUI(u, stats) {
     const elements = {
@@ -1023,11 +1007,9 @@ function updateDashboardUI(u, stats) {
         lockedRNDInfo: document.getElementById('lockedRNDInfo')
     };
     
-    // Calculate daily release and locked RND values once
     const dailyReleaseValue = stats?.totalDailyRelease || u.releaseWallet || 0;
     const lockedRNDValue = stats?.totalLockedRND || u.lockedRND || 0;
     
-    // Update all elements with the SAME values
     if (elements.depositWallet) elements.depositWallet.textContent = '$' + (u.depositWallet || 0).toFixed(2);
     if (elements.referralWallet) elements.referralWallet.textContent = (u.referralWallet || 0).toFixed(2);
     if (elements.rndWallet) elements.rndWallet.textContent = (u.rndWallet || 0).toFixed(4);
@@ -1050,7 +1032,6 @@ function renderDashboard(u) {
     const username = u.username || u.referralCode || 'USER';
     const name = u.name || 'User';
     
-    // ✅ UPDATED: Rank calculated from teamBusiness (Cumulative - never subtract)
     const teamBusinessForRank = u.teamBusiness || 0;
     let rank = 'Member';
     const rankThresholds = [
@@ -1061,20 +1042,14 @@ function renderDashboard(u) {
         { min: 3000, rank: 'Executive' }
     ];
     for (let level of rankThresholds) {
-        if (teamBusinessForRank >= level.min) {
-            rank = level.rank;
-        }
+        if (teamBusinessForRank >= level.min) rank = level.rank;
     }
     
     const isMember = rank === 'Member' || rank === 'member' || !rank;
-    
-    // ✅ FIX: Calculate totalReferrals from teamStructure (All Levels Combined)
     const teamStructure = u.teamStructure || { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
     const directReferrals = teamStructure.level1 || 0;
-    const totalReferrals = (teamStructure.level1 || 0) + 
-                          (teamStructure.level2 || 0) + 
-                          (teamStructure.level3 || 0) + 
-                          (teamStructure.level4 || 0) + 
+    const totalReferrals = (teamStructure.level1 || 0) + (teamStructure.level2 || 0) + 
+                          (teamStructure.level3 || 0) + (teamStructure.level4 || 0) + 
                           (teamStructure.level5 || 0);
     
     const depositWallet = u.depositWallet || 0;
@@ -1102,8 +1077,7 @@ function renderDashboard(u) {
     for (let key in packages) {
         const pkg = packages[key];
         if (pkg.status === 'active' && pkg.dailyRelease > 0) {
-            const released = pkg.releasedRND || 0;
-            const days = Math.floor(released / pkg.dailyRelease);
+            const days = Math.floor((pkg.releasedRND || 0) / pkg.dailyRelease);
             daysPassed = Math.max(daysPassed, days);
         }
     }
@@ -1118,8 +1092,8 @@ function renderDashboard(u) {
     const referralLink = `${REGISTER_URL}?ref=${u.referralCode}`;
     const rankClass = isMember ? 'rank-badge member' : 'rank-badge';
     
-    const transferHistory = u.transferHistory || [];
-    const sortedHistory = [...transferHistory].reverse().slice(0, 5);
+    const transferHistory = normalizeTransferHistory(u.transferHistory);
+    const sortedHistory = [...transferHistory].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 5);
 
     document.getElementById('dashboardContent').innerHTML = `
         <div class="row g-4">
@@ -1154,7 +1128,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== 4 WALLETS ====== -->
             <div class="col-12">
                 <div class="row g-3">
                     <div class="col-6 col-lg-3">
@@ -1192,7 +1165,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== DAILY RELEASE & STATS ====== -->
             <div class="col-12">
                 <div class="row">
                     <div class="col-md-4">
@@ -1222,7 +1194,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== RELEASE INFO BOX ====== -->
             <div class="col-12">
                 <div class="release-info-box">
                     <div>
@@ -1239,7 +1210,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== STATISTICS ====== -->
             <div class="col-12">
                 <h5 class="fw-bold mb-3"><i class="bi bi-diagram-3 text-success me-2"></i>Statistics</h5>
                 <div class="network-stats">
@@ -1258,59 +1228,27 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== 5 LEVEL MEMBERS ====== -->
             <div class="col-12">
                 <h5 class="fw-bold mb-3"><i class="bi bi-people text-success me-2"></i>Team Members by Level</h5>
                 <div class="level-stats">
-                    <div class="level-stat-card">
-                        <div class="number">${teamLevels.level1 || 0}</div>
-                        <div class="label">Level 1</div>
-                    </div>
-                    <div class="level-stat-card">
-                        <div class="number">${teamLevels.level2 || 0}</div>
-                        <div class="label">Level 2</div>
-                    </div>
-                    <div class="level-stat-card">
-                        <div class="number">${teamLevels.level3 || 0}</div>
-                        <div class="label">Level 3</div>
-                    </div>
-                    <div class="level-stat-card">
-                        <div class="number">${teamLevels.level4 || 0}</div>
-                        <div class="label">Level 4</div>
-                    </div>
-                    <div class="level-stat-card">
-                        <div class="number">${teamLevels.level5 || 0}</div>
-                        <div class="label">Level 5</div>
-                    </div>
+                    <div class="level-stat-card"><div class="number">${teamLevels.level1 || 0}</div><div class="label">Level 1</div></div>
+                    <div class="level-stat-card"><div class="number">${teamLevels.level2 || 0}</div><div class="label">Level 2</div></div>
+                    <div class="level-stat-card"><div class="number">${teamLevels.level3 || 0}</div><div class="label">Level 3</div></div>
+                    <div class="level-stat-card"><div class="number">${teamLevels.level4 || 0}</div><div class="label">Level 4</div></div>
+                    <div class="level-stat-card"><div class="number">${teamLevels.level5 || 0}</div><div class="label">Level 5</div></div>
                 </div>
             </div>
             
-            <!-- ====== 5 LEVEL COMMISSIONS ====== -->
             <div class="col-12">
                 <div class="card-glass">
                     <div class="card-title"><i class="bi bi-cash-stack text-success me-2"></i>5 Level Referral Commissions</div>
                     <div class="row">
                         <div class="col-md-8">
-                            <div class="commission-row">
-                                <span class="level">Level 1 (8%)</span>
-                                <span class="earnings">$${(level1Earn || 0).toFixed(2)}</span>
-                            </div>
-                            <div class="commission-row">
-                                <span class="level">Level 2 (4%)</span>
-                                <span class="earnings">$${(level2Earn || 0).toFixed(2)}</span>
-                            </div>
-                            <div class="commission-row">
-                                <span class="level">Level 3 (2%)</span>
-                                <span class="earnings">$${(level3Earn || 0).toFixed(2)}</span>
-                            </div>
-                            <div class="commission-row">
-                                <span class="level">Level 4 (1%)</span>
-                                <span class="earnings">$${(level4Earn || 0).toFixed(2)}</span>
-                            </div>
-                            <div class="commission-row">
-                                <span class="level">Level 5 (1%)</span>
-                                <span class="earnings">$${(level5Earn || 0).toFixed(2)}</span>
-                            </div>
+                            <div class="commission-row"><span class="level">Level 1 (8%)</span><span class="earnings">$${(level1Earn || 0).toFixed(2)}</span></div>
+                            <div class="commission-row"><span class="level">Level 2 (4%)</span><span class="earnings">$${(level2Earn || 0).toFixed(2)}</span></div>
+                            <div class="commission-row"><span class="level">Level 3 (2%)</span><span class="earnings">$${(level3Earn || 0).toFixed(2)}</span></div>
+                            <div class="commission-row"><span class="level">Level 4 (1%)</span><span class="earnings">$${(level4Earn || 0).toFixed(2)}</span></div>
+                            <div class="commission-row"><span class="level">Level 5 (1%)</span><span class="earnings">$${(level5Earn || 0).toFixed(2)}</span></div>
                             <div class="commission-row" style="border-top:2px solid rgba(251,191,36,0.2);padding-top:10px;margin-top:4px;">
                                 <span class="level" style="font-weight:700;color:#fbbf24;">Total Referral Earnings</span>
                                 <span class="earnings" style="font-size:1.1rem;">$${(referralEarnings || 0).toFixed(2)}</span>
@@ -1327,7 +1265,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== REFERRAL LINK ====== -->
             <div class="col-12">
                 <div class="card-glass">
                     <div class="card-title"><i class="bi bi-link-45deg"></i>Your Referral Link</div>
@@ -1342,7 +1279,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== TRANSFER SYSTEM ====== -->
             <div class="col-12">
                 <div class="card-glass">
                     <div class="card-title"><i class="bi bi-arrow-left-right text-success me-2"></i>Send Money</div>
@@ -1393,7 +1329,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ====== QUICK LINKS ====== -->
             <div class="col-12">
                 <div class="card-glass">
                     <div class="card-title"><i class="bi bi-grid-3x3-gap-fill"></i>Quick Links</div>
@@ -1429,7 +1364,7 @@ function renderDashboard(u) {
 // ============================================================
 window.copyUserId = function(username) {
     navigator.clipboard.writeText(username).then(() => {
-        showToast('✅ User ID copied to clipboard!', 'success');
+        showToast('✅ User ID copied!', 'success');
     }).catch(() => {
         const textArea = document.createElement('textarea');
         textArea.value = username;
@@ -1437,129 +1372,136 @@ window.copyUserId = function(username) {
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        showToast('✅ User ID copied to clipboard!', 'success');
+        showToast('✅ User ID copied!', 'success');
     });
 };
 
 // ============================================================
-// 🔥 TRANSFER HANDLER (UPDATED)
+// ✅ TRANSFER HANDLER
 // ============================================================
 async function handleTransfer() {
+    if (transferLock) {
+        showToast('⏳ Transfer already in progress...', 'error');
+        return;
+    }
+
     const recipientIdentifier = document.getElementById('transferUserId').value.trim();
-    const amount = parseFloat(document.getElementById('transferAmount').value);
+    const amountRaw = document.getElementById('transferAmount').value;
     const walletType = document.getElementById('transferWallet').value;
     const btn = document.querySelector('#transferForm button[type="submit"]');
     
-    if (!recipientIdentifier) { showToast('❌ Please enter recipient User ID, Username or Referral Code', 'error'); return; }
-    if (!amount || amount <= 0) { showToast('❌ Please enter a valid amount', 'error'); return; }
+    if (!recipientIdentifier) {
+        showToast('❌ Please enter recipient ID', 'error');
+        return;
+    }
+    const amount = parseFloat(amountRaw);
+    if (!isFinite(amount) || Number.isNaN(amount) || amount <= 0) {
+        showToast('❌ Please enter a valid amount', 'error');
+        return;
+    }
+    if (!WALLET_CURRENCY[walletType]) {
+        showToast('❌ Invalid wallet type', 'error');
+        return;
+    }
     
     const user = auth.currentUser;
     if (!user) { showToast('❌ Please login first', 'error'); return; }
     
-    const senderSnap = await get(ref(db, 'users/' + user.uid));
-    if (!senderSnap.exists()) { showToast('❌ User data not found', 'error'); return; }
-    const senderData = senderSnap.val();
-    const senderUsername = senderData.username || senderData.referralCode;
-    const senderUid = user.uid;
-    
-    // 🔥 Search recipient by UID, Username or Referral Code
     const recipient = await getUserByIdentifier(recipientIdentifier);
-    if (!recipient) { showToast('❌ User not found! Please check the ID, Username or Referral Code.', 'error'); return; }
-    
-    const recipientUid = recipient.uid;
-    const recipientData = recipient.data;
-    const recipientUsername = recipientData.username || recipientData.referralCode;
-    
-    // 🔥 Self Transfer Check - by UID
-    if (recipientUid === senderUid) { 
-        showToast('❌ You cannot send money to yourself!', 'error'); 
-        return; 
-    }
-    
-    const senderBalance = senderData[walletType] || 0;
-    if (senderBalance < amount) {
-        const walletLabels = {
-            'depositWallet': 'Deposit Wallet (USDT)',
-            'referralWallet': 'Referral Wallet (USDT)',
-            'rndWallet': 'RND Wallet (RND)'
-        };
-        showToast(`❌ Insufficient balance in ${walletLabels[walletType] || 'Wallet'}! You have ${senderBalance.toFixed(4)}`, 'error');
+    if (!recipient) {
+        showToast('❌ User not found!', 'error');
         return;
     }
-    
-    const currency = walletType === 'rndWallet' ? 'RND' : 'USDT';
-    
+    if (recipient.uid === user.uid) {
+        showToast('❌ You cannot send money to yourself!', 'error');
+        return;
+    }
+
+    const requestId = generateRequestId();
+
+    transferLock = true;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
-    
+
+    await markPending(user.uid, requestId);
+
     try {
         const result = await atomicTransfer(
-            senderUid,
-            recipientUid,
-            recipientData,
+            user.uid,
+            recipient.uid,
+            recipient.data,
             amount,
             walletType,
-            currency,
-            senderUsername,
-            senderUid
+            WALLET_CURRENCY[walletType],
+            requestId
         );
-        
-        if (result.success) {
-            showToast(`✅ ${amount} ${currency} sent successfully to ${recipientUsername}!`, 'success');
+
+        const currency = WALLET_CURRENCY[walletType];
+        const recipientName = recipient.data.username || recipient.data.referralCode || recipient.uid.slice(0, 8);
+
+        if (result.status === TRANSFER_STATUS.SUCCESS) {
+            showToast(`✅ ${amount} ${currency} sent to ${recipientName}!`, 'success');
             document.getElementById('transferUserId').value = '';
             document.getElementById('transferAmount').value = '';
+            await clearPending(user.uid, requestId);
             await loadDashboardData(user.uid);
+        } else if (result.status === TRANSFER_STATUS.UNKNOWN) {
+            showToast(
+                '⚠️ Transfer status could not be confirmed. Please DO NOT submit again. Checking...',
+                'error'
+            );
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Verifying...';
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+                transferLock = false;
+                loadDashboardData(user.uid);
+            }, 15000);
+            return;
         } else {
-            showToast('❌ ' + (result.error || 'Transfer failed. Please try again.'), 'error');
+            showToast('❌ ' + (result.error || 'Transfer failed'), 'error');
+            await clearPending(user.uid, requestId);
         }
-        
     } catch (error) {
         console.error('Transfer error:', error);
-        showToast('❌ Error sending. Please try again.', 'error');
+        showToast('❌ Error. Status will be verified on next load.', 'error');
     }
     
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+    transferLock = false;
 }
 
 // ============================================================
 // LOAD DASHBOARD DATA
+// ✅ Financial operations ab dashboard load par NAHI chalti
+// ✅ Sirf reconciliation hoti hai
 // ============================================================
 async function loadDashboardData(userId) {
     if (isDashboardLoading) return;
     isDashboardLoading = true;
     
     try {
+        // Reconciliation only
+        try {
+            const reconciliations = await reconcilePendingTransfers(userId);
+            for (const r of reconciliations) {
+                if (r.status === TRANSFER_STATUS.SUCCESS) {
+                    showToast(`✅ Previous transfer confirmed successful`, 'success');
+                } else if (r.status === TRANSFER_STATUS.FAILED) {
+                    showToast(`❌ Previous transfer failed`, 'error');
+                }
+            }
+        } catch (err) {
+            console.warn('Reconciliation skipped:', err);
+        }
+
         const userSnap = await get(ref(db, 'users/' + userId));
         
         if (!userSnap.exists()) {
             const authUser = auth.currentUser;
             if (authUser) {
-                const checkResult = await checkUserExists(userId);
-                
-                if (checkResult.exists) {
-                    console.log('🔄 Found existing data, attempting recovery...');
-                    const recovered = await recoverUserData(userId, authUser);
-                    if (recovered) {
-                        await processDailyRelease(userId);
-                        const stats = calculateUserStats(recovered);
-                        currentUserData = recovered;
-                        currentUserId = userId;
-                        renderDashboard(recovered);
-                        setupRealtimeListener(userId);
-                        showToast('✅ Your data has been recovered successfully', 'success');
-                    }
-                } else {
-                    console.log('🆕 No existing data found, creating new user...');
-                    const newUser = await recoverUserData(userId, authUser);
-                    if (newUser) {
-                        const stats = calculateUserStats(newUser);
-                        currentUserData = newUser;
-                        currentUserId = userId;
-                        renderDashboard(newUser);
-                        setupRealtimeListener(userId);
-                    }
-                }
+                await loadDashboardData_internal(userId, authUser);
             }
             isDashboardLoading = false;
             return;
@@ -1567,21 +1509,21 @@ async function loadDashboardData(userId) {
         
         const u = userSnap.val();
         
-        // Create backup before processing
-        await createComprehensiveBackup(userId, 'dashboard_load');
+        // ⚠️ NOTE: Daily release aur commission ab dashboard load par nahi hote
+        // Yeh kaam alag trigger se honge (manual button ya scheduled job)
         
-        // Process daily release (with pending days)
-        await processDailyRelease(userId);
-        
-        // Check for pending commissions
+        // Sirf missing commission packages process karo (best-effort, background)
         const packages = u.packages || {};
         for (let [key, pkg] of Object.entries(packages)) {
-            if (pkg.status === 'active' && !pkg.commissionProcessed) {
-                await processReferralCommission(userId, key, pkg);
+            if (pkg.status === 'active' && !pkg.commissionProcessed && !pkg.commissionProcessing) {
+                // Fire and forget (background)
+                processReferralCommission(userId, key, pkg).catch(err => 
+                    console.warn('Background commission failed:', err)
+                );
             }
         }
         
-        // Refresh user data after processing
+        // Fresh read
         const updatedSnap = await get(ref(db, 'users/' + userId));
         const updatedData = updatedSnap.exists() ? updatedSnap.val() : u;
         const stats = calculateUserStats(updatedData);
@@ -1598,12 +1540,38 @@ async function loadDashboardData(userId) {
             <div class="text-center py-5">
                 <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
                 <h4>Error Loading Dashboard</h4>
-                <p class="text-muted">${error.message || 'Please check your internet connection.'}</p>
+                <p class="text-muted">${error.message || 'Please check connection.'}</p>
                 <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
             </div>
         `;
     } finally {
         isDashboardLoading = false;
+    }
+}
+
+async function loadDashboardData_internal(userId, authUser) {
+    const checkResult = await checkUserExists(userId);
+    
+    if (checkResult.exists) {
+        const recovered = await recoverUserData(userId, authUser);
+        if (recovered) {
+            // ❌ NO automatic daily release / commission on first load
+            const stats = calculateUserStats(recovered);
+            currentUserData = recovered;
+            currentUserId = userId;
+            renderDashboard(recovered);
+            setupRealtimeListener(userId);
+            showToast('✅ Data recovered successfully', 'success');
+        }
+    } else {
+        const newUser = await recoverUserData(userId, authUser);
+        if (newUser) {
+            const stats = calculateUserStats(newUser);
+            currentUserData = newUser;
+            currentUserId = userId;
+            renderDashboard(newUser);
+            setupRealtimeListener(userId);
+        }
     }
 }
 
@@ -1622,11 +1590,10 @@ onAuthStateChanged(auth, async (user) => {
         const userSnap = await get(ref(db, 'users/' + user.uid));
         
         if (!userSnap.exists()) {
-            console.log('🔄 User authenticated, checking for existing data...');
+            console.log('🔄 Checking existing data...');
             const checkResult = await checkUserExists(user.uid);
             
             if (checkResult.exists) {
-                console.log('✅ Found existing data in:', checkResult.source);
                 await loadDashboardData(user.uid);
             } else {
                 const email = user.email;
@@ -1644,12 +1611,11 @@ onAuthStateChanged(auth, async (user) => {
                     }
                     
                     if (emailExists) {
-                        console.warn('⚠️ Email already exists with different UID');
                         document.getElementById('dashboardContent').innerHTML = `
                             <div class="text-center py-5">
                                 <i class="bi bi-exclamation-triangle text-warning fs-1 d-block mb-3"></i>
                                 <h4>Account Already Exists</h4>
-                                <p class="text-muted">This email is already registered with another account.</p>
+                                <p class="text-muted">This email is registered with another account.</p>
                                 <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Try Again</button>
                             </div>
                         `;
@@ -1657,7 +1623,6 @@ onAuthStateChanged(auth, async (user) => {
                     }
                 }
                 
-                console.log('🆕 Creating new user account...');
                 await loadDashboardData(user.uid);
             }
             return;
@@ -1675,7 +1640,7 @@ onAuthStateChanged(auth, async (user) => {
         await loadDashboardData(user.uid);
 
     } catch (error) {
-        console.error('Error in auth handler:', error);
+        console.error('Auth handler error:', error);
         document.getElementById('dashboardContent').innerHTML = `
             <div class="text-center py-5">
                 <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
@@ -1687,18 +1652,9 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// Clean up listener on page unload
+// Cleanup
 window.addEventListener('beforeunload', () => {
-    if (listenerOff) {
-        listenerOff();
-        listenerOff = null;
-    }
-    if (listenerTimeout) {
-        clearTimeout(listenerTimeout);
-        listenerTimeout = null;
-    }
-    if (updateTimer) {
-        clearTimeout(updateTimer);
-        updateTimer = null;
-    }
+    if (listenerOff) { listenerOff(); listenerOff = null; }
+    if (listenerTimeout) { clearTimeout(listenerTimeout); listenerTimeout = null; }
+    if (updateTimer) { clearTimeout(updateTimer); updateTimer = null; }
 });

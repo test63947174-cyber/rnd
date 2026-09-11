@@ -1,15 +1,14 @@
 // ============================================================
-// TRANSFER.JS — v5 (FINAL FIX)
-// ============================================================
-// ✅ Password eye button
-// ✅ Save के बाद transfer flow साफ़ — कोई pending stuck नहीं
-// ✅ transferLock properly manage — modal open/close पर भी
-// ✅ Idempotency (requestId localStorage)
-// ✅ नाम के साथ history
+// TRANSFER.JS — v6 (Forgot Password Added)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { 
+    getAuth, 
+    onAuthStateChanged,
+    EmailAuthProvider,
+    reauthenticateWithCredential
+} from "firebase/auth";
 import { getDatabase, ref, get, runTransaction, set, onValue } from "firebase/database";
 
 const firebaseConfig = {
@@ -30,22 +29,16 @@ const db = getDatabase(app);
 const WALLET_CURRENCY = { depositWallet: 'USDT', referralWallet: 'USDT', rndWallet: 'RND' };
 const WALLET_PRECISION = { depositWallet: 2, referralWallet: 2, rndWallet: 8 };
 
-// ============================================================
-// State
-// ============================================================
 let currentUserData = null;
 let currentUserId = null;
 let transferLock = false;
 let balanceListenerOff = null;
 let currentBalances = { depositWallet: 0, referralWallet: 0, rndWallet: 0 };
-
-// 🔑 Pending transfer — जब modal खुला हो
 let pendingTransfer = null;
-// 🔑 Modal खुला है क्या?
 let modalOpen = false;
 
 // ============================================================
-// 👁️ Password Eye Toggle
+// 👁️ Eye toggle
 // ============================================================
 window.togglePassword = function(inputId, btn) {
     const input = document.getElementById(inputId);
@@ -83,14 +76,13 @@ function getOrCreateRequestId() {
     localStorage.setItem('activeTransferRequestId', newId);
     return newId;
 }
-
 function clearActiveRequestId() {
     localStorage.removeItem('activeTransferRequestId');
     localStorage.removeItem('activeTransferDetails');
 }
 
 // ============================================================
-// UI Helpers
+// Toast
 // ============================================================
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
@@ -182,7 +174,7 @@ async function verifyTransferPassword(uid, password) {
 }
 
 // ============================================================
-// ✅ ATOMIC TRANSFER
+// ATOMIC TRANSFER
 // ============================================================
 async function atomicTransfer(senderUid, recipientUid, amount, walletType, currency, requestId, senderName, recipientName) {
     if (!senderUid || !recipientUid) return { status: 'failed', error: 'Missing IDs' };
@@ -198,7 +190,6 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
     const txId = 'TX_' + requestId.replace(/-/g, '').slice(0, 20);
     const now = Date.now();
 
-    // Sender
     const senderRef = ref(db, `users/${senderUid}`);
     let senderBalanceBefore = 0;
     let alreadyInSender = false;
@@ -211,7 +202,6 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
             const balance = roundToPrecision(currentData[walletType] || 0, precision);
             senderBalanceBefore = balance;
             if (balance < safeAmount) return;
-
             currentData[walletType] = roundToPrecision(balance - safeAmount, precision);
 
             if (!currentData.transferHistory || Array.isArray(currentData.transferHistory)) {
@@ -236,9 +226,7 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
             return currentData;
         });
 
-        if (alreadyInSender) {
-            return { status: 'success', txId, recipientName, duplicate: true };
-        }
+        if (alreadyInSender) return { status: 'success', txId, recipientName, duplicate: true };
         if (!senderResult.committed) {
             return { status: 'failed', error: `Insufficient balance. Available: ${senderBalanceBefore} ${currency}` };
         }
@@ -247,7 +235,6 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
         return { status: 'unknown', error: 'Network error on sender' };
     }
 
-    // Recipient
     const recipientRef = ref(db, `users/${recipientUid}`);
     let alreadyInRecipient = false;
 
@@ -282,9 +269,8 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
         });
 
         if (alreadyInRecipient) {
-            // दोनों तरफ हो चुका
+            // Already processed
         } else if (!recipientResult.committed) {
-            // Compensation
             await runTransaction(senderRef, (currentData) => {
                 if (!currentData) return currentData;
                 const hist = currentData.transferHistory || {};
@@ -310,7 +296,6 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
         return { status: 'unknown', txId, error: 'Status could not be confirmed.' };
     }
 
-    // Success record
     try {
         await set(requestRef, {
             requestId, txId, senderUid, recipientUid,
@@ -323,7 +308,7 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
 }
 
 // ============================================================
-// 🎭 Modal Controls
+// Modal Controls
 // ============================================================
 function openModal(id) {
     const m = document.getElementById(id);
@@ -334,20 +319,30 @@ function closeModal(id) {
     const m = document.getElementById(id);
     if (m) m.classList.remove('active');
     modalOpen = false;
-    // Password field reset
     if (id === 'setupModal') {
-        document.getElementById('setupPassword').value = '';
-        document.getElementById('setupPasswordConfirm').value = '';
-        document.getElementById('setupPassword').type = 'password';
-        document.getElementById('setupPasswordConfirm').type = 'password';
+        ['setupPassword', 'setupPasswordConfirm'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.value = ''; el.type = 'password'; }
+        });
         document.querySelectorAll('#setupModal .password-eye i').forEach(i => i.className = 'bi bi-eye');
         document.getElementById('setupError').classList.remove('show');
     }
     if (id === 'verifyModal') {
-        document.getElementById('verifyPassword').value = '';
-        document.getElementById('verifyPassword').type = 'password';
+        const el = document.getElementById('verifyPassword');
+        if (el) { el.value = ''; el.type = 'password'; }
         document.querySelectorAll('#verifyModal .password-eye i').forEach(i => i.className = 'bi bi-eye');
         document.getElementById('verifyError').classList.remove('show');
+    }
+    if (id === 'forgotModal') {
+        ['forgotAccountPassword', 'forgotNewPassword', 'forgotNewPasswordConfirm'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.value = ''; el.type = 'password'; }
+        });
+        document.querySelectorAll('#forgotModal .password-eye i').forEach(i => i.className = 'bi bi-eye');
+        document.getElementById('forgotError1').classList.remove('show');
+        document.getElementById('forgotError2').classList.remove('show');
+        document.getElementById('forgotStep1').classList.add('active');
+        document.getElementById('forgotStep2').classList.remove('active');
     }
 }
 
@@ -364,7 +359,6 @@ async function handlePasswordSetup() {
     const confirm = document.getElementById('setupPasswordConfirm').value;
     const errorEl = document.getElementById('setupError');
     const btn = document.getElementById('setupBtn');
-
     errorEl.classList.remove('show');
 
     if (!pwd || pwd.length < 6) {
@@ -386,10 +380,9 @@ async function handlePasswordSetup() {
         showToast('✅ Password set! अब फिर Send दबाओ।', 'success');
         closeModal('setupModal');
         pendingTransfer = null;
-        // अब user दोबारा Send दबाएगा → verify modal खुलेगा
     } catch (err) {
         console.error('Save error:', err);
-        errorEl.textContent = 'Password save नहीं हुआ। दोबारा try करें।';
+        errorEl.textContent = 'Password save नहीं हुआ।';
         errorEl.classList.add('show');
     } finally {
         btn.disabled = false;
@@ -401,9 +394,7 @@ async function handlePasswordSetup() {
 // Password Verify
 // ============================================================
 function openPasswordVerify(details) {
-    // 🔑 pendingTransfer यहाँ set होता है — modal खुलने से पहले
     pendingTransfer = details;
-
     const detailsEl = document.getElementById('verifyDetails');
     detailsEl.innerHTML = `
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
@@ -419,7 +410,6 @@ function openPasswordVerify(details) {
             <strong>${details.walletLabel}</strong>
         </div>
     `;
-
     openModal('verifyModal');
     setTimeout(() => document.getElementById('verifyPassword').focus(), 200);
 }
@@ -428,7 +418,6 @@ async function handlePasswordVerify() {
     const password = document.getElementById('verifyPassword').value;
     const errorEl = document.getElementById('verifyError');
     const btn = document.getElementById('verifyBtn');
-
     errorEl.classList.remove('show');
 
     if (!password) {
@@ -436,8 +425,6 @@ async function handlePasswordVerify() {
         errorEl.classList.add('show');
         return;
     }
-
-    // 🔑 pendingTransfer होना चाहिए
     if (!pendingTransfer) {
         errorEl.textContent = 'Transfer details missing. दोबारा Send दबाओ।';
         errorEl.classList.add('show');
@@ -449,7 +436,6 @@ async function handlePasswordVerify() {
 
     try {
         const isValid = await verifyTransferPassword(currentUserId, password);
-
         if (!isValid) {
             errorEl.textContent = '❌ Password गलत है';
             errorEl.classList.add('show');
@@ -458,19 +444,17 @@ async function handlePasswordVerify() {
             return;
         }
 
-        // ✅ Password सही
         const details = pendingTransfer;
         closeModal('verifyModal');
 
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify & Send';
 
-        // 🚀 अब transfer चलाओ
         await executeTransfer(details);
 
     } catch (err) {
         console.error('Verify error:', err);
-        errorEl.textContent = 'Error आया। दोबारा try करें।';
+        errorEl.textContent = 'Error आया।';
         errorEl.classList.add('show');
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify & Send';
@@ -484,9 +468,7 @@ async function executeTransfer(details) {
     const user = auth.currentUser;
     if (!user) return;
 
-    // 🔒 Lock दोबारा (modal के दौरान unlock हो गया था)
     transferLock = true;
-
     const btn = document.getElementById('sendBtn');
     if (btn) {
         btn.disabled = true;
@@ -496,14 +478,9 @@ async function executeTransfer(details) {
 
     try {
         const result = await atomicTransfer(
-            user.uid,
-            details.recipient.uid,
-            details.amount,
-            details.walletType,
-            details.currency,
-            details.requestId,
-            details.senderName,
-            details.recipientName
+            user.uid, details.recipient.uid, details.amount,
+            details.walletType, details.currency, details.requestId,
+            details.senderName, details.recipientName
         );
 
         if (result.status === 'success') {
@@ -512,13 +489,11 @@ async function executeTransfer(details) {
             } else {
                 showToast(`✅ ${details.amount} ${details.currency} sent to ${details.recipientName}!`, 'success');
             }
-
             document.getElementById('recipientInput').value = '';
             document.getElementById('amountInput').value = '';
             clearActiveRequestId();
             setTimeout(() => loadUserData(user.uid), 500);
             resetButton();
-
         } else if (result.status === 'unknown') {
             showToast('⚠️ Status could not be confirmed. Please wait...', 'error');
             if (btn) {
@@ -527,13 +502,11 @@ async function executeTransfer(details) {
             }
             startReconciliationLoop(details.requestId, user.uid);
             return;
-
         } else {
             showToast('❌ ' + (result.error || 'Transfer failed'), 'error');
             clearActiveRequestId();
             resetButton();
         }
-
     } catch (err) {
         console.error('Execute error:', err);
         showToast('❌ Unexpected error.', 'error');
@@ -553,15 +526,105 @@ function resetButton() {
 }
 
 // ============================================================
+// 🆕 FORGOT PASSWORD — Step 1: Verify account password
+// ============================================================
+async function handleForgotVerify() {
+    const password = document.getElementById('forgotAccountPassword').value;
+    const errorEl = document.getElementById('forgotError1');
+    const btn = document.getElementById('forgotVerifyBtn');
+    errorEl.classList.remove('show');
+
+    if (!password) {
+        errorEl.textContent = 'Account password डालें';
+        errorEl.classList.add('show');
+        return;
+    }
+
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+        errorEl.textContent = 'User email नहीं मिला। Support से संपर्क करें।';
+        errorEl.classList.add('show');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner me-2"></span>Verifying...';
+
+    try {
+        // 🔑 Firebase से verify करो — असली तरीका
+        const credential = EmailAuthProvider.credential(user.email, password);
+        await reauthenticateWithCredential(user, credential);
+
+        // ✅ Password सही — step 2 दिखाओ
+        document.getElementById('forgotStep1').classList.remove('active');
+        document.getElementById('forgotStep2').classList.add('active');
+        document.getElementById('forgotAccountPassword').value = '';
+        setTimeout(() => document.getElementById('forgotNewPassword').focus(), 200);
+
+    } catch (err) {
+        console.error('Forgot verify error:', err);
+        let msg = '❌ Account password गलत है';
+        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+            msg = '❌ Account password गलत है';
+        } else if (err.code === 'auth/too-many-requests') {
+            msg = 'बहुत बार try किया। थोड़ी देर बाद try करें।';
+        } else if (err.code === 'auth/network-request-failed') {
+            msg = 'Network error। Internet check करें।';
+        }
+        errorEl.textContent = msg;
+        errorEl.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify';
+    }
+}
+
+// ============================================================
+// 🆕 FORGOT PASSWORD — Step 2: Set new password
+// ============================================================
+async function handleForgotReset() {
+    const pwd = document.getElementById('forgotNewPassword').value;
+    const confirm = document.getElementById('forgotNewPasswordConfirm').value;
+    const errorEl = document.getElementById('forgotError2');
+    const btn = document.getElementById('forgotResetBtn');
+    errorEl.classList.remove('show');
+
+    if (!pwd || pwd.length < 6) {
+        errorEl.textContent = 'Password कम से कम 6 characters का हो';
+        errorEl.classList.add('show');
+        return;
+    }
+    if (pwd !== confirm) {
+        errorEl.textContent = 'दोनों passwords match नहीं कर रहे';
+        errorEl.classList.add('show');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner me-2"></span>Saving...';
+
+    try {
+        await saveTransferPassword(currentUserId, pwd);
+        showToast('✅ Transfer password reset successfully!', 'success');
+        closeModal('forgotModal');
+        pendingTransfer = null;
+        // 🔑 User को फिर Send दबाना पड़ेगा
+    } catch (err) {
+        console.error('Reset error:', err);
+        errorEl.textContent = 'Password save नहीं हुआ।';
+        errorEl.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Set New Password';
+    }
+}
+
+// ============================================================
 // Form Submit
 // ============================================================
 async function handleTransferSubmit(e) {
     e.preventDefault();
-
-    // 🔒 Modal खुला है? तो कुछ मत करो
     if (modalOpen) return;
-
-    // 🔒 Lock है? रोक दो
     if (transferLock) {
         showToast('⏳ Transfer in progress...', 'error');
         return;
@@ -579,51 +642,27 @@ async function handleTransferSubmit(e) {
         const walletType = document.getElementById('walletSelect').value;
         const amountRaw = document.getElementById('amountInput').value;
 
-        if (!recipientInput) {
-            showToast('❌ Enter recipient', 'error');
-            resetButton();
-            return;
-        }
+        if (!recipientInput) { showToast('❌ Enter recipient', 'error'); resetButton(); return; }
         const amount = parseFloat(amountRaw);
         if (!isFinite(amount) || Number.isNaN(amount) || amount <= 0) {
-            showToast('❌ Valid amount डालें', 'error');
-            resetButton();
-            return;
+            showToast('❌ Valid amount डालें', 'error'); resetButton(); return;
         }
         const amountCheck = validateAmount(amount, walletType);
-        if (!amountCheck.valid) {
-            showToast('❌ ' + amountCheck.error, 'error');
-            resetButton();
-            return;
-        }
+        if (!amountCheck.valid) { showToast('❌ ' + amountCheck.error, 'error'); resetButton(); return; }
 
         const user = auth.currentUser;
-        if (!user) {
-            showToast('❌ Please login', 'error');
-            resetButton();
-            return;
-        }
+        if (!user) { showToast('❌ Please login', 'error'); resetButton(); return; }
 
         const currentBalance = currentBalances[walletType] || 0;
         if (currentBalance < amountCheck.value) {
             showToast(`❌ Insufficient balance. Available: ${currentBalance} ${WALLET_CURRENCY[walletType]}`, 'error');
-            resetButton();
-            return;
+            resetButton(); return;
         }
 
         const recipient = await getUserByIdentifier(recipientInput);
-        if (!recipient) {
-            showToast('❌ User not found!', 'error');
-            resetButton();
-            return;
-        }
-        if (recipient.uid === user.uid) {
-            showToast('❌ Cannot send to yourself!', 'error');
-            resetButton();
-            return;
-        }
+        if (!recipient) { showToast('❌ User not found!', 'error'); resetButton(); return; }
+        if (recipient.uid === user.uid) { showToast('❌ Cannot send to yourself!', 'error'); resetButton(); return; }
 
-        // Pending check
         const existingRequestId = localStorage.getItem('activeTransferRequestId');
         if (existingRequestId) {
             const pendingSnap = await get(ref(db, `transferRequests/${existingRequestId}`));
@@ -633,40 +672,31 @@ async function handleTransferSubmit(e) {
                     showToast('✅ Previous transfer completed. Refreshing...', 'success');
                     clearActiveRequestId();
                     setTimeout(() => loadUserData(user.uid), 500);
-                    resetButton();
-                    return;
+                    resetButton(); return;
                 } else if (pData.status === 'unknown') {
                     showToast('⚠️ Previous transfer still verifying. Wait.', 'error');
-                    resetButton();
-                    return;
+                    resetButton(); return;
                 } else if (pData.status === 'failed') {
                     clearActiveRequestId();
                 }
             } else {
-                // Record नहीं मिला — clear करके आगे बढ़ो
                 clearActiveRequestId();
             }
         }
 
         const requestId = getOrCreateRequestId();
-
         const senderName = getUserDisplayName(currentUserData, user.uid);
         const recipientName = getUserDisplayName(recipient.data, recipient.uid);
 
         const details = {
-            recipient,
-            recipientName,
-            senderName,
-            amount: amountCheck.value,
-            walletType,
-            requestId,
+            recipient, recipientName, senderName,
+            amount: amountCheck.value, walletType, requestId,
             currency: WALLET_CURRENCY[walletType],
             walletLabel: getWalletLabel(walletType)
         };
 
         const hasPwd = await hasTransferPassword(user.uid);
 
-        // 🔑 Unlock before opening modal
         transferLock = false;
         if (btn) {
             btn.disabled = false;
@@ -677,7 +707,6 @@ async function handleTransferSubmit(e) {
             openPasswordSetup();
             return;
         }
-
         openPasswordVerify(details);
 
     } catch (err) {
@@ -700,7 +729,6 @@ function getWalletLabel(w) {
 function startReconciliationLoop(requestId, userId) {
     let attempts = 0;
     const maxAttempts = 30;
-
     const check = async () => {
         attempts++;
         try {
@@ -879,23 +907,43 @@ onAuthStateChanged(auth, async (user) => {
     await loadUserData(user.uid);
     setupBalanceListener(user.uid);
 
-    // Form submit
     const form = document.getElementById('transferForm');
     if (form) form.addEventListener('submit', handleTransferSubmit);
 
-    // Setup modal
+    // Setup
     document.getElementById('setupBtn').addEventListener('click', handlePasswordSetup);
     document.getElementById('setupPasswordConfirm').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handlePasswordSetup();
     });
 
-    // Verify modal
+    // Verify
     document.getElementById('verifyBtn').addEventListener('click', handlePasswordVerify);
     document.getElementById('verifyPassword').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handlePasswordVerify();
     });
     document.getElementById('verifyCancelBtn').addEventListener('click', () => {
         closeModal('verifyModal');
+        pendingTransfer = null;
+        resetButton();
+    });
+
+    // 🆕 Forgot Password
+    document.getElementById('forgotPasswordBtn').addEventListener('click', () => {
+        // Verify modal बंद करके forgot modal खोलो
+        closeModal('verifyModal');
+        openModal('forgotModal');
+        setTimeout(() => document.getElementById('forgotAccountPassword').focus(), 200);
+    });
+    document.getElementById('forgotVerifyBtn').addEventListener('click', handleForgotVerify);
+    document.getElementById('forgotAccountPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleForgotVerify();
+    });
+    document.getElementById('forgotResetBtn').addEventListener('click', handleForgotReset);
+    document.getElementById('forgotNewPasswordConfirm').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleForgotReset();
+    });
+    document.getElementById('forgotCancelBtn1').addEventListener('click', () => {
+        closeModal('forgotModal');
         pendingTransfer = null;
         resetButton();
     });

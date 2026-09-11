@@ -7,7 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     
-    <!-- ✅ यह नया है — Firebase SDK load करने के लिए import map -->
     <script type="importmap">
     {
       "imports": {
@@ -182,7 +181,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .recent-transfers {
             margin-top: 20px;
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
         }
         .transfer-item {
@@ -199,15 +198,173 @@
         .transfer-received { color: #2ecc71; }
         .transfer-amount { font-weight: 700; }
         .transfer-date { font-size: 0.7rem; color: #64748b; }
+        .transfer-name { color: #60a5fa; font-weight: 600; }
         
         .btn-send.sending { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
         .btn-send.verifying { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-        .btn-send.locked { background: linear-gradient(135deg, #64748b 0%, #475569 100%); }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 460px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: modalIn 0.3s ease;
+        }
+        @keyframes modalIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-icon {
+            text-align: center;
+            font-size: 3rem;
+            color: #2ecc71;
+            margin-bottom: 16px;
+        }
+        .modal-title {
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+        }
+        .modal-subtitle {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .modal-info {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .modal-info i { color: #60a5fa; }
+        .modal-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            margin-bottom: 12px;
+        }
+        .modal-input:focus {
+            outline: none;
+            border-color: #2ecc71;
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+        }
+        .modal-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: all 0.2s;
+        }
+        .modal-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(46, 204, 113, 0.3);
+        }
+        .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .modal-btn-cancel {
+            background: transparent;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            color: #94a3b8;
+            margin-top: 8px;
+        }
+        .modal-btn-cancel:hover:not(:disabled) {
+            background: rgba(148, 163, 184, 0.1);
+            box-shadow: none;
+            transform: none;
+        }
+        .modal-error {
+            color: #ef4444;
+            font-size: 0.85rem;
+            text-align: center;
+            margin-top: 12px;
+            display: none;
+        }
+        .modal-error.show { display: block; }
     </style>
 </head>
 <body>
 
 <div class="toast-container" id="toastContainer"></div>
+
+<!-- ============================================================ -->
+<!-- Modal 1: Password Setup (पहली बार) -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="setupModal">
+    <div class="modal-box">
+        <div class="modal-icon"><i class="bi bi-shield-lock"></i></div>
+        <div class="modal-title">Set Transfer Password</div>
+        <div class="modal-subtitle">
+            पहली बार Transfer करने से पहले एक password सेट करें।
+            यह password हर Transfer पर पूछा जाएगा।
+        </div>
+        <div class="modal-info">
+            <i class="bi bi-info-circle me-1"></i>
+            Password को hash करके safe तरीके से save किया जाएगा। 
+            इसे भूलें नहीं — बाद में बदलने के लिए support से संपर्क करें।
+        </div>
+        <input type="password" id="setupPassword" class="modal-input" placeholder="Password (min 6 characters)" autocomplete="new-password">
+        <input type="password" id="setupPasswordConfirm" class="modal-input" placeholder="Confirm Password" autocomplete="new-password">
+        <button class="modal-btn" id="setupBtn">
+            <i class="bi bi-check-circle me-2"></i>Set Password
+        </button>
+        <div class="modal-error" id="setupError"></div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Modal 2: Password Verification (हर transfer पर) -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="verifyModal">
+    <div class="modal-box">
+        <div class="modal-icon"><i class="bi bi-lock-fill"></i></div>
+        <div class="modal-title">Enter Transfer Password</div>
+        <div class="modal-subtitle" id="verifySubtitle">
+            Transfer confirm करने के लिए अपना password डालें।
+        </div>
+        <div class="modal-info" id="verifyDetails"></div>
+        <input type="password" id="verifyPassword" class="modal-input" placeholder="Password" autocomplete="current-password">
+        <button class="modal-btn" id="verifyBtn">
+            <i class="bi bi-shield-check me-2"></i>Verify & Send
+        </button>
+        <button class="modal-btn modal-btn-cancel" id="verifyCancelBtn">
+            Cancel
+        </button>
+        <div class="modal-error" id="verifyError"></div>
+    </div>
+</div>
 
 <div class="container-custom">
     <a href="dashboard.html" class="back-btn">
@@ -244,14 +401,8 @@
                 <label class="form-label-custom">
                     Recipient (User ID / Username / Referral Code)
                 </label>
-                <input 
-                    type="text" 
-                    id="recipientInput" 
-                    class="form-control-custom" 
-                    placeholder="जैसे: john123 या ABC123XY या UID"
-                    required
-                    autocomplete="off"
-                >
+                <input type="text" id="recipientInput" class="form-control-custom" 
+                       placeholder="जैसे: john123 या ABC123XY या UID" required autocomplete="off">
             </div>
 
             <div style="margin-bottom: 20px;">
@@ -265,24 +416,14 @@
 
             <div style="margin-bottom: 20px;">
                 <label class="form-label-custom">Amount</label>
-                <input 
-                    type="number" 
-                    id="amountInput" 
-                    class="form-control-custom" 
-                    placeholder="0.00"
-                    min="0.01"
-                    step="0.01"
-                    required
-                >
+                <input type="number" id="amountInput" class="form-control-custom" 
+                       placeholder="0.00" min="0.01" step="0.01" required>
                 <div style="margin-top: 8px; display: flex; justify-content: space-between; font-size: 0.8rem;">
                     <span style="color: #64748b;">
                         Available: <strong id="availableText" style="color: #2ecc71;">0</strong>
                     </span>
-                    <button 
-                        type="button" 
-                        onclick="setMaxAmount()"
-                        style="background: none; border: none; color: #60a5fa; cursor: pointer; font-size: 0.8rem; text-decoration: underline;"
-                    >
+                    <button type="button" onclick="setMaxAmount()"
+                        style="background: none; border: none; color: #60a5fa; cursor: pointer; font-size: 0.8rem; text-decoration: underline;">
                         Send Max
                     </button>
                 </div>
@@ -295,8 +436,8 @@
 
         <div class="info-box">
             <i class="bi bi-shield-check"></i>
-            <strong>सुरक्षा सूचना:</strong> अगर network slow है या response देर से आ रहा है, तो 
-            <strong>दोबारा Send न दबाएँ</strong>। हम आपके transfer की स्थिति खुद जाँच लेंगे।
+            <strong>सुरक्षा सूचना:</strong> हर transfer पर password पूछा जाएगा।
+            अगर network slow है, तो <strong>दोबारा Send न दबाएँ</strong>।
         </div>
 
         <div style="margin-top: 24px;">

@@ -17,7 +17,7 @@
       }
     }
     </script>
-    
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -25,48 +25,299 @@
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             color: #e2e8f0;
             min-height: 100vh;
+        }
+        .page-wrapper {
+            max-width: 1100px;
+            margin: 0 auto;
             padding: 20px;
         }
-        .container-custom { max-width: 900px; margin: 0 auto; }
-        .header-card {
+
+        /* ============================================
+           TOP BAR with 3-dot menu
+           ============================================ */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .page-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #2ecc71;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .menu-toggle-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: #2ecc71;
+            font-size: 1.3rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .menu-toggle-btn:hover {
+            background: rgba(46, 204, 113, 0.15);
+            border-color: #2ecc71;
+        }
+
+        /* ============================================
+           SIDEBAR
+           ============================================ */
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .sidebar-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .sidebar-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 280px;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border-right: 1px solid rgba(148, 163, 184, 0.15);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar-panel.open {
+            transform: translateX(0);
+        }
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sidebar-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        .sidebar-user-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .sidebar-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #e2e8f0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar-uid {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+        .sidebar-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(148, 163, 184, 0.1);
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .sidebar-close:hover {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+        }
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            color: #cbd5e1;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+        .sidebar-link:hover {
+            background: rgba(46, 204, 113, 0.1);
+            color: #2ecc71;
+        }
+        .sidebar-link.active {
+            background: linear-gradient(135deg, rgba(46, 204, 113, 0.2) 0%, rgba(46, 204, 113, 0.1) 100%);
+            color: #2ecc71;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+        .sidebar-link i {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+        }
+        .sidebar-divider {
+            height: 1px;
+            background: rgba(148, 163, 184, 0.1);
+            margin: 12px 16px;
+        }
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        .sidebar-logout {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            color: #ef4444;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .sidebar-logout:hover {
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        /* ============================================
+           WALLET CARDS (dashboard style)
+           ============================================ */
+        .wallet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .wallet-card-new {
             background: rgba(30, 41, 59, 0.6);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(148, 163, 184, 0.1);
+            border: 1px solid rgba(148, 163, 184, 0.15);
             border-radius: 16px;
-            padding: 24px; margin-bottom: 24px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
         }
-        .header-title {
-            font-size: 1.5rem; font-weight: 700;
-            color: #2ecc71; margin-bottom: 8px;
+        .wallet-card-new:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
         }
-        .header-subtitle { color: #94a3b8; font-size: 0.9rem; }
-        .back-btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            color: #2ecc71; text-decoration: none; font-size: 0.9rem;
-            margin-bottom: 12px; transition: all 0.2s;
+        .wallet-card-new::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            opacity: 0.8;
         }
-        .back-btn:hover { color: #27ae60; transform: translateX(-4px); }
-        .wallet-balance-box {
-            background: rgba(46, 204, 113, 0.08);
-            border: 1px solid rgba(46, 204, 113, 0.2);
-            border-radius: 12px; padding: 16px; margin-bottom: 20px;
+        .wallet-card-new.deposit::before { background: linear-gradient(90deg, #2ecc71, #27ae60); }
+        .wallet-card-new.referral::before { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .wallet-card-new.rnd::before { background: linear-gradient(90deg, #60a5fa, #3b82f6); }
+        
+        .wallet-icon-new {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            margin-bottom: 14px;
         }
-        .wallet-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        .wallet-icon-new.deposit {
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
         }
-        .wallet-row:last-child { border-bottom: none; }
-        .wallet-label { color: #94a3b8; font-size: 0.9rem; }
-        .wallet-value { font-weight: 700; font-size: 1rem; color: #2ecc71; }
+        .wallet-icon-new.referral {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+        }
+        .wallet-icon-new.rnd {
+            background: rgba(96, 165, 250, 0.15);
+            color: #60a5fa;
+        }
+        .wallet-amount {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+        .wallet-amount.deposit { color: #2ecc71; }
+        .wallet-amount.referral { color: #fbbf24; }
+        .wallet-amount.rnd { color: #60a5fa; }
+        
+        .wallet-label-new {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            font-weight: 600;
+        }
+        .wallet-sub-new {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        /* ============================================
+           FORM CARD
+           ============================================ */
         .form-card {
             background: rgba(30, 41, 59, 0.6);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(148, 163, 184, 0.1);
-            border-radius: 16px; padding: 28px;
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+        .card-title-new {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .form-label-custom {
             display: block; margin-bottom: 8px; color: #94a3b8;
-            font-size: 0.85rem; font-weight: 600;
+            font-size: 0.8rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.5px;
         }
         .form-control-custom {
@@ -83,6 +334,7 @@
         .form-control-custom::placeholder { color: #64748b; }
         select.form-control-custom { cursor: pointer; }
         select.form-control-custom option { background: #1e293b; color: #e2e8f0; }
+        
         .btn-send {
             width: 100%; padding: 16px;
             background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
@@ -94,9 +346,10 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(46, 204, 113, 0.3);
         }
-        .btn-send:disabled {
-            opacity: 0.5; cursor: not-allowed; transform: none;
-        }
+        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-send.sending { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .btn-send.verifying { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+
         .info-box {
             background: rgba(59, 130, 246, 0.08);
             border: 1px solid rgba(59, 130, 246, 0.2);
@@ -105,8 +358,34 @@
             color: #94a3b8; line-height: 1.6;
         }
         .info-box i { color: #60a5fa; margin-right: 6px; }
+
+        /* ============================================
+           RECENT TRANSFERS
+           ============================================ */
+        .recent-transfers { margin-top: 20px; max-height: 400px; overflow-y: auto; }
+        .transfer-item {
+            background: rgba(15, 23, 42, 0.5); border-radius: 10px;
+            padding: 14px; margin-bottom: 8px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.85rem;
+            border: 1px solid rgba(148, 163, 184, 0.08);
+            transition: all 0.2s;
+        }
+        .transfer-item:hover {
+            border-color: rgba(46, 204, 113, 0.2);
+            background: rgba(15, 23, 42, 0.7);
+        }
+        .transfer-sent { color: #ef4444; }
+        .transfer-received { color: #2ecc71; }
+        .transfer-amount { font-weight: 700; font-size: 0.95rem; }
+        .transfer-date { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
+        .transfer-name { color: #60a5fa; font-weight: 600; }
+
+        /* ============================================
+           TOAST
+           ============================================ */
         .toast-container {
-            position: fixed; top: 20px; right: 20px; z-index: 9999;
+            position: fixed; top: 20px; right: 20px; z-index: 10001;
             display: flex; flex-direction: column; gap: 10px;
         }
         .toast-custom {
@@ -133,25 +412,12 @@
             animation: spin 0.6s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .recent-transfers { margin-top: 20px; max-height: 400px; overflow-y: auto; }
-        .transfer-item {
-            background: rgba(15, 23, 42, 0.4); border-radius: 8px;
-            padding: 12px; margin-bottom: 8px;
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 0.85rem;
-        }
-        .transfer-sent { color: #ef4444; }
-        .transfer-received { color: #2ecc71; }
-        .transfer-amount { font-weight: 700; }
-        .transfer-date { font-size: 0.7rem; color: #64748b; }
-        .transfer-name { color: #60a5fa; font-weight: 600; }
-        
-        .btn-send.sending { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-        .btn-send.verifying { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
 
-        /* Modal */
+        /* ============================================
+           MODALS (same as before)
+           ============================================ */
         .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            position: fixed; inset: 0;
             background: rgba(0, 0, 0, 0.75);
             backdrop-filter: blur(8px);
             display: none; align-items: center; justify-content: center;
@@ -196,7 +462,6 @@
             border-color: rgba(245, 158, 11, 0.2);
         }
         .modal-info.warn i { color: #f59e0b; }
-
         .password-wrapper { position: relative; margin-bottom: 12px; }
         .password-wrapper .modal-input { margin-bottom: 0; padding-right: 50px; }
         .password-eye {
@@ -204,10 +469,8 @@
             transform: translateY(-50%);
             background: none; border: none; color: #94a3b8;
             cursor: pointer; font-size: 1.1rem; padding: 4px 8px;
-            transition: color 0.2s;
         }
         .password-eye:hover { color: #2ecc71; }
-
         .modal-input {
             width: 100%; padding: 14px 16px;
             background: rgba(15, 23, 42, 0.8);
@@ -234,7 +497,7 @@
         .modal-btn-cancel {
             background: transparent;
             border: 1px solid rgba(148, 163, 184, 0.3);
-            color: #94a3b8; margin-top: 8px;
+            color: #94a3b8;
         }
         .modal-btn-cancel:hover:not(:disabled) {
             background: rgba(148, 163, 184, 0.1);
@@ -246,174 +509,135 @@
         }
         .modal-error.show { display: block; }
         .forgot-link {
-            display: block;
-            text-align: center;
-            margin-top: 16px;
-            color: #60a5fa;
-            font-size: 0.85rem;
-            text-decoration: none;
-            cursor: pointer;
-            background: none;
-            border: none;
-            width: 100%;
-            padding: 8px;
+            display: block; text-align: center; margin-top: 16px;
+            color: #60a5fa; font-size: 0.85rem; text-decoration: none;
+            cursor: pointer; background: none; border: none; width: 100%; padding: 8px;
         }
         .forgot-link:hover { color: #3b82f6; text-decoration: underline; }
         .modal-step { display: none; }
         .modal-step.active { display: block; }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            .page-wrapper { padding: 12px; }
+            .form-card { padding: 20px; }
+            .wallet-grid { grid-template-columns: 1fr; gap: 12px; }
+            .wallet-amount { font-size: 1.3rem; }
+        }
     </style>
 </head>
 <body>
 
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- Setup Modal -->
-<div class="modal-overlay" id="setupModal">
-    <div class="modal-box">
-        <div class="modal-icon"><i class="bi bi-shield-lock"></i></div>
-        <div class="modal-title">Set Transfer Password</div>
-        <div class="modal-subtitle">
-            पहली बार Transfer करने से पहले एक password सेट करें।
+<!-- ============================================ -->
+<!-- SIDEBAR -->
+<!-- ============================================ -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<aside class="sidebar-panel" id="sidebarPanel">
+    <div class="sidebar-header">
+        <div class="sidebar-avatar" id="sidebarAvatar">U</div>
+        <div class="sidebar-user-info">
+            <div class="sidebar-name" id="sidebarName">User</div>
+            <div class="sidebar-uid" id="sidebarUid">ID: ...</div>
         </div>
-        <div class="modal-info">
-            <i class="bi bi-info-circle me-1"></i>
-            Password को hash करके safe तरीके से save किया जाएगा।
-        </div>
-        <div class="password-wrapper">
-            <input type="password" id="setupPassword" class="modal-input" placeholder="Password (min 6 characters)" autocomplete="new-password">
-            <button type="button" class="password-eye" onclick="togglePassword('setupPassword', this)">
-                <i class="bi bi-eye"></i>
-            </button>
-        </div>
-        <div class="password-wrapper">
-            <input type="password" id="setupPasswordConfirm" class="modal-input" placeholder="Confirm Password" autocomplete="new-password">
-            <button type="button" class="password-eye" onclick="togglePassword('setupPasswordConfirm', this)">
-                <i class="bi bi-eye"></i>
-            </button>
-        </div>
-        <button class="modal-btn" id="setupBtn">
-            <i class="bi bi-check-circle me-2"></i>Set Password
+        <button class="sidebar-close" id="sidebarCloseBtn">
+            <i class="bi bi-x-lg"></i>
         </button>
-        <div class="modal-error" id="setupError"></div>
     </div>
-</div>
 
-<!-- Verify Modal -->
-<div class="modal-overlay" id="verifyModal">
-    <div class="modal-box">
-        <div class="modal-icon"><i class="bi bi-lock-fill"></i></div>
-        <div class="modal-title">Enter Transfer Password</div>
-        <div class="modal-subtitle" id="verifySubtitle">
-            Transfer confirm करने के लिए अपना password डालें।
+    <nav class="sidebar-nav">
+        <a href="dashboard.html" class="sidebar-link">
+            <i class="bi bi-house-door"></i> Dashboard
+        </a>
+        <a href="transfer.html" class="sidebar-link active">
+            <i class="bi bi-arrow-left-right"></i> Transfer
+        </a>
+        <a href="deposit.html" class="sidebar-link">
+            <i class="bi bi-arrow-down-circle"></i> Deposit
+        </a>
+        <a href="withdrawal.html" class="sidebar-link">
+            <i class="bi bi-arrow-up-circle"></i> Withdraw
+        </a>
+        <a href="referrals.html" class="sidebar-link">
+            <i class="bi bi-people"></i> Referrals
+        </a>
+        <a href="buy-package.html" class="sidebar-link">
+            <i class="bi bi-box-seam"></i> Buy Package
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <a href="profile.html" class="sidebar-link">
+            <i class="bi bi-person"></i> Profile
+        </a>
+        <a href="history.html" class="sidebar-link">
+            <i class="bi bi-clock-history"></i> History
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <a href="#" class="sidebar-logout" id="sidebarLogout">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </div>
+</aside>
+
+<!-- ============================================ -->
+<!-- PAGE -->
+<!-- ============================================ -->
+<div class="page-wrapper">
+
+    <!-- Top bar with 3-dot menu -->
+    <div class="top-bar">
+        <div class="page-title">
+            <i class="bi bi-arrow-left-right"></i> Send Money
         </div>
-        <div class="modal-info" id="verifyDetails"></div>
-        <div class="password-wrapper">
-            <input type="password" id="verifyPassword" class="modal-input" placeholder="Password" autocomplete="current-password">
-            <button type="button" class="password-eye" onclick="togglePassword('verifyPassword', this)">
-                <i class="bi bi-eye"></i>
-            </button>
-        </div>
-        <button class="modal-btn" id="verifyBtn">
-            <i class="bi bi-shield-check me-2"></i>Verify & Send
+        <button class="menu-toggle-btn" id="menuToggleBtn" title="Menu">
+            <i class="bi bi-list"></i>
         </button>
-        <button class="modal-btn modal-btn-cancel" id="verifyCancelBtn">
-            Cancel
-        </button>
-        <button class="forgot-link" id="forgotPasswordBtn">
-            🔑 Forgot Password?
-        </button>
-        <div class="modal-error" id="verifyError"></div>
     </div>
-</div>
 
-<!-- ============================================================ -->
-<!-- Forgot Password Modal — 2 STEP -->
-<!-- ============================================================ -->
-<div class="modal-overlay" id="forgotModal">
-    <div class="modal-box">
-        <div class="modal-icon" style="color: #f59e0b;"><i class="bi bi-key"></i></div>
-        <div class="modal-title">Reset Transfer Password</div>
-
-        <!-- STEP 1: Firebase password verify -->
-        <div class="modal-step active" id="forgotStep1">
-            <div class="modal-subtitle">
-                पहले अपना <strong>account password</strong> डालें (जो login के लिए use करते हैं)।
-                यह confirm करेगा कि आप असली owner हैं।
+    <!-- ============================================ -->
+    <!-- WALLET CARDS (dashboard style) -->
+    <!-- ============================================ -->
+    <div class="wallet-grid">
+        <div class="wallet-card-new deposit">
+            <div class="wallet-icon-new deposit">
+                <i class="bi bi-wallet2"></i>
             </div>
-            <div class="modal-info warn">
-                <i class="bi bi-exclamation-triangle me-1"></i>
-                यह आपके <strong>login password</strong> है, transfer password नहीं।
-            </div>
-            <div class="password-wrapper">
-                <input type="password" id="forgotAccountPassword" class="modal-input" placeholder="Account password" autocomplete="current-password">
-                <button type="button" class="password-eye" onclick="togglePassword('forgotAccountPassword', this)">
-                    <i class="bi bi-eye"></i>
-                </button>
-            </div>
-            <button class="modal-btn" id="forgotVerifyBtn">
-                <i class="bi bi-shield-check me-2"></i>Verify
-            </button>
-            <button class="modal-btn modal-btn-cancel" id="forgotCancelBtn1">
-                Cancel
-            </button>
-            <div class="modal-error" id="forgotError1"></div>
+            <div class="wallet-amount deposit" id="balanceDeposit">$0.00</div>
+            <div class="wallet-label-new">Deposit Wallet</div>
+            <div class="wallet-sub-new">USDT Balance</div>
         </div>
 
-        <!-- STEP 2: New transfer password -->
-        <div class="modal-step" id="forgotStep2">
-            <div class="modal-subtitle">
-                ✅ Verified! अब नया transfer password सेट करें।
+        <div class="wallet-card-new referral">
+            <div class="wallet-icon-new referral">
+                <i class="bi bi-coin"></i>
             </div>
-            <div class="password-wrapper">
-                <input type="password" id="forgotNewPassword" class="modal-input" placeholder="New password (min 6 characters)" autocomplete="new-password">
-                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPassword', this)">
-                    <i class="bi bi-eye"></i>
-                </button>
-            </div>
-            <div class="password-wrapper">
-                <input type="password" id="forgotNewPasswordConfirm" class="modal-input" placeholder="Confirm new password" autocomplete="new-password">
-                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPasswordConfirm', this)">
-                    <i class="bi bi-eye"></i>
-                </button>
-            </div>
-            <button class="modal-btn" id="forgotResetBtn">
-                <i class="bi bi-check-circle me-2"></i>Set New Password
-            </button>
-            <div class="modal-error" id="forgotError2"></div>
+            <div class="wallet-amount referral" id="balanceReferral">$0.00</div>
+            <div class="wallet-label-new">💰 Referral Wallet</div>
+            <div class="wallet-sub-new">USDT Balance</div>
         </div>
-    </div>
-</div>
 
-<div class="container-custom">
-    <a href="dashboard.html" class="back-btn">
-        <i class="bi bi-arrow-left"></i> Back to Dashboard
-    </a>
-
-    <div class="header-card">
-        <div class="header-title">
-            <i class="bi bi-arrow-left-right me-2"></i>Send Money
-        </div>
-        <div class="header-subtitle">
-            अपने RND Staking वॉलेट से दूसरे यूज़र को पैसे भेजें
+        <div class="wallet-card-new rnd">
+            <div class="wallet-icon-new rnd">
+                <i class="bi bi-database"></i>
+            </div>
+            <div class="wallet-amount rnd" id="balanceRND">0.0000</div>
+            <div class="wallet-label-new">RND Wallet</div>
+            <div class="wallet-sub-new">RND Balance</div>
         </div>
     </div>
 
-    <div class="wallet-balance-box">
-        <div class="wallet-row">
-            <span class="wallet-label"><i class="bi bi-wallet2 me-1"></i> Deposit Wallet (USDT)</span>
-            <span class="wallet-value" id="balanceDeposit">$0.00</span>
-        </div>
-        <div class="wallet-row">
-            <span class="wallet-label"><i class="bi bi-coin me-1"></i> Referral Wallet (USDT)</span>
-            <span class="wallet-value" id="balanceReferral">$0.00</span>
-        </div>
-        <div class="wallet-row">
-            <span class="wallet-label"><i class="bi bi-database me-1"></i> RND Wallet (RND)</span>
-            <span class="wallet-value" id="balanceRND">0.0000</span>
-        </div>
-    </div>
-
+    <!-- ============================================ -->
+    <!-- FORM CARD -->
+    <!-- ============================================ -->
     <div class="form-card">
+        <div class="card-title-new">
+            <i class="bi bi-send" style="color: #2ecc71;"></i> Transfer Details
+        </div>
+
         <form id="transferForm">
             <div style="margin-bottom: 20px;">
                 <label class="form-label-custom">
@@ -456,21 +680,226 @@
             <i class="bi bi-shield-check"></i>
             <strong>सुरक्षा सूचना:</strong> हर transfer पर password पूछा जाएगा।
         </div>
+    </div>
 
-        <div style="margin-top: 24px;">
-            <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 10px; font-weight: 600;">
-                <i class="bi bi-clock-history me-1"></i> Recent Transfers
+    <!-- ============================================ -->
+    <!-- RECENT TRANSFERS -->
+    <!-- ============================================ -->
+    <div class="form-card">
+        <div class="card-title-new">
+            <i class="bi bi-clock-history" style="color: #60a5fa;"></i> Recent Transfers
+        </div>
+        <div class="recent-transfers" id="recentTransfers">
+            <div style="text-align: center; color: #64748b; padding: 20px; font-size: 0.85rem;">
+                Loading...
             </div>
-            <div class="recent-transfers" id="recentTransfers">
-                <div style="text-align: center; color: #64748b; padding: 20px; font-size: 0.85rem;">
-                    Loading...
-                </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ============================================ -->
+<!-- MODALS (SAME AS BEFORE) -->
+<!-- ============================================ -->
+
+<div class="modal-overlay" id="setupModal">
+    <div class="modal-box">
+        <div class="modal-icon"><i class="bi bi-shield-lock"></i></div>
+        <div class="modal-title">Set Transfer Password</div>
+        <div class="modal-subtitle">
+            पहली बार Transfer करने से पहले एक password सेट करें।
+        </div>
+        <div class="modal-info">
+            <i class="bi bi-info-circle me-1"></i>
+            Password को hash करके safe तरीके से save किया जाएगा।
+        </div>
+        <div class="password-wrapper">
+            <input type="password" id="setupPassword" class="modal-input" placeholder="Password (min 6 characters)" autocomplete="new-password">
+            <button type="button" class="password-eye" onclick="togglePassword('setupPassword', this)">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>
+        <div class="password-wrapper">
+            <input type="password" id="setupPasswordConfirm" class="modal-input" placeholder="Confirm Password" autocomplete="new-password">
+            <button type="button" class="password-eye" onclick="togglePassword('setupPasswordConfirm', this)">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>
+        <button class="modal-btn" id="setupBtn">
+            <i class="bi bi-check-circle me-2"></i>Set Password
+        </button>
+        <div class="modal-error" id="setupError"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="verifyModal">
+    <div class="modal-box">
+        <div class="modal-icon"><i class="bi bi-lock-fill"></i></div>
+        <div class="modal-title">Enter Transfer Password</div>
+        <div class="modal-subtitle">Transfer confirm करने के लिए अपना password डालें।</div>
+        <div class="modal-info" id="verifyDetails"></div>
+        <div class="password-wrapper">
+            <input type="password" id="verifyPassword" class="modal-input" placeholder="Password" autocomplete="current-password">
+            <button type="button" class="password-eye" onclick="togglePassword('verifyPassword', this)">
+                <i class="bi bi-eye"></i>
+            </button>
+        </div>
+        <button class="modal-btn" id="verifyBtn">
+            <i class="bi bi-shield-check me-2"></i>Verify & Send
+        </button>
+        <button class="modal-btn modal-btn-cancel" id="verifyCancelBtn">
+            Cancel
+        </button>
+        <button class="forgot-link" id="forgotPasswordBtn">
+            🔑 Forgot Password?
+        </button>
+        <div class="modal-error" id="verifyError"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="forgotModal">
+    <div class="modal-box">
+        <div class="modal-icon" style="color: #f59e0b;"><i class="bi bi-key"></i></div>
+        <div class="modal-title">Reset Transfer Password</div>
+
+        <div class="modal-step active" id="forgotStep1">
+            <div class="modal-subtitle">
+                पहले अपना <strong>account password</strong> डालें (जो login के लिए use करते हैं)।
             </div>
+            <div class="modal-info warn">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                यह आपके <strong>login password</strong> है, transfer password नहीं।
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="forgotAccountPassword" class="modal-input" placeholder="Account password" autocomplete="current-password">
+                <button type="button" class="password-eye" onclick="togglePassword('forgotAccountPassword', this)">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+            <button class="modal-btn" id="forgotVerifyBtn">
+                <i class="bi bi-shield-check me-2"></i>Verify
+            </button>
+            <button class="modal-btn modal-btn-cancel" id="forgotCancelBtn1">
+                Cancel
+            </button>
+            <div class="modal-error" id="forgotError1"></div>
+        </div>
+
+        <div class="modal-step" id="forgotStep2">
+            <div class="modal-subtitle">
+                ✅ Verified! अब नया transfer password सेट करें।
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="forgotNewPassword" class="modal-input" placeholder="New password (min 6 characters)" autocomplete="new-password">
+                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPassword', this)">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="forgotNewPasswordConfirm" class="modal-input" placeholder="Confirm new password" autocomplete="new-password">
+                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPasswordConfirm', this)">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+            <button class="modal-btn" id="forgotResetBtn">
+                <i class="bi bi-check-circle me-2"></i>Set New Password
+            </button>
+            <div class="modal-error" id="forgotError2"></div>
         </div>
     </div>
 </div>
 
+<!-- ============================================ -->
+<!-- LOGIC FILE (unchanged) -->
+<!-- ============================================ -->
 <script type="module" src="transfer.js"></script>
+
+<!-- ============================================ -->
+<!-- SIDEBAR SCRIPT (small, separate) -->
+<!-- ============================================ -->
+<script>
+    // Sidebar open/close
+    const sidebarPanel = document.getElementById('sidebarPanel');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const menuToggleBtn = document.getElementById('menuToggleBtn');
+    const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+
+    function openSidebar() {
+        sidebarPanel.classList.add('open');
+        sidebarOverlay.classList.add('active');
+    }
+    function closeSidebar() {
+        sidebarPanel.classList.remove('open');
+        sidebarOverlay.classList.remove('active');
+    }
+
+    menuToggleBtn.addEventListener('click', openSidebar);
+    sidebarCloseBtn.addEventListener('click', closeSidebar);
+    sidebarOverlay.addEventListener('click', closeSidebar);
+
+    // Logout
+    document.getElementById('sidebarLogout').addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+            const { getAuth, signOut } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+            const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+            
+            // Get existing app if initialized
+            let app;
+            if (getApps().length > 0) {
+                app = getApps()[0];
+            } else {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+                    authDomain: "rwebsite-e031b.firebaseapp.com",
+                    databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+                    projectId: "rwebsite-e031b",
+                    storageBucket: "rwebsite-e031b.firebasestorage.app",
+                    messagingSenderId: "376966041558",
+                    appId: "1:376966041558:web:02bc9062ec182590275e77"
+                };
+                app = initializeApp(firebaseConfig);
+            }
+            const auth = getAuth(app);
+            await signOut(auth);
+            window.location.href = 'login.html';
+        } catch (err) {
+            console.error('Logout error:', err);
+            window.location.href = 'login.html';
+        }
+    });
+
+    // Fill sidebar user info (wait for transfer.js to set it, or fetch independently)
+    setTimeout(async () => {
+        try {
+            const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+            const { getDatabase, ref, get } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
+            const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+            
+            let app;
+            if (getApps().length > 0) {
+                app = getApps()[0];
+            } else {
+                return;
+            }
+            const auth = getAuth(app);
+            const user = auth.currentUser;
+            if (user) {
+                const db = getDatabase(app);
+                const snap = await get(ref(db, 'users/' + user.uid));
+                if (snap.exists()) {
+                    const u = snap.val();
+                    const name = u.name || u.username || u.referralCode || 'User';
+                    document.getElementById('sidebarName').textContent = name;
+                    document.getElementById('sidebarUid').textContent = 'ID: ' + (u.username || user.uid.substring(0, 12)) + '...';
+                    document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
+                }
+            }
+        } catch (err) {
+            console.warn('Sidebar fill error:', err);
+        }
+    }, 500);
+</script>
 
 </body>
 </html>

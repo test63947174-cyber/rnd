@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Transfer - RND Staking</title>
+    <title>Dashboard - RND Staking</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -168,26 +168,67 @@
         .user-profile-sidebar .user-id { color: #8899bb; font-size: 0.75rem; }
         
         /* ============================================================
-           PAGE CONTAINER
+           DASHBOARD CONTAINER
            ============================================================ */
-        .page-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        .dashboard-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
         
         /* ============================================================
-           PAGE HEADER
+           WELCOME SECTION
            ============================================================ */
-        .page-header {
+        .welcome-section {
             background: linear-gradient(135deg, rgba(46,204,113,0.08), rgba(26,122,58,0.05));
             border-radius: 20px;
             padding: 25px 30px;
             border: 1px solid rgba(46,204,113,0.1);
             margin-bottom: 25px;
         }
-        .page-header h1 { font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
-        .page-header h1 i { color: #2ecc71; margin-right: 10px; }
-        .page-header p { color: #8899bb; font-size: 0.9rem; margin: 0; }
+        .welcome-section h2 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .welcome-section h2 span { color: #2ecc71; }
+        .welcome-section .user-id-badge {
+            background: rgba(46,204,113,0.15);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 30px;
+            padding: 6px 18px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #2ecc71;
+            font-weight: 600;
+        }
+        .user-id-badge .copy-btn-small {
+            background: rgba(46,204,113,0.15);
+            border: 1px solid rgba(46,204,113,0.2);
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 0.6rem;
+            color: #2ecc71;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .user-id-badge .copy-btn-small:hover { background: rgba(46,204,113,0.25); }
         
         /* ============================================================
-           WALLET CARDS (dashboard style)
+           RANK BADGE
+           ============================================================ */
+        .rank-badge {
+            background: rgba(251,191,36,0.12);
+            border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 30px;
+            padding: 6px 18px;
+            display: inline-block;
+            font-size: 0.8rem;
+            color: #fbbf24;
+            font-weight: 600;
+        }
+        .rank-badge.member {
+            background: rgba(46,204,113,0.08);
+            border-color: rgba(46,204,113,0.15);
+            color: #8899bb;
+        }
+        
+        /* ============================================================
+           WALLET CARDS
            ============================================================ */
         .wallet-card {
             background: rgba(19,34,55,0.6);
@@ -211,13 +252,59 @@
         .wallet-card .wallet-icon.deposit { background: rgba(46,204,113,0.12); color: #2ecc71; }
         .wallet-card .wallet-icon.referral { background: rgba(251,191,36,0.12); color: #fbbf24; }
         .wallet-card .wallet-icon.rnd { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .wallet-card .wallet-icon.locked { background: rgba(139,92,246,0.12); color: #a78bfa; }
+        .wallet-card .wallet-icon.release { background: rgba(52,211,153,0.12); color: #34d399; }
         
         .wallet-card .wallet-number { font-size: 1.8rem; font-weight: 800; color: #fff; }
         .wallet-card .wallet-number.green { color: #2ecc71; }
         .wallet-card .wallet-number.gold { color: #fbbf24; }
         .wallet-card .wallet-number.blue { color: #60a5fa; }
+        .wallet-card .wallet-number.purple { color: #a78bfa; }
+        .wallet-card .wallet-number.teal { color: #34d399; }
         .wallet-card .wallet-label { color: #8899bb; font-size: 0.75rem; font-weight: 500; margin-top: 4px; }
         .wallet-card .wallet-sub { color: #556688; font-size: 0.65rem; margin-top: 2px; }
+        
+        /* ============================================================
+           NETWORK STATS
+           ============================================================ */
+        .network-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .network-stat-card {
+            background: rgba(19,34,55,0.6);
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 16px;
+            padding: 18px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .network-stat-card:hover { border-color: rgba(46,204,113,0.2); transform: translateY(-2px); }
+        .network-stat-card .number { font-size: 1.8rem; font-weight: 800; color: #2ecc71; }
+        .network-stat-card .label { color: #8899bb; font-size: 0.75rem; font-weight: 500; margin-top: 2px; }
+        
+        /* ============================================================
+           LEVEL STATS
+           ============================================================ */
+        .level-stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .level-stat-card {
+            background: rgba(19,34,55,0.6);
+            border: 1px solid rgba(46,204,113,0.08);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .level-stat-card:hover { border-color: rgba(46,204,113,0.2); }
+        .level-stat-card .number { font-size: 1.5rem; font-weight: 700; color: #2ecc71; }
+        .level-stat-card .label { color: #8899bb; font-size: 0.65rem; font-weight: 500; }
         
         /* ============================================================
            GLASS CARDS
@@ -230,75 +317,53 @@
             padding: 1.5rem;
             transition: all 0.3s ease;
         }
-        .card-glass:hover { border-color: rgba(46,204,113,0.3); }
+        .card-glass:hover { border-color: rgba(46,204,113,0.3); transform: translateY(-3px); }
         .card-glass .card-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 15px; }
         .card-glass .card-title i { color: #2ecc71; margin-right: 8px; }
         
         /* ============================================================
-           FORM CONTROLS
+           REFERRAL BOX
            ============================================================ */
-        .form-label-custom {
-            display: block;
-            margin-bottom: 8px;
-            color: #8899bb;
+        .referral-box {
+            background: rgba(8,14,26,0.6);
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            border: 1px dashed rgba(46,204,113,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .referral-box code { color: #a0b8d0; font-size: 0.8rem; word-break: break-all; flex: 1; }
+        .copy-btn {
+            cursor: pointer;
+            padding: 4px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(46,204,113,0.2);
+            background: transparent;
+            color: #a0b8d0;
+            transition: all 0.3s ease;
             font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
-        .form-control-custom {
-            background: rgba(8,14,26,0.8) !important;
-            border: 1px solid rgba(46,204,113,0.15) !important;
-            color: #f0f4ff !important;
-            padding: 12px 16px !important;
-            border-radius: 12px !important;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-            width: 100%;
-        }
-        .form-control-custom:focus {
-            border-color: #2ecc71 !important;
-            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
-            outline: none;
-        }
-        .form-control-custom::placeholder { color: #556688 !important; }
-        .form-select-custom {
-            background: rgba(8,14,26,0.8) !important;
-            border: 1px solid rgba(46,204,113,0.15) !important;
-            color: #f0f4ff !important;
-            padding: 12px 16px !important;
-            border-radius: 12px !important;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-            width: 100%;
-        }
-        .form-select-custom:focus {
-            border-color: #2ecc71 !important;
-            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
-            outline: none;
-        }
-        .form-select-custom option { background: #080e1a; color: #f0f4ff; }
+        .copy-btn:hover { background: rgba(46,204,113,0.1); color: #2ecc71; }
         
         /* ============================================================
            BUTTONS
            ============================================================ */
-        .btn-send {
-            width: 100%;
+        .btn-primary-custom {
             background: linear-gradient(135deg, #2ecc71, #27ae60);
             border: none;
             color: #fff;
-            font-weight: 700;
-            padding: 14px 24px;
+            font-weight: 600;
+            padding: 10px 24px;
             border-radius: 12px;
             transition: all 0.3s ease;
-            font-size: 1rem;
-            cursor: pointer;
-            margin-top: 10px;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.9rem;
         }
-        .btn-send:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); }
-        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .btn-send.sending { background: linear-gradient(135deg, #f59e0b, #d97706); }
-        .btn-send.verifying { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
         
         .btn-outline-custom {
             border: 2px solid rgba(46,204,113,0.3);
@@ -315,24 +380,41 @@
         .btn-outline-custom:hover { border-color: #2ecc71; color: #2ecc71; }
         
         /* ============================================================
-           INFO BOX
+           FORM CONTROLS
            ============================================================ */
-        .info-box {
-            background: rgba(59,130,246,0.08);
-            border: 1px solid rgba(59,130,246,0.2);
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin-top: 20px;
-            font-size: 0.85rem;
-            color: #8899bb;
-            line-height: 1.6;
+        .form-control-custom {
+            background: rgba(8,14,26,0.8) !important;
+            border: 1px solid rgba(46,204,113,0.15) !important;
+            color: #f0f4ff !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
         }
-        .info-box i { color: #60a5fa; margin-right: 6px; }
+        .form-control-custom:focus {
+            border-color: #2ecc71 !important;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
+        }
+        .form-control-custom::placeholder { color: #556688 !important; }
+        .form-select-custom {
+            background: rgba(8,14,26,0.8) !important;
+            border: 1px solid rgba(46,204,113,0.15) !important;
+            color: #f0f4ff !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .form-select-custom:focus {
+            border-color: #2ecc71 !important;
+            box-shadow: 0 0 0 3px rgba(46,204,113,0.15) !important;
+        }
+        .form-select-custom option { background: #080e1a; color: #f0f4ff; }
         
         /* ============================================================
            TRANSFER HISTORY
            ============================================================ */
-        .transfer-history { margin-top: 15px; max-height: 400px; overflow-y: auto; }
+        .transfer-history { margin-top: 15px; max-height: 200px; overflow-y: auto; }
         .transfer-history::-webkit-scrollbar { width: 4px; }
         .transfer-history::-webkit-scrollbar-track { background: rgba(46,204,113,0.05); border-radius: 10px; }
         .transfer-history::-webkit-scrollbar-thumb { background: rgba(46,204,113,0.3); border-radius: 10px; }
@@ -340,7 +422,7 @@
         .transfer-item {
             background: rgba(8,14,26,0.4);
             border-radius: 10px;
-            padding: 12px 14px;
+            padding: 10px 14px;
             border: 1px solid rgba(46,204,113,0.06);
             margin-bottom: 6px;
             display: flex;
@@ -353,11 +435,11 @@
         .transfer-item .sent { color: #f87171; }
         .transfer-item .received { color: #34d399; }
         .transfer-item .amount { font-weight: 700; }
-        .transfer-item .date { color: #556688; font-size: 0.65rem; margin-top: 2px; }
+        .transfer-item .date { color: #556688; font-size: 0.65rem; }
         .transfer-item .user { color: #a78bfa; font-weight: 500; }
         
         /* ============================================================
-           TOAST
+           TOAST NOTIFICATIONS
            ============================================================ */
         .toast-container {
             position: fixed;
@@ -387,169 +469,134 @@
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         
         /* ============================================================
-           SPINNER
+           RND PRICE BADGE
            ============================================================ */
-        .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        /* ============================================================
-           MODALS
-           ============================================================ */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(8px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            padding: 20px;
-        }
-        .modal-overlay.active { display: flex; }
-        .modal-box {
-            background: linear-gradient(135deg, #0f1e35 0%, #080e1a 100%);
+        .rnd-price-badge {
+            background: rgba(46,204,113,0.1);
             border: 1px solid rgba(46,204,113,0.2);
-            border-radius: 16px;
-            padding: 32px;
-            max-width: 460px;
-            width: 100%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            animation: modalIn 0.3s ease;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .modal-icon {
-            text-align: center;
-            font-size: 3rem;
+            border-radius: 30px;
+            padding: 4px 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             color: #2ecc71;
-            margin-bottom: 16px;
-        }
-        .modal-title {
-            text-align: center;
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #f0f4ff;
-            margin-bottom: 8px;
-        }
-        .modal-subtitle {
-            text-align: center;
+            font-weight: 600;
             font-size: 0.85rem;
-            color: #8899bb;
-            margin-bottom: 24px;
-            line-height: 1.5;
         }
-        .modal-info {
-            background: rgba(59,130,246,0.08);
-            border: 1px solid rgba(59,130,246,0.2);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 20px;
-            font-size: 0.8rem;
-            color: #8899bb;
-            line-height: 1.5;
-        }
-        .modal-info i { color: #60a5fa; }
-        .modal-info.warn { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
-        .modal-info.warn i { color: #f59e0b; }
-        .password-wrapper { position: relative; margin-bottom: 12px; }
-        .password-wrapper .modal-input { margin-bottom: 0; padding-right: 50px; }
-        .password-eye {
-            position: absolute;
-            right: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #8899bb;
-            cursor: pointer;
-            font-size: 1.1rem;
-            padding: 4px 8px;
-        }
-        .password-eye:hover { color: #2ecc71; }
-        .modal-input {
-            width: 100%;
-            padding: 14px 16px;
-            background: rgba(8,14,26,0.8);
-            border: 1px solid rgba(46,204,113,0.15);
-            border-radius: 10px;
-            color: #f0f4ff;
-            font-size: 1rem;
-            margin-bottom: 12px;
-        }
-        .modal-input:focus {
-            outline: none;
-            border-color: #2ecc71;
-            box-shadow: 0 0 0 3px rgba(46,204,113,0.15);
-        }
-        .modal-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #2ecc71, #27ae60);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 8px;
-            transition: all 0.2s;
-        }
-        .modal-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(46,204,113,0.3); }
-        .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .modal-btn-cancel {
-            background: transparent;
-            border: 1px solid rgba(148,163,184,0.3);
-            color: #8899bb;
-        }
-        .modal-btn-cancel:hover:not(:disabled) { background: rgba(148,163,184,0.1); box-shadow: none; transform: none; }
-        .modal-error {
-            color: #f87171;
-            font-size: 0.85rem;
-            text-align: center;
-            margin-top: 12px;
-            display: none;
-        }
-        .modal-error.show { display: block; }
-        .forgot-link {
-            display: block;
-            text-align: center;
-            margin-top: 16px;
-            color: #60a5fa;
-            font-size: 0.85rem;
-            text-decoration: none;
-            cursor: pointer;
-            background: none;
-            border: none;
-            width: 100%;
-            padding: 8px;
-        }
-        .forgot-link:hover { color: #3b82f6; text-decoration: underline; }
-        .modal-step { display: none; }
-        .modal-step.active { display: block; }
         
         /* ============================================================
-           RESPONSIVE
+           COMMISSION ROWS
            ============================================================ */
+        .commission-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(251,191,36,0.05);
+        }
+        .commission-row:last-child { border-bottom: none; }
+        .commission-row .level { color: #8899bb; }
+        .commission-row .earnings { color: #fbbf24; font-weight: 600; }
+        
+        /* ============================================================
+           RELEASE INFO BOX
+           ============================================================ */
+        .release-info-box {
+            background: rgba(52,211,153,0.08);
+            border: 1px solid rgba(52,211,153,0.15);
+            border-radius: 12px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .release-info-box .label { color: #8899bb; font-size: 0.75rem; }
+        .release-info-box .value { color: #34d399; font-weight: 700; font-size: 0.95rem; }
+        
+        /* ============================================================
+           DAYS REMAINING
+           ============================================================ */
+        .days-remaining {
+            background: rgba(251,191,36,0.05);
+            border: 1px solid rgba(251,191,36,0.1);
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-size: 0.65rem;
+            color: #fbbf24;
+        }
+        
+        /* ============================================================
+           LIVE INDICATOR
+           ============================================================ */
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(46,204,113,0.15);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #2ecc71;
+        }
+        .live-indicator .pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #2ecc71;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        /* ============================================================
+           STATUS BADGE
+           ============================================================ */
+        .status-badge {
+            font-size: 0.65rem;
+            color: #556688;
+            padding: 2px 10px;
+            border-radius: 12px;
+            background: rgba(46,204,113,0.05);
+        }
+        .status-badge.active { color: #2ecc71; background: rgba(46,204,113,0.1); }
+        
+        /* ============================================================
+           RESPONSIVE DESIGN
+           ============================================================ */
+        @media (max-width: 992px) {
+            .network-stats { grid-template-columns: repeat(2, 1fr); }
+            .level-stats { grid-template-columns: repeat(3, 1fr); }
+        }
+        
         @media (max-width: 768px) {
-            .page-container { padding: 15px; }
-            .page-header { padding: 20px; }
-            .page-header h1 { font-size: 1.2rem; }
+            .dashboard-container { padding: 15px; }
+            .welcome-section { padding: 20px; }
+            .welcome-section h2 { font-size: 1.2rem; }
+            .network-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .level-stats { grid-template-columns: repeat(2, 1fr); }
             .sidebar-panel { width: 280px; right: -300px; }
             .sidebar-panel .nav-item { padding: 10px 16px; font-size: 0.85rem; }
         }
+        
         @media (max-width: 480px) {
             .sidebar-panel { width: 100%; right: -100%; }
             .sidebar-panel.open { right: 0; }
+            .network-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .level-stats { grid-template-columns: 1fr 1fr; }
+            .release-info-box { flex-direction: column; text-align: center; }
+        }
+        
+        @media print {
+            .navbar-custom, .sidebar-toggle, .sidebar-panel, .sidebar-overlay { display: none !important; }
+            body { background: #fff; }
+            .wallet-card { background: #f8f8f8; border-color: #ddd; }
+            .welcome-section { background: #f0f0f0; }
+            .wallet-card .wallet-number { color: #000 !important; }
         }
     </style>
 </head>
@@ -594,284 +641,55 @@
             </div>
         </div>
     </div>
-
-    <a href="dashboard.html" class="nav-item">
-        <i class="bi bi-speedometer2"></i>
-        <span>Dashboard</span>
+    
+    <a href="dashboard.html" class="nav-item active">
+        <i class="bi bi-speedometer2"></i> Dashboard
     </a>
-
     <a href="deposit.html" class="nav-item">
-        <i class="bi bi-arrow-down-circle"></i>
-        <span>Deposit</span>
+        <i class="bi bi-arrow-down-circle"></i> Deposit
     </a>
-
     <a href="withdrawal.html" class="nav-item">
-        <i class="bi bi-arrow-up-circle"></i>
-        <span>Withdraw</span>
+        <i class="bi bi-arrow-up-circle"></i> Withdraw
     </a>
-
-    <a href="transfer.html" class="nav-item active">
-        <i class="bi bi-arrow-left-right"></i>
-        <span>Transfer</span>
-    </a>
-
     <a href="referrals.html" class="nav-item">
-        <i class="bi bi-people"></i>
-        <span>Referrals</span>
+        <i class="bi bi-people"></i> Referrals
+        <span class="badge" id="referralBadge">0</span>
     </a>
-
     <a href="buy-package.html" class="nav-item">
-        <i class="bi bi-box-seam"></i>
-        <span>Buy Package</span>
+        <i class="bi bi-box-seam"></i> Buy Package
     </a>
-
-    <a href="rank-reward.html" class="nav-item">
-        <i class="bi bi-trophy"></i>
-        <span>Rank Reward</span>
-    </a>
-
     <a href="transactions.html" class="nav-item">
-        <i class="bi bi-receipt"></i>
-        <span>Transactions</span>
+        <i class="bi bi-receipt"></i> Transactions
     </a>
-
-    <a href="direct-offer.html" class="nav-item direct-offer-nav" id="directOfferNav">
-        <i class="bi bi-gift"></i>
-        <span>Direct Offer</span>
-    </a>
-
     <a href="invoice.html" class="nav-item">
-        <i class="bi bi-file-text"></i>
-        <span>Invoice</span>
+        <i class="bi bi-file-text"></i> Invoice
     </a>
-
     <a href="profile.html" class="nav-item">
-        <i class="bi bi-person"></i>
-        <span>Profile</span>
+        <i class="bi bi-person"></i> Profile
     </a>
-
-    <a href="support.html" class="nav-item">
-        <i class="bi bi-headset"></i>
-        <span>Support Center</span>
+    <a href="#" onclick="window.open('support.html', '_blank'); return false;" class="nav-item">
+        <i class="bi bi-headset"></i> Support Center
     </a>
-
+    
     <div class="sidebar-footer">
         <a href="#" class="nav-item" id="logoutBtnSidebar">
-            <i class="bi bi-box-arrow-right"></i>
-            <span>Logout</span>
+            <i class="bi bi-box-arrow-right"></i> Logout
         </a>
     </div>
 </div>
 
-<!-- ====== PAGE CONTENT ====== -->
-<div class="page-container">
-
-    <!-- PAGE HEADER -->
-    <div class="page-header">
-        <h1><i class="bi bi-arrow-left-right"></i>Send Money</h1>
-        <p>अपने RND Staking वॉलेट से दूसरे यूज़र को पैसे भेजें</p>
-    </div>
-
-    <!-- WALLET CARDS -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-lg-4">
-            <div class="wallet-card">
-                <div class="wallet-icon deposit"><i class="bi bi-wallet2"></i></div>
-                <div class="wallet-number green" id="balanceDeposit">$0.00</div>
-                <div class="wallet-label">Deposit Wallet</div>
-                <div class="wallet-sub">USDT Balance</div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-4">
-            <div class="wallet-card">
-                <div class="wallet-icon referral"><i class="bi bi-coin"></i></div>
-                <div class="wallet-number gold" id="balanceReferral">$0.00</div>
-                <div class="wallet-label">💰 Referral Wallet</div>
-                <div class="wallet-sub">USDT Balance</div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-4">
-            <div class="wallet-card">
-                <div class="wallet-icon rnd"><i class="bi bi-database"></i></div>
-                <div class="wallet-number blue" id="balanceRND">0.0000</div>
-                <div class="wallet-label">RND Wallet</div>
-                <div class="wallet-sub">RND Balance</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- FORM CARD -->
-    <div class="card-glass mb-4">
-        <div class="card-title"><i class="bi bi-send"></i>Transfer Details</div>
-
-        <form id="transferForm">
-            <div class="mb-3">
-                <label class="form-label-custom">Recipient (User ID / Username / Referral Code)</label>
-                <input type="text" id="recipientInput" class="form-control-custom" 
-                       placeholder="जैसे: john123 या ABC123XY या UID" required autocomplete="off">
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label-custom">Wallet</label>
-                <select id="walletSelect" class="form-select-custom">
-                    <option value="depositWallet">💰 Deposit Wallet (USDT)</option>
-                    <option value="referralWallet">💳 Referral Wallet (USDT)</option>
-                    <option value="rndWallet">📊 RND Wallet (RND)</option>
-                </select>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label-custom">Amount</label>
-                <input type="number" id="amountInput" class="form-control-custom" 
-                       placeholder="0.00" min="0.01" step="0.01" required>
-                <div style="margin-top: 8px; display: flex; justify-content: space-between; font-size: 0.8rem;">
-                    <span style="color: #8899bb;">
-                        Available: <strong id="availableText" style="color: #2ecc71;">0</strong>
-                    </span>
-                    <button type="button" onclick="setMaxAmount()"
-                        style="background: none; border: none; color: #60a5fa; cursor: pointer; font-size: 0.8rem; text-decoration: underline;">
-                        Send Max
-                    </button>
-                </div>
-            </div>
-
-            <button type="submit" id="sendBtn" class="btn-send">
-                <i class="bi bi-send me-2"></i> Send Money
-            </button>
-        </form>
-
-        <div class="info-box">
-            <i class="bi bi-shield-check"></i>
-            <strong>सुरक्षा सूचना:</strong> हर transfer पर password पूछा जाएगा।
-        </div>
-    </div>
-
-    <!-- RECENT TRANSFERS -->
-    <div class="card-glass">
-        <div class="card-title"><i class="bi bi-clock-history"></i>Recent Transfers</div>
-        <div class="transfer-history" id="recentTransfers">
-            <div style="text-align: center; color: #556688; padding: 20px; font-size: 0.85rem;">
-                Loading...
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<!-- ====== MODALS ====== -->
-
-<!-- Setup Modal -->
-<div class="modal-overlay" id="setupModal">
-    <div class="modal-box">
-        <div class="modal-icon"><i class="bi bi-shield-lock"></i></div>
-        <div class="modal-title">Set Transfer Password</div>
-        <div class="modal-subtitle">पहली बार Transfer करने से पहले एक password सेट करें।</div>
-        <div class="modal-info">
-            <i class="bi bi-info-circle me-1"></i>
-            Password को hash करके safe तरीके से save किया जाएगा।
-        </div>
-        <div class="password-wrapper">
-            <input type="password" id="setupPassword" class="modal-input" placeholder="Password (min 6 characters)" autocomplete="new-password">
-            <button type="button" class="password-eye" onclick="togglePassword('setupPassword', this)">
-                <i class="bi bi-eye"></i>
-            </button>
-        </div>
-        <div class="password-wrapper">
-            <input type="password" id="setupPasswordConfirm" class="modal-input" placeholder="Confirm Password" autocomplete="new-password">
-            <button type="button" class="password-eye" onclick="togglePassword('setupPasswordConfirm', this)">
-                <i class="bi bi-eye"></i>
-            </button>
-        </div>
-        <button class="modal-btn" id="setupBtn">
-            <i class="bi bi-check-circle me-2"></i>Set Password
-        </button>
-        <div class="modal-error" id="setupError"></div>
-    </div>
-</div>
-
-<!-- Verify Modal -->
-<div class="modal-overlay" id="verifyModal">
-    <div class="modal-box">
-        <div class="modal-icon"><i class="bi bi-lock-fill"></i></div>
-        <div class="modal-title">Enter Transfer Password</div>
-        <div class="modal-subtitle">Transfer confirm करने के लिए अपना password डालें।</div>
-        <div class="modal-info" id="verifyDetails"></div>
-        <div class="password-wrapper">
-            <input type="password" id="verifyPassword" class="modal-input" placeholder="Password" autocomplete="current-password">
-            <button type="button" class="password-eye" onclick="togglePassword('verifyPassword', this)">
-                <i class="bi bi-eye"></i>
-            </button>
-        </div>
-        <button class="modal-btn" id="verifyBtn">
-            <i class="bi bi-shield-check me-2"></i>Verify & Send
-        </button>
-        <button class="modal-btn modal-btn-cancel" id="verifyCancelBtn">
-            Cancel
-        </button>
-        <button class="forgot-link" id="forgotPasswordBtn">
-            🔑 Forgot Password?
-        </button>
-        <div class="modal-error" id="verifyError"></div>
-    </div>
-</div>
-
-<!-- Forgot Modal -->
-<div class="modal-overlay" id="forgotModal">
-    <div class="modal-box">
-        <div class="modal-icon" style="color: #f59e0b;"><i class="bi bi-key"></i></div>
-        <div class="modal-title">Reset Transfer Password</div>
-
-        <div class="modal-step active" id="forgotStep1">
-            <div class="modal-subtitle">
-                पहले अपना <strong>account password</strong> डालें (जो login के लिए use करते हैं)।
-            </div>
-            <div class="modal-info warn">
-                <i class="bi bi-exclamation-triangle me-1"></i>
-                यह आपके <strong>login password</strong> है, transfer password नहीं।
-            </div>
-            <div class="password-wrapper">
-                <input type="password" id="forgotAccountPassword" class="modal-input" placeholder="Account password" autocomplete="current-password">
-                <button type="button" class="password-eye" onclick="togglePassword('forgotAccountPassword', this)">
-                    <i class="bi bi-eye"></i>
-                </button>
-            </div>
-            <button class="modal-btn" id="forgotVerifyBtn">
-                <i class="bi bi-shield-check me-2"></i>Verify
-            </button>
-            <button class="modal-btn modal-btn-cancel" id="forgotCancelBtn1">
-                Cancel
-            </button>
-            <div class="modal-error" id="forgotError1"></div>
-        </div>
-
-        <div class="modal-step" id="forgotStep2">
-            <div class="modal-subtitle">
-                ✅ Verified! अब नया transfer password सेट करें।
-            </div>
-            <div class="password-wrapper">
-                <input type="password" id="forgotNewPassword" class="modal-input" placeholder="New password (min 6 characters)" autocomplete="new-password">
-                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPassword', this)">
-                    <i class="bi bi-eye"></i>
-                </button>
-            </div>
-            <div class="password-wrapper">
-                <input type="password" id="forgotNewPasswordConfirm" class="modal-input" placeholder="Confirm new password" autocomplete="new-password">
-                <button type="button" class="password-eye" onclick="togglePassword('forgotNewPasswordConfirm', this)">
-                    <i class="bi bi-eye"></i>
-                </button>
-            </div>
-            <button class="modal-btn" id="forgotResetBtn">
-                <i class="bi bi-check-circle me-2"></i>Set New Password
-            </button>
-            <div class="modal-error" id="forgotError2"></div>
-        </div>
+<!-- ====== DASHBOARD CONTENT ====== -->
+<div class="dashboard-container" id="dashboardContent">
+    <div class="text-center py-5">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="text-muted mt-3">Loading dashboard...</p>
     </div>
 </div>
 
 <!-- ====== SCRIPTS ====== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Import Map -->
+<!-- ====== IMPORT MAP ====== -->
 <script type="importmap">
 {
     "imports": {
@@ -882,95 +700,8 @@
 }
 </script>
 
-<!-- transfer.js (same logic) -->
-<script type="module" src="transfer.js"></script>
-
-<!-- Sidebar Control Script -->
-<script>
-    // Sidebar open/close
-    const sidebarPanel = document.getElementById('sidebarPanel');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebarClose = document.getElementById('sidebarClose');
-
-    function openSidebar() {
-        sidebarPanel.classList.add('open');
-        sidebarOverlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-    function closeSidebar() {
-        sidebarPanel.classList.remove('open');
-        sidebarOverlay.classList.remove('active');
-        document.body.style.overflow = '';
-    }
-
-    sidebarToggle.addEventListener('click', openSidebar);
-    sidebarClose.addEventListener('click', closeSidebar);
-    sidebarOverlay.addEventListener('click', closeSidebar);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
-
-    // Logout
-    document.getElementById('logoutBtnSidebar').addEventListener('click', async (e) => {
-        e.preventDefault();
-        try {
-            const { getAuth, signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-            const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-            
-            let app;
-            if (getApps().length > 0) {
-                app = getApps()[0];
-            } else {
-                const firebaseConfig = {
-                    apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
-                    authDomain: "rwebsite-e031b.firebaseapp.com",
-                    databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
-                    projectId: "rwebsite-e031b",
-                    storageBucket: "rwebsite-e031b.firebasestorage.app",
-                    messagingSenderId: "376966041558",
-                    appId: "1:376966041558:web:02bc9062ec182590275e77"
-                };
-                app = initializeApp(firebaseConfig);
-            }
-            const auth = getAuth(app);
-            await signOut(auth);
-            window.location.href = 'login.html';
-        } catch (err) {
-            console.error('Logout error:', err);
-            window.location.href = 'login.html';
-        }
-    });
-
-    // Fill sidebar user info
-    setTimeout(async () => {
-        try {
-            const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-            const { getDatabase, ref, get } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
-            const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-            
-            let app;
-            if (getApps().length > 0) {
-                app = getApps()[0];
-            } else {
-                return;
-            }
-            const auth = getAuth(app);
-            const user = auth.currentUser;
-            if (user) {
-                const db = getDatabase(app);
-                const snap = await get(ref(db, 'users/' + user.uid));
-                if (snap.exists()) {
-                    const u = snap.val();
-                    const name = u.name || u.username || u.referralCode || 'User';
-                    document.getElementById('sidebarName').textContent = name;
-                    document.getElementById('sidebarUserId').textContent = 'ID: ' + (u.username || user.uid.substring(0, 16)) + '...';
-                    document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
-                }
-            }
-        } catch (err) {
-            console.warn('Sidebar fill error:', err);
-        }
-    }, 600);
-</script>
+<!-- ====== DASHBOARD.JS (All Logic) ====== -->
+<script type="module" src="dashboard.js"></script>
 
 </body>
 </html>

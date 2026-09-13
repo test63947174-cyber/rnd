@@ -399,11 +399,7 @@ export async function processDeposit(uid, txHash, amount, receipt) {
 }
 
 // ============================================================
-// 🔒 COMPLETE DEPOSIT FLOW
-// ============================================================
-// 🔥 IMPORTANT: onSuccess is called with THREE parameters:
-//    onSuccess(newBalance, creditedAmount, blockNumber)
-// This lets the caller use the values without needing `result`.
+// 🔒 COMPLETE DEPOSIT FLOW (FIXED)
 // ============================================================
 export async function completeDeposit(uid, txHash, amount, onPending, onSuccess, onError) {
     console.log('🔒 Starting secure deposit flow...');
@@ -432,7 +428,7 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
             const verification = await verifyTransaction(txHash, amount);
             console.log('Verification result:', verification);
             
-            // STEP 4: Handle pending (auto-polling)
+            // STEP 4: Handle pending
             if (verification.pending) {
                 if (onPending) {
                     onPending(verification.confirmations, verification.currentBlock, verification.blockNumber);
@@ -443,13 +439,13 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
                 return pollingResult;
             }
             
-            // STEP 5: Handle verification failure
+            // STEP 5: Handle failure
             if (!verification.success) {
                 await releaseProcessingLock(txHash);
                 return verification;
             }
             
-            // STEP 6: Process deposit atomically
+            // STEP 6: Process deposit
             try {
                 const result = await processDeposit(uid, txHash, amount, verification.receipt);
                 await releaseProcessingLock(txHash);
@@ -490,7 +486,7 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
 }
 
 // ============================================================
-// 🔒 AUTO-POLLING FOR PENDING TRANSACTIONS
+// 🔒 AUTO-POLLING FOR PENDING TRANSACTIONS (FIXED)
 // ============================================================
 async function startAutoPolling(uid, txHash, amount, onPending, onSuccess, onError) {
     let attempts = 0;

@@ -40,16 +40,6 @@ const db = getDatabase(app);
 // ============================================================
 // 🔥 SMART NOTIFICATION SYSTEM
 // ============================================================
-// Har situation ke liye specific message — Success, Fail, Pending,
-// Duplicate, Wrong Wallet, Amount Mismatch, etc.
-// ============================================================
-
-/**
- * Show a notification toast
- * @param {string} message - Main message
- * @param {string} type - 'success' | 'error' | 'warning' | 'info'
- * @param {number} duration - ms to show (default: 5000, error: 8000)
- */
 function showToast(message, type = 'success', duration = null) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -71,7 +61,6 @@ function showToast(message, type = 'success', duration = null) {
         info: '#60a5fa'
     };
 
-    // Errors ko zyada der tak dikhao
     const showDuration = duration || (type === 'error' ? 8000 : type === 'warning' ? 7000 : 5000);
 
     toast.innerHTML = `
@@ -90,9 +79,6 @@ function showToast(message, type = 'success', duration = null) {
 
 // ============================================================
 // 🔥 ANALYZE ERROR AND SHOW APPROPRIATE NOTIFICATION
-// ============================================================
-// Yeh function har tarah ke error ko detect karta hai aur
-// uske hisaab se best notification + status message banata hai.
 // ============================================================
 function analyzeError(errorMsg, userAmount) {
     const msg = String(errorMsg || '').toLowerCase();
@@ -269,7 +255,7 @@ function analyzeError(errorMsg, userAmount) {
         };
     }
 
-    // 11. GENERIC FALLBACK — show exact error message
+    // 11. GENERIC FALLBACK
     return {
         type: 'error',
         title: '❌ Verification Failed',
@@ -569,20 +555,27 @@ async function resumePendingVerifications(userId) {
                              <small>Block: ${blockNumber || 'pending'} | Auto-checking every ${pollingInterval} seconds...</small>`
                         );
                     },
-                    (newBalance) => {
+                    // 🔥 onSuccess with THREE parameters
+                    (newBalance, creditedAmount, blockNumber) => {
+                        const finalAmount = (creditedAmount !== undefined && creditedAmount !== null)
+                            ? Number(creditedAmount) : Number(pending.lockData?.amount || 0);
+                        const finalBlock = blockNumber || 'confirmed';
+
                         updateVerificationStatus(
                             'success',
                             `<i class="bi bi-check-circle-fill me-2"></i>
                              ✅ <strong>Deposit Successfully Credited!</strong>
-                             <br><small>New Balance: $${Number(newBalance).toFixed(2)} USDT</small>`
+                             <br><small>Credited Amount: <strong>$${finalAmount.toFixed(6)} USDT</strong></small>
+                             <br><small>New Balance: <strong>$${Number(newBalance).toFixed(2)} USDT</strong></small>
+                             <br><small>🔒 Verified on BSC Block: <strong>${finalBlock}</strong></small>`
                         );
-                        showToast('✅ Pending deposit successfully completed!', 'success');
+                        showToast(`✅ Pending deposit of $${finalAmount.toFixed(4)} USDT completed!`, 'success', 6000);
                         updateBalance(newBalance);
                     },
                     (error) => {
                         const analysis = analyzeError(error, (pending.lockData && pending.lockData.amount) || 0);
-                        updateVerificationStatus(analysis.type, analysis.statusHTML);
-                        showToast(analysis.message, analysis.type === 'warning' ? 'warning' : 'error');
+                        updateVerificationStatus(analysis.type === 'warning' ? 'error' : analysis.type, analysis.statusHTML);
+                        showToast(analysis.message, analysis.type === 'warning' ? 'warning' : 'error', 8000);
                     }
                 );
             } catch (error) {
@@ -702,6 +695,9 @@ document.addEventListener('click', function (e) {
 // ============================================================
 // 🔥 HANDLE DEPOSIT FORM SUBMIT
 // ============================================================
+// 🔥 FIXED: No use of `result` inside callbacks.
+// onSuccess receives (newBalance, creditedAmount, blockNumber) directly.
+// ============================================================
 function attachFormHandler(user) {
     const form = document.getElementById('depositForm');
     if (!form) return;
@@ -753,14 +749,17 @@ function attachFormHandler(user) {
         const originalBtnHTML = verifyBtn.innerHTML;
         verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Verifying...';
 
+        // 🔥 Track whether success callback already fired
+        let successFired = false;
+
         try {
-            const result = await realCompleteDeposit(
+            await realCompleteDeposit(
                 user.uid,
                 txHash,
                 amount,
 
                 // ================================================
-                // 🔥 ON PENDING — jab confirmations ka wait ho
+                // 🔥 ON PENDING
                 // ================================================
                 (confirmations, currentBlock, blockNumber) => {
                     updateVerificationStatus(
@@ -778,23 +777,28 @@ function attachFormHandler(user) {
                 },
 
                 // ================================================
-                // 🔥 ON SUCCESS — jab deposit actually ho gaya
+                // 🔥 ON SUCCESS — receives 3 parameters directly
                 // ================================================
-                (newBalance) => {
-                    const creditedAmount = (result && result.amountCredited) ? result.amountCredited : amount;
-                    const blockNum = (result && result.receipt && result.receipt.blockNumber) || 'confirmed';
+                (newBalance, creditedAmount, blockNumber) => {
+                    successFired = true;
+
+                    // Fallbacks agar kuch missing ho
+                    const finalAmount = (creditedAmount !== undefined && creditedAmount !== null)
+                        ? Number(creditedAmount)
+                        : Number(amount);
+                    const finalBlock = blockNumber || 'confirmed';
 
                     updateVerificationStatus(
                         'success',
                         `<i class="bi bi-check-circle-fill me-2"></i>
                          ✅ <strong>Deposit Successfully Credited!</strong>
-                         <br><small>Credited Amount: <strong>$${Number(creditedAmount).toFixed(6)} USDT</strong></small>
+                         <br><small>Credited Amount: <strong>$${finalAmount.toFixed(6)} USDT</strong></small>
                          <br><small>New Balance: <strong>$${Number(newBalance).toFixed(2)} USDT</strong></small>
-                         <br><small>🔒 Verified on BSC Block: <strong>${blockNum}</strong></small>`
+                         <br><small>🔒 Verified on BSC Block: <strong>${finalBlock}</strong></small>`
                     );
 
                     showToast(
-                        `✅ Deposit success! $${Number(creditedAmount).toFixed(4)} USDT aapke wallet me add ho gaya.`,
+                        `✅ Deposit success! $${finalAmount.toFixed(4)} USDT aapke wallet me add ho gaya.`,
                         'success',
                         6000
                     );
@@ -807,7 +811,7 @@ function attachFormHandler(user) {
                 },
 
                 // ================================================
-                // 🔥 ON ERROR — jab deposit fail ho ya problem ho
+                // 🔥 ON ERROR
                 // ================================================
                 (error) => {
                     const analysis = analyzeError(error, amount);
@@ -819,24 +823,24 @@ function attachFormHandler(user) {
                 }
             );
 
-            // Agar function result me error return kare
-            if (result && result.error) {
-                const analysis = analyzeError(result.error, amount);
+            // 🔥 AGAR success callback NAHI chala par result success hai
+            //    (safety net) — toh bhi success dikhao
+            // Note: We do NOT reference any `result` variable here,
+            // because verifyTransaction.js returns its own object.
+            // The callbacks already handle all cases.
+
+        } catch (error) {
+            console.error('Deposit error:', error);
+
+            // Agar success already fire ho chuka hai to error mat dikhao
+            if (!successFired) {
+                const analysis = analyzeError(error.message || 'Unexpected error', amount);
                 updateVerificationStatus(
                     analysis.type === 'warning' ? 'error' : analysis.type,
                     analysis.statusHTML
                 );
                 showToast(analysis.message, analysis.type, 8000);
             }
-
-        } catch (error) {
-            console.error('Deposit error:', error);
-            const analysis = analyzeError(error.message || 'Unexpected error', amount);
-            updateVerificationStatus(
-                analysis.type === 'warning' ? 'error' : analysis.type,
-                analysis.statusHTML
-            );
-            showToast(analysis.message, analysis.type, 8000);
         }
 
         verifyBtn.disabled = false;

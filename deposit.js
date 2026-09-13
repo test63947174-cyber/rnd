@@ -433,10 +433,6 @@ function renderDepositUI(depositWallet) {
                         <br>
                         Minimum confirmations required: <strong>${minConfirmations}</strong>
                         <br>
-                        ✅ <strong>Amount tolerance ±0.5%</strong> — आप थोड़ा-बहुत अलग amount डालें तो भी accept होगा
-                        <br>
-                        💡 <strong>Tip:</strong> Enter exact amount with decimals (e.g. 5.012) for fastest verification
-                        <br>
                         ❌ <strong>Cannot fake or bypass verification!</strong>
                     </div>
 

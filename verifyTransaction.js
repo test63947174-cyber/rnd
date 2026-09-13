@@ -22,23 +22,9 @@ const activeVerifications = new Map();
 // ============================================================
 // 🔥 AMOUNT TOLERANCE CONFIG
 // ============================================================
-// Blockchain amounts often have more decimals than what user types.
-// Example: user types 5.01, blockchain shows 5.012
-// We accept if difference is within RELATIVE_TOLERANCE (0.5%) OR
-// ABSOLUTE_TOLERANCE (0.01 USDT) — whichever is larger.
-// ============================================================
 const RELATIVE_TOLERANCE = 0.005;  // 0.5%
 const ABSOLUTE_TOLERANCE = 0.01;   // 0.01 USDT minimum floor
 
-/**
- * Check if two amounts are "close enough" to be considered the same.
- * Handles cases like: 5.01 vs 5.012  → PASS
- *                     5.01 vs 5.05   → FAIL
- *                     100  vs 100.4  → PASS
- * @param {number} userAmount - Amount entered by user
- * @param {number} chainAmount - Actual amount from blockchain
- * @returns {boolean} - True if amounts match within tolerance
- */
 export function amountsMatch(userAmount, chainAmount) {
     const a = Number(userAmount);
     const b = Number(chainAmount);
@@ -262,16 +248,10 @@ export async function verifyTransaction(txHash, expectedAmount) {
             };
         }
         
-        // ============================================================
-        // 🔥 GET ACTUAL AMOUNT FROM BLOCKCHAIN
-        // ============================================================
+        // GET ACTUAL AMOUNT FROM BLOCKCHAIN
         const actualAmount = parseFloat(ethers.formatUnits(transferAmount, 18));
         
-        // ============================================================
-        // 🔥 AMOUNT VALIDATION WITH SMART TOLERANCE
-        // ============================================================
-        // If expectedAmount is not provided (0 or invalid), auto-accept
-        // the blockchain amount. This handles pending/resume cases.
+        // AMOUNT VALIDATION WITH SMART TOLERANCE
         if (expectedAmount && Number(expectedAmount) > 0) {
             if (!amountsMatch(expectedAmount, actualAmount)) {
                 const tolerance = Math.max(actualAmount * RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE);
@@ -287,9 +267,7 @@ export async function verifyTransaction(txHash, expectedAmount) {
             }
         }
         
-        // ============================================================
-        // 🔒 ALL VALIDATIONS PASSED
-        // ============================================================
+        // ALL VALIDATIONS PASSED
         return {
             success: true,
             verified: true,
@@ -321,12 +299,9 @@ export async function verifyTransaction(txHash, expectedAmount) {
 // ============================================================
 // 🔒 PROCESS DEPOSIT - ATOMIC
 // ============================================================
-// IMPORTANT: Use the ACTUAL blockchain amount (from receipt.amount)
-// not the user-entered amount. This prevents any discrepancy.
-// ============================================================
 export async function processDeposit(uid, txHash, amount, receipt) {
     try {
-        // 🔥 Use the verified blockchain amount if available
+        // Use the verified blockchain amount if available
         const finalAmount = (receipt && receipt.amount) ? Number(receipt.amount) : Number(amount);
         
         const userRef = ref(db, `users/${uid}`);
@@ -345,7 +320,7 @@ export async function processDeposit(uid, txHash, amount, receipt) {
                 }
             }
             
-            // STEP 2: Update balance with ACTUAL blockchain amount
+            // STEP 2: Update balance
             const currentBalance = Number(currentData.depositWallet) || 0;
             const newBalance = currentBalance + finalAmount;
             
@@ -413,7 +388,8 @@ export async function processDeposit(uid, txHash, amount, receipt) {
         return {
             success: true,
             newBalance: result.snapshot.val().depositWallet,
-            amountCredited: finalAmount
+            amountCredited: finalAmount,
+            blockNumber: receipt.blockNumber
         };
         
     } catch (error) {
@@ -424,6 +400,10 @@ export async function processDeposit(uid, txHash, amount, receipt) {
 
 // ============================================================
 // 🔒 COMPLETE DEPOSIT FLOW
+// ============================================================
+// 🔥 IMPORTANT: onSuccess is called with THREE parameters:
+//    onSuccess(newBalance, creditedAmount, blockNumber)
+// This lets the caller use the values without needing `result`.
 // ============================================================
 export async function completeDeposit(uid, txHash, amount, onPending, onSuccess, onError) {
     console.log('🔒 Starting secure deposit flow...');
@@ -452,7 +432,7 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
             const verification = await verifyTransaction(txHash, amount);
             console.log('Verification result:', verification);
             
-            // STEP 4: Handle pending
+            // STEP 4: Handle pending (auto-polling)
             if (verification.pending) {
                 if (onPending) {
                     onPending(verification.confirmations, verification.currentBlock, verification.blockNumber);
@@ -463,19 +443,24 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
                 return pollingResult;
             }
             
-            // STEP 5: Handle failure
+            // STEP 5: Handle verification failure
             if (!verification.success) {
                 await releaseProcessingLock(txHash);
                 return verification;
             }
             
-            // STEP 6: Process deposit with ACTUAL blockchain amount
+            // STEP 6: Process deposit atomically
             try {
                 const result = await processDeposit(uid, txHash, amount, verification.receipt);
                 await releaseProcessingLock(txHash);
                 
+                // 🔥 Call onSuccess with THREE parameters
                 if (onSuccess) {
-                    onSuccess(result.newBalance);
+                    onSuccess(
+                        result.newBalance,
+                        result.amountCredited,
+                        result.blockNumber
+                    );
                 }
                 
                 return {
@@ -553,8 +538,14 @@ async function startAutoPolling(uid, txHash, amount, onPending, onSuccess, onErr
                 
                 try {
                     const result = await processDeposit(uid, txHash, amount, verification.receipt);
+                    
+                    // 🔥 Call onSuccess with THREE parameters
                     if (onSuccess) {
-                        onSuccess(result.newBalance);
+                        onSuccess(
+                            result.newBalance,
+                            result.amountCredited,
+                            result.blockNumber
+                        );
                     }
                     resolve({
                         success: true,

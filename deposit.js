@@ -2,11 +2,12 @@
 // 🔥 DEPOSIT PAGE LOGIC - RND STAKING
 // ============================================================
 // Firebase + Real Blockchain Verification
+// Amount tolerance: ±0.5% (handles rounding like 5.012 vs 5.01)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase, ref, get, onValue, remove } from "firebase/database";
+import { getDatabase, ref, get, onValue } from "firebase/database";
 
 // Real verification from external file
 import {
@@ -133,11 +134,7 @@ const logoutBtn = document.getElementById('logoutBtnSidebar');
 if (logoutBtn) {
     logoutBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        try {
-            await signOut(auth);
-        } catch (err) {
-            console.error('Logout error:', err);
-        }
+        try { await signOut(auth); } catch (err) { console.error('Logout error:', err); }
         window.location.href = 'login.html';
     });
 }
@@ -169,7 +166,6 @@ function renderDepositUI(depositWallet) {
     const depositAddress = WALLET_CONFIG.DEPOSIT_WALLET || '';
     const usdtContract = WALLET_CONFIG.USDT_CONTRACT || '';
     const minConfirmations = WALLET_CONFIG.MIN_CONFIRMATIONS || 3;
-    const pollingInterval = (WALLET_CONFIG.POLLING_INTERVAL || 15000) / 1000;
 
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(depositAddress)}&color=2ecc71&bgcolor=080e1a`;
 
@@ -243,6 +239,10 @@ function renderDepositUI(depositWallet) {
                         <br>
                         Minimum confirmations required: <strong>${minConfirmations}</strong>
                         <br>
+                        ✅ <strong>Amount tolerance ±0.5%</strong> — आप थोड़ा-बहुत अलग amount डालें तो भी accept होगा
+                        <br>
+                        💡 <strong>Tip:</strong> Enter exact amount with decimals (e.g. 5.012) for fastest verification
+                        <br>
                         ❌ <strong>Cannot fake or bypass verification!</strong>
                     </div>
 
@@ -253,8 +253,8 @@ function renderDepositUI(depositWallet) {
                                     Amount You Sent (USDT) <span class="required">*</span>
                                 </label>
                                 <input type="number" id="depositAmount" class="form-control form-control-custom"
-                                       placeholder="Enter amount" min="1" step="0.01" required>
-                                <span class="form-hint">Must match exactly what you sent</span>
+                                       placeholder="e.g. 5.012" min="0.01" step="any" required>
+                                <span class="form-hint">Exact amount you sent (decimals OK)</span>
                             </div>
                             <div class="col-12 col-md-5">
                                 <label class="form-label" for="txHash">
@@ -296,17 +296,15 @@ function renderDepositUI(depositWallet) {
         </div>
     `;
 
-    // Attach copy button handler
     const copyBtn = document.getElementById('copyAddressBtn');
     if (copyBtn) {
         copyBtn.addEventListener('click', function () {
             copyToClipboard(depositAddress);
             this.classList.add('copied');
-            const originalHTML = '<i class="bi bi-copy"></i> Copy';
             this.innerHTML = '<i class="bi bi-check"></i> Copied!';
             setTimeout(() => {
                 this.classList.remove('copied');
-                this.innerHTML = originalHTML;
+                this.innerHTML = '<i class="bi bi-copy"></i> Copy';
             }, 2000);
         });
     }
@@ -473,6 +471,60 @@ function listenToBalance(userId) {
 }
 
 // ============================================================
+// 🔥 FORMAT VERIFICATION ERROR (with tolerance hint)
+// ============================================================
+function formatVerificationError(error, userAmount) {
+    const msg = String(error || '');
+
+    if (/amount\s*mismatch/i.test(msg)) {
+        const match = msg.match(/blockchain\s*shows\s*([\d.]+)/i)
+                  || msg.match(/shows\s*([\d.]+)\s*USDT/i);
+        const chainAmount = match ? match[1] : null;
+
+        if (chainAmount) {
+            return `
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                ❌ <strong>Amount mismatch</strong>
+                <br><small>You entered: <strong>${userAmount} USDT</strong></small>
+                <br><small>Blockchain shows: <strong>${chainAmount} USDT</strong></small>
+                <br><small>💡 <strong>Tip:</strong> Enter the exact amount from your wallet (decimals included)</small>
+                <br>
+                <button type="button" class="btn-refresh mt-2" id="autoFillBtn" style="max-width:320px;padding:8px 16px;font-size:0.8rem;">
+                    <i class="bi bi-magic"></i>
+                    Auto-fill ${chainAmount} USDT
+                </button>
+            `;
+        }
+        return `
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            ❌ <strong>Amount mismatch</strong>
+            <br><small>You entered ${userAmount} USDT but blockchain amount is different.</small>
+            <br><small>💡 Enter the exact amount from your wallet, including decimals.</small>
+        `;
+    }
+
+    return `<i class="bi bi-exclamation-triangle me-2"></i> ❌ ${msg}`;
+}
+
+// ============================================================
+// 🔥 AUTO-FILL BUTTON HANDLER
+// ============================================================
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('#autoFillBtn');
+    if (!btn) return;
+
+    const match = btn.textContent.match(/([\d.]+)/);
+    if (!match) return;
+
+    const amountInput = document.getElementById('depositAmount');
+    if (amountInput) {
+        amountInput.value = match[1];
+        showToast(`✅ Auto-filled ${match[1]} USDT. Click Verify again.`, 'success');
+        btn.remove();
+    }
+});
+
+// ============================================================
 // 🔥 HANDLE DEPOSIT FORM SUBMIT
 // ============================================================
 function attachFormHandler(user) {
@@ -492,7 +544,6 @@ function attachFormHandler(user) {
         const minConfirmations = WALLET_CONFIG.MIN_CONFIRMATIONS || 3;
         const pollingInterval = (WALLET_CONFIG.POLLING_INTERVAL || 15000) / 1000;
 
-        // Frontend validation
         if (!amount || amount <= 0) {
             showToast('❌ Please enter a valid amount.', 'error');
             return;
@@ -530,7 +581,6 @@ function attachFormHandler(user) {
                 user.uid,
                 txHash,
                 amount,
-                // onPending
                 (confirmations, currentBlock, blockNumber) => {
                     updateVerificationStatus(
                         'polling',
@@ -541,39 +591,38 @@ function attachFormHandler(user) {
                     );
                     showToast(`⏳ Waiting for confirmations... (${confirmations}/${minConfirmations})`, 'info');
                 },
-                // onSuccess
                 (newBalance) => {
+                    const creditedAmount = (result && result.amountCredited) ? result.amountCredited : amount;
                     updateVerificationStatus(
                         'success',
                         `<i class="bi bi-check-circle me-2"></i>
                          ✅ Deposit verified successfully on blockchain!
-                         <br><small>$${amount} USDT added to your Deposit Wallet.</small>
+                         <br><small>Credited: $${Number(creditedAmount).toFixed(6)} USDT</small>
                          <br><small>New Balance: $${Number(newBalance).toFixed(2)}</small>
                          <br><small>🔒 Verified on BSC block: ${(result && result.receipt && result.receipt.blockNumber) || 'confirmed'}</small>`
                     );
-                    showToast(`✅ $${amount} USDT deposited successfully! (Blockchain verified)`, 'success');
+                    showToast(`✅ Deposit of $${Number(creditedAmount).toFixed(4)} USDT verified! (Blockchain)`, 'success');
                     updateBalance(newBalance);
 
                     amountInput.value = '';
                     txHashInput.value = '';
                 },
-                // onError
                 (error) => {
-                    updateVerificationStatus('error', `<i class="bi bi-exclamation-triangle me-2"></i> ❌ ${error}`);
-                    showToast(`❌ ${error}`, 'error');
+                    const friendlyError = formatVerificationError(error, amount);
+                    updateVerificationStatus('error', friendlyError);
+                    showToast('❌ Verification failed. Check the details below.', 'error');
                 }
             );
 
             if (result && result.error) {
-                updateVerificationStatus('error', `<i class="bi bi-exclamation-triangle me-2"></i> ❌ ${result.error}`);
-                showToast(`❌ ${result.error}`, 'error');
+                const friendlyError = formatVerificationError(result.error, amount);
+                updateVerificationStatus('error', friendlyError);
+                showToast('❌ Verification failed. Check the details below.', 'error');
             }
         } catch (error) {
             console.error('Deposit error:', error);
-            updateVerificationStatus(
-                'error',
-                `<i class="bi bi-exclamation-triangle me-2"></i> ❌ ${error.message || 'Something went wrong. Please try again.'}`
-            );
+            const friendlyError = formatVerificationError(error.message, amount);
+            updateVerificationStatus('error', friendlyError);
             showToast('❌ Error processing deposit. Please try again.', 'error');
         }
 
@@ -592,14 +641,12 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     try {
-        // Clean up stale locks
         try {
             await realCleanupStaleLocks();
         } catch (err) {
             console.warn('cleanupStaleLocks warning:', err);
         }
 
-        // Get user data
         const userSnap = await get(ref(db, 'users/' + user.uid));
         if (!userSnap.exists()) {
             window.location.href = 'dashboard.html';
@@ -608,7 +655,6 @@ onAuthStateChanged(auth, async (user) => {
 
         const userData = userSnap.val();
 
-        // Update sidebar
         const name = userData.name || 'User';
         const username = userData.username || userData.referralCode || 'USER';
         const sidebarName = document.getElementById('sidebarName');
@@ -623,19 +669,10 @@ onAuthStateChanged(auth, async (user) => {
 
         const depositWallet = userData.depositWallet || 0;
 
-        // Render UI
         renderDepositUI(depositWallet);
-
-        // Resume any pending verifications
         await resumePendingVerifications(user.uid);
-
-        // Load recent deposits in real-time
         loadRecentDeposits(user.uid);
-
-        // Listen to balance changes
         listenToBalance(user.uid);
-
-        // Attach form handler
         attachFormHandler(user);
 
     } catch (error) {

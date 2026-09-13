@@ -116,7 +116,7 @@ function analyzeError(errorMsg, userAmount) {
                     <br><small>Blockchain pe actual: <strong>${chainAmount} USDT</strong></small>
                     <br><small>💡 Neeche button click karke sahi amount auto-fill karein, phir Verify dabayein.</small>
                     <br>
-                    <button type="button" class="btn-refresh mt-2" id="autoFillBtn" style="max-width:320px;padding:8px 16px;font-size:0.8rem;">
+                    <button type="button" class="btn-refresh mt-2" id="autoFillBtn" style="max-width:340px;padding:8px 16px;font-size:0.8rem;">
                         <i class="bi bi-magic"></i>
                         Auto-fill ${chainAmount} USDT
                     </button>
@@ -378,7 +378,6 @@ function renderDepositUI(depositWallet) {
         </div>
 
         <div class="row g-4">
-            <!-- Balance Card -->
             <div class="col-12 col-lg-6">
                 <div class="card-glass">
                     <div class="card-title">
@@ -394,7 +393,6 @@ function renderDepositUI(depositWallet) {
                 </div>
             </div>
 
-            <!-- Deposit Address Card -->
             <div class="col-12 col-lg-6">
                 <div class="card-glass">
                     <div class="card-title">
@@ -422,7 +420,6 @@ function renderDepositUI(depositWallet) {
                 </div>
             </div>
 
-            <!-- Verify Form Card -->
             <div class="col-12">
                 <div class="card-glass">
                     <div class="card-title">
@@ -475,7 +472,6 @@ function renderDepositUI(depositWallet) {
                 </div>
             </div>
 
-            <!-- Recent Deposits Card -->
             <div class="col-12">
                 <div class="card-glass">
                     <div class="card-title">
@@ -557,7 +553,6 @@ async function resumePendingVerifications(userId) {
                              <small>Block: ${blockNumber || 'pending'} | Auto-checking every ${pollingInterval} seconds...</small>`
                         );
                     },
-                    // 🔥 onSuccess with THREE parameters
                     (newBalance, creditedAmount, blockNumber) => {
                         const finalAmount = (creditedAmount !== undefined && creditedAmount !== null)
                             ? Number(creditedAmount) : Number(pending.lockData && pending.lockData.amount) || 0;
@@ -695,12 +690,7 @@ document.addEventListener('click', function (e) {
 });
 
 // ============================================================
-// 🔥 HANDLE DEPOSIT FORM SUBMIT (FULLY FIXED)
-// ============================================================
-// 🔥 KEY FIX: 
-//  - onSuccess receives (newBalance, creditedAmount, blockNumber) directly
-//  - NO use of `result` variable inside callbacks
-//  - successFired flag prevents showing error after success
+// 🔥 HANDLE DEPOSIT FORM SUBMIT (FIXED)
 // ============================================================
 function attachFormHandler(user) {
     const form = document.getElementById('depositForm');
@@ -753,11 +743,10 @@ function attachFormHandler(user) {
         const originalBtnHTML = verifyBtn.innerHTML;
         verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Verifying...';
 
-        // 🔥 Track if success already fired — to prevent error overwriting success
         let successFired = false;
 
         try {
-            await realCompleteDeposit(
+            const result = await realCompleteDeposit(
                 user.uid,
                 txHash,
                 amount,
@@ -781,7 +770,7 @@ function attachFormHandler(user) {
                 },
 
                 // ================================================
-                // 🔥 ON SUCCESS — 3 parameters directly (NO result)
+                // 🔥 ON SUCCESS
                 // ================================================
                 (newBalance, creditedAmount, blockNumber) => {
                     successFired = true;
@@ -808,7 +797,6 @@ function attachFormHandler(user) {
 
                     updateBalance(newBalance);
 
-                    // Clear form
                     amountInput.value = '';
                     txHashInput.value = '';
                 },
@@ -817,7 +805,6 @@ function attachFormHandler(user) {
                 // 🔥 ON ERROR
                 // ================================================
                 (error) => {
-                    // Agar success already fire ho chuka hai, error mat dikhao
                     if (successFired) {
                         console.warn('Ignoring error because success already fired:', error);
                         return;
@@ -832,10 +819,29 @@ function attachFormHandler(user) {
                 }
             );
 
+            // 🔥 IMPORTANT: Check result AFTER all callbacks fire
+            // If result has amountMismatch and callback didn't fire
+            if (result && result.amountMismatch && !successFired) {
+                const analysis = analyzeError(result.error, amount);
+                updateVerificationStatus(
+                    analysis.type === 'warning' ? 'error' : analysis.type,
+                    analysis.statusHTML
+                );
+                showToast(analysis.message, analysis.type, 8000);
+            }
+            // If result has error and callback didn't fire
+            else if (result && result.error && !successFired) {
+                const analysis = analyzeError(result.error, amount);
+                updateVerificationStatus(
+                    analysis.type === 'warning' ? 'error' : analysis.type,
+                    analysis.statusHTML
+                );
+                showToast(analysis.message, analysis.type, 8000);
+            }
+
         } catch (error) {
             console.error('Deposit error:', error);
 
-            // 🔥 KEY FIX: Agar success already fire ho chuka hai, error mat dikhao
             if (successFired) {
                 console.warn('Ignoring catch error because success already fired:', error);
             } else {

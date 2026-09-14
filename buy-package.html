@@ -76,7 +76,7 @@
         ::-webkit-scrollbar-thumb:hover { background: rgba(46, 204, 113, 0.45); }
 
         /* ============================================================
-           NAVBAR (Same as Dashboard)
+           NAVBAR (Dashboard style — icon HATA diya)
            ============================================================ */
         .navbar-custom {
             background: rgba(6, 11, 20, 0.85);
@@ -92,45 +92,17 @@
 
         .navbar-custom .navbar-brand {
             font-weight: 800;
-            font-size: 1.25rem;
+            font-size: 1.35rem;
             color: #fff !important;
             letter-spacing: -0.5px;
             display: flex;
             align-items: center;
             gap: 12px;
+            transition: all 0.3s ease;
         }
 
-        .navbar-custom .navbar-brand .brand-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 13px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-            color: #fff;
-            box-shadow: 0 4px 18px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.2);
-            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-        }
-
-        .navbar-custom .navbar-brand:hover .brand-icon {
-            transform: rotate(-6deg) scale(1.05);
-            box-shadow: 0 6px 24px rgba(46, 204, 113, 0.5), inset 0 1px 0 rgba(255,255,255,0.3);
-        }
-
-        .navbar-custom .navbar-brand .brand-icon::after {
-            content: '';
-            position: absolute;
-            top: -2px;
-            right: -2px;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #4cd7f6;
-            box-shadow: 0 0 10px #4cd7f6;
-            border: 2px solid var(--bg-dark);
+        .navbar-custom .navbar-brand:hover {
+            color: var(--primary) !important;
         }
 
         /* ============================================================
@@ -777,19 +749,22 @@
             width: 18px;
         }
 
+        /* ============================================================
+           PLAN CTA BUTTON — GREEN (matching Dashboard primary)
+           ============================================================ */
         .package-card .plan-cta {
             margin-top: 18px;
             width: 100%;
-            padding: 11px 0;
+            padding: 12px 0;
             border: none;
             border-radius: 60px;
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: 0.88rem;
             letter-spacing: 0.3px;
-            background: linear-gradient(145deg, #f59e0b, #d97706);
-            color: #0b111e;
-            box-shadow: 0 8px 18px rgba(245, 158, 11, 0.25);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #fff;
+            box-shadow: 0 8px 20px rgba(46, 204, 113, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -812,12 +787,14 @@
 
         .package-card .plan-cta:hover {
             transform: translateY(-2px);
-            box-shadow: 0 12px 28px rgba(245, 158, 11, 0.4);
-            background: linear-gradient(145deg, #fbbf24, #f59e0b);
-            color: #000;
+            box-shadow: 0 12px 30px rgba(46, 204, 113, 0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+            background: linear-gradient(135deg, #34d399, var(--primary));
+            color: #fff;
         }
 
         .package-card .plan-cta:hover::before { left: 100%; }
+
+        .package-card .plan-cta:active { transform: translateY(0); }
 
         .package-card .plan-cta i { font-size: 1.05rem; }
 
@@ -1044,8 +1021,7 @@
             .wallet-card-new { padding: 16px 14px; }
             .wallet-card-new .wallet-card-value { font-size: 1.35rem; }
             .package-card { padding: 1.35rem 1.1rem; }
-            .navbar-custom .navbar-brand { font-size: 1.05rem; }
-            .navbar-custom .navbar-brand .brand-icon { width: 34px; height: 34px; font-size: 1.1rem; }
+            .navbar-custom .navbar-brand { font-size: 1.1rem; }
         }
     </style>
 </head>
@@ -1053,13 +1029,10 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- ====== NAVBAR (Dashboard style) ====== -->
+<!-- ====== NAVBAR (Icon hata diya — sirf text) ====== -->
 <nav class="navbar navbar-custom">
     <div class="container-fluid px-3">
         <a class="navbar-brand" href="dashboard.html">
-            <div class="brand-icon">
-                <i class="bi bi-currency-bitcoin"></i>
-            </div>
             RND Staking
         </a>
         <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Menu">

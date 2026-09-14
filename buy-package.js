@@ -493,9 +493,6 @@ onAuthStateChanged(auth, async (user) => {
 
         const depositWallet = finalUserData.depositWallet || 0;
         const referralWallet = finalUserData.referralWallet || 0;
-        const rndWallet = finalUserData.rndWallet || 0;
-        const lockedRND = finalUserData.lockedRND || 0;
-        const releaseWallet = finalUserData.releaseWallet || 0;
 
         let packagesHtml = '';
         userPackages.forEach((p) => {
@@ -577,12 +574,6 @@ onAuthStateChanged(auth, async (user) => {
                                     <span>Earned from referrals</span>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="release-info-box mt-3">
-                            <span class="label"><i class="bi bi-info-circle me-1"></i> Package buy karte hi RND Locked wallet mein add ho jayega. Release next day se start hoga.</span>
-                            <span class="label">Today's Release:</span>
-                            <span class="value">${(releaseWallet || 0).toFixed(4)} RND</span>
                         </div>
                     </div>
                 </div>

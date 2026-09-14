@@ -52,7 +52,7 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Ambient background glow (Same as Dashboard) */
+        /* Ambient background glow */
         body::before {
             content: '';
             position: fixed;
@@ -68,7 +68,7 @@
         }
 
         /* ============================================================
-           SCROLLBAR (Same as Dashboard)
+           SCROLLBAR
            ============================================================ */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: rgba(46, 204, 113, 0.03); border-radius: 10px; }
@@ -76,7 +76,7 @@
         ::-webkit-scrollbar-thumb:hover { background: rgba(46, 204, 113, 0.45); }
 
         /* ============================================================
-           NAVBAR (Dashboard style — icon HATA diya)
+           NAVBAR
            ============================================================ */
         .navbar-custom {
             background: rgba(6, 11, 20, 0.85);
@@ -106,7 +106,7 @@
         }
 
         /* ============================================================
-           SIDEBAR TOGGLE (Same as Dashboard)
+           SIDEBAR TOGGLE
            ============================================================ */
         .sidebar-toggle {
             background: rgba(46, 204, 113, 0.08);
@@ -145,7 +145,7 @@
         .sidebar-toggle i { position: relative; z-index: 1; }
 
         /* ============================================================
-           SIDEBAR OVERLAY (Same as Dashboard)
+           SIDEBAR OVERLAY
            ============================================================ */
         .sidebar-overlay {
             position: fixed;
@@ -165,7 +165,7 @@
         .sidebar-overlay.active { display: block; opacity: 1; }
 
         /* ============================================================
-           SIDEBAR PANEL (Same as Dashboard)
+           SIDEBAR PANEL
            ============================================================ */
         .sidebar-panel {
             position: fixed;
@@ -230,7 +230,7 @@
         }
 
         /* ============================================================
-           USER PROFILE SIDEBAR (Same as Dashboard)
+           USER PROFILE SIDEBAR
            ============================================================ */
         .user-profile-sidebar {
             padding: 20px;
@@ -268,7 +268,7 @@
         }
 
         /* ============================================================
-           SIDEBAR NAV ITEMS (Same as Dashboard)
+           SIDEBAR NAV ITEMS
            ============================================================ */
         .sidebar-panel .nav-item {
             display: flex;
@@ -351,7 +351,7 @@
         .sidebar-panel .sidebar-footer .nav-item::before { background: var(--red); }
 
         /* ============================================================
-           DASHBOARD CONTAINER (Same as Dashboard)
+           DASHBOARD CONTAINER
            ============================================================ */
         .dashboard-container {
             padding: 24px;
@@ -362,7 +362,7 @@
         }
 
         /* ============================================================
-           PAGE HEADER (matching welcome section style)
+           PAGE HEADER
            ============================================================ */
         .page-header-section {
             background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(26, 122, 58, 0.03));
@@ -419,7 +419,7 @@
         .page-header-section .rnd-price-badge { position: relative; z-index: 1; }
 
         /* ============================================================
-           RND PRICE BADGE (Same as Dashboard)
+           RND PRICE BADGE
            ============================================================ */
         .rnd-price-badge {
             background: rgba(46, 204, 113, 0.08);
@@ -441,7 +441,7 @@
         }
 
         /* ============================================================
-           GLASS CARDS (Same as Dashboard)
+           GLASS CARDS
            ============================================================ */
         .card-glass {
             background: var(--bg-card);
@@ -493,7 +493,7 @@
         }
 
         /* ============================================================
-           WALLET CARDS (Same as Dashboard "wallet-card" style)
+           WALLET CARDS
            ============================================================ */
         .wallet-cards-row {
             display: grid;
@@ -629,7 +629,7 @@
         .wallet-card-new.referral .wallet-card-footer i { color: var(--gold); }
 
         /* ============================================================
-           PACKAGE CARDS (matching dashboard card style)
+           PACKAGE CARDS
            ============================================================ */
         .package-card {
             background: var(--bg-card);
@@ -750,7 +750,7 @@
         }
 
         /* ============================================================
-           PLAN CTA BUTTON — GREEN (matching Dashboard primary)
+           PLAN CTA BUTTON — GREEN
            ============================================================ */
         .package-card .plan-cta {
             margin-top: 18px;
@@ -799,7 +799,7 @@
         .package-card .plan-cta i { font-size: 1.05rem; }
 
         /* ============================================================
-           FORM CONTROLS (Same as Dashboard)
+           FORM CONTROLS
            ============================================================ */
         .form-control-custom {
             background: rgba(6, 11, 20, 0.8) !important;
@@ -839,7 +839,7 @@
         .form-label .required { color: var(--red); }
 
         /* ============================================================
-           BUTTONS (Same as Dashboard)
+           BUTTONS
            ============================================================ */
         .btn-primary-custom {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -890,7 +890,7 @@
         }
 
         /* ============================================================
-           PACKAGE HISTORY (matching card-glass style)
+           PACKAGE HISTORY
            ============================================================ */
         .package-history {
             margin-top: 12px;
@@ -951,7 +951,7 @@
         }
 
         /* ============================================================
-           TOAST (Same as Dashboard)
+           TOAST
            ============================================================ */
         .toast-container {
             position: fixed;
@@ -1029,7 +1029,7 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- ====== NAVBAR (Icon hata diya — sirf text) ====== -->
+<!-- ====== NAVBAR ====== -->
 <nav class="navbar navbar-custom">
     <div class="container-fluid px-3">
         <a class="navbar-brand" href="dashboard.html">
@@ -1041,13 +1041,14 @@
     </div>
 </nav>
 
-<!-- ====== SIDEBAR (Dashboard style) ====== -->
+<!-- ====== SIDEBAR (Exact match with Dashboard) ====== -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="sidebar-panel" id="sidebarPanel">
     <div class="sidebar-header">
         <h5><i class="bi bi-grid-1x2-fill"></i> Menu</h5>
         <button class="sidebar-close" id="sidebarClose"><i class="bi bi-x-lg"></i></button>
     </div>
+    
     <div class="user-profile-sidebar">
         <div class="d-flex align-items-center gap-3">
             <div class="avatar" id="sidebarAvatar">U</div>
@@ -1057,16 +1058,63 @@
             </div>
         </div>
     </div>
-    <a href="dashboard.html" class="nav-item"><i class="bi bi-speedometer2"></i> <span>Dashboard</span></a>
-    <a href="deposit.html" class="nav-item"><i class="bi bi-arrow-down-circle"></i> <span>Deposit</span></a>
-    <a href="withdrawal.html" class="nav-item"><i class="bi bi-arrow-up-circle"></i> <span>Withdraw</span></a>
-    <a href="referrals.html" class="nav-item"><i class="bi bi-people"></i> <span>Referrals</span> <span class="badge" id="referralBadge">0</span></a>
-    <a href="buy-package.html" class="nav-item active"><i class="bi bi-box-seam"></i> <span>Buy Package</span></a>
-    <a href="transactions.html" class="nav-item"><i class="bi bi-receipt"></i> <span>Transactions</span></a>
-    <a href="invoice.html" class="nav-item"><i class="bi bi-file-text"></i> <span>Invoice</span></a>
-    <a href="profile.html" class="nav-item"><i class="bi bi-person"></i> <span>Profile</span></a>
+
+    <a href="dashboard.html" class="nav-item">
+        <i class="bi bi-speedometer2"></i>
+        <span>Dashboard</span>
+    </a>
+    <a href="deposit.html" class="nav-item">
+        <i class="bi bi-arrow-down-circle"></i>
+        <span>Deposit</span>
+    </a>
+    <a href="withdrawal.html" class="nav-item">
+        <i class="bi bi-arrow-up-circle"></i>
+        <span>Withdraw</span>
+    </a>
+    <a href="buy-package.html" class="nav-item active">
+        <i class="bi bi-box-seam"></i>
+        <span>Buy Package</span>
+    </a>
+    <a href="referrals.html" class="nav-item">
+        <i class="bi bi-people"></i>
+        <span>Referrals</span>
+        <span class="badge" id="referralBadge">0</span>
+    </a>
+    <a href="transfer.html" class="nav-item">
+        <i class="bi bi-arrow-left-right"></i>
+        <span>Transfer</span>
+        <span class="badge" id="transferBadge">0</span>
+    </a>
+    <a href="rank-reward.html" class="nav-item">
+        <i class="bi bi-trophy"></i>
+        <span>Rank Reward</span>
+    </a>
+    <a href="direct-offer.html" class="nav-item direct-offer-nav" id="directOfferNav">
+        <i class="bi bi-gift"></i>
+        <span>Direct Offer</span>
+    </a>
+    <a href="transactions.html" class="nav-item">
+        <i class="bi bi-receipt"></i>
+        <span>Transactions</span>
+    </a>
+    <a href="invoice.html" class="nav-item">
+        <i class="bi bi-file-text"></i>
+        <span>Invoice</span>
+    </a>
+    <a href="profile.html" class="nav-item">
+        <i class="bi bi-person"></i>
+        <span>Profile</span>
+    </a>
+    <a href="#" onclick="window.open('support.html', '_blank'); return false;" class="nav-item">
+        <i class="bi bi-headset"></i>
+        <span>Support Center</span>
+    </a>
+    
     <div class="sidebar-footer">
-        <a href="#" class="nav-item" id="logoutBtnSidebar"><i class="bi bi-box-arrow-right"></i> <span>Logout</span></a>
+        <a href="#" class="nav-item" id="logoutBtnSidebar">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Logout</span>
+        </a>
     </div>
 </div>
 

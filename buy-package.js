@@ -345,7 +345,19 @@ async function processAtomicPurchase(uid, plan, payAmount, payFrom, result) {
 }
 
 // ============================================================
-// 🔥 ATOMIC REFERRAL COMMISSION
+// 🔥 ATOMIC REFERRAL COMMISSION (FIXED)
+// ============================================================
+// 🔥 FIX v2:
+//   - commissionProcessed = true SIRF tab set karo jab SAARE
+//     required sponsor commissions SUCCESS ho jaayen
+//   - Agar koi level fail ho, to package ko retry-able rakho:
+//       commissionProcessed: false
+//       commissionProcessing: false
+//       commissionPartial: true
+//       commissionFailedLevels: [list of failed levels]
+//   - Dashboard.js ka processReferralCommission() failed levels
+//     ko apne aap retry kar dega (uska commissionHistory-based
+//     duplicate check successful levels ko skip kar dega)
 // ============================================================
 async function distributeReferralCommissionAtomic(userUid, amount, rndPriceAtTime, packageId) {
     try {
@@ -355,10 +367,38 @@ async function distributeReferralCommissionAtomic(userUid, amount, rndPriceAtTim
         const date = new Date().toDateString();
         
         const usersSnap = await get(ref(db, 'users'));
-        if (!usersSnap.exists()) return { totalCommission: 0, commissionCount: 0 };
+        if (!usersSnap.exists()) {
+            // No users at all — nothing to process, mark processed to avoid
+            // infinite retry by Dashboard
+            try {
+                await update(ref(db, `users/${userUid}/packages/${packageId}`), {
+                    commissionProcessed: true,
+                    commissionProcessing: false,
+                    commissionProcessedAt: timestamp,
+                    commissionTxIds: [],
+                    commissionNoSponsors: true
+                });
+            } catch (e) {
+                console.warn('Could not mark package as processed (no users):', e);
+            }
+            return { totalCommission: 0, commissionCount: 0 };
+        }
         const users = usersSnap.val();
         const currentUser = users[userUid];
-        if (!currentUser) return { totalCommission: 0, commissionCount: 0 };
+        if (!currentUser) {
+            try {
+                await update(ref(db, `users/${userUid}/packages/${packageId}`), {
+                    commissionProcessed: true,
+                    commissionProcessing: false,
+                    commissionProcessedAt: timestamp,
+                    commissionTxIds: [],
+                    commissionNoSponsors: true
+                });
+            } catch (e) {
+                console.warn('Could not mark package as processed (no current user):', e);
+            }
+            return { totalCommission: 0, commissionCount: 0 };
+        }
         
         let currentRefCode = currentUser.referredBy || '';
         let totalCommission = 0;
@@ -394,24 +434,73 @@ async function distributeReferralCommissionAtomic(userUid, amount, rndPriceAtTim
             currentRefCode = sponsor.referredBy || '';
         }
         
+        // ============================================================
+        // No sponsors at all — nothing to distribute.
+        // Mark as processed so Dashboard doesn't keep retrying.
+        // ============================================================
         if (sponsors.length === 0) {
+            try {
+                await update(ref(db, `users/${userUid}/packages/${packageId}`), {
+                    commissionProcessed: true,
+                    commissionProcessing: false,
+                    commissionProcessedAt: timestamp,
+                    commissionTxIds: [],
+                    commissionNoSponsors: true
+                });
+                console.log('✅ Package marked processed (no sponsors):', packageId);
+            } catch (e) {
+                console.warn('Could not mark package as processed (no sponsors):', e);
+            }
             return { totalCommission: 0, commissionCount: 0 };
         }
         
         let successCount = 0;
         let failedSponsors = [];
+        const processedTxIds = [];
         
+        // ============================================================
+        // Distribute commission level by level
+        // ============================================================
         for (const sponsor of sponsors) {
             try {
                 const sponsorRef = ref(db, 'users/' + sponsor.uid);
+                const commissionTxId = `comm_${packageId}_L${sponsor.level}`;
+                
                 const result = await runTransaction(sponsorRef, (currentData) => {
                     if (!currentData) return { ...currentData };
+                    
+                    // 🔥 Duplicate check — commission already credited for this package+level
+                    const commissionHistory = currentData.commissionHistory || [];
+                    const alreadyExists = Array.isArray(commissionHistory)
+                        ? commissionHistory.find(h => h.txId === commissionTxId)
+                        : Object.values(commissionHistory).find(h => h && h.txId === commissionTxId);
+                    
+                    if (alreadyExists) {
+                        console.log(`⚠️ Commission already exists for ${commissionTxId}`);
+                        return { ...currentData }; // abort — no change
+                    }
                     
                     const newReferralEarnings = roundTo8((currentData.referralEarnings || 0) + sponsor.commission);
                     const newReferralWallet = roundTo8((currentData.referralWallet || 0) + sponsor.commission);
                     const newTeamBusiness = roundTo8((currentData.teamBusiness || 0) + amount);
                     const newTotalReferralCommission = roundTo8((currentData.totalReferralCommission || 0) + sponsor.commission);
                     const newLevelEarnings = roundTo8((currentData[`level${sponsor.level}Earnings`] || 0) + sponsor.commission);
+                    
+                    // 🔥 Add to commissionHistory with deterministic txId
+                    const newHistory = Array.isArray(commissionHistory) ? [...commissionHistory] : Object.values(commissionHistory || {});
+                    newHistory.push({
+                        type: 'referral_commission',
+                        level: sponsor.level,
+                        percent: rates[sponsor.level - 1] * 100,
+                        amount: sponsor.commission,
+                        fromUser: currentUser.username || userUid,
+                        fromUid: userUid,
+                        packageId: packageId,
+                        txId: commissionTxId,
+                        timestamp: timestamp,
+                        date: date,
+                        description: `${sponsor.levelName} commission from package purchase`
+                    });
                     
                     const transactions = currentData.transactions || {};
                     const txId = 'tx_' + timestamp + '_' + Math.random().toString(36).substr(2, 8);
@@ -421,11 +510,13 @@ async function distributeReferralCommissionAtomic(userUid, amount, rndPriceAtTim
                         amount: sponsor.commission,
                         currency: 'USDT',
                         fromUser: currentUser.username || userUid,
+                        fromUid: userUid,
                         packageId: packageId,
                         rate: rndPriceAtTime,
                         timestamp: timestamp,
                         date: date,
                         status: 'completed',
+                        txId: commissionTxId,
                         description: `${sponsor.levelName} commission from package purchase`
                     };
                     
@@ -436,12 +527,14 @@ async function distributeReferralCommissionAtomic(userUid, amount, rndPriceAtTim
                         teamBusiness: newTeamBusiness,
                         totalReferralCommission: newTotalReferralCommission,
                         [`level${sponsor.level}Earnings`]: newLevelEarnings,
+                        commissionHistory: newHistory,
                         transactions: transactions
                     };
                 });
                 
                 if (result.committed) {
                     successCount++;
+                    processedTxIds.push(commissionTxId);
                 } else {
                     failedSponsors.push(sponsor.level);
                 }
@@ -451,12 +544,55 @@ async function distributeReferralCommissionAtomic(userUid, amount, rndPriceAtTim
             }
         }
         
+        // ============================================================
+        // 🔥 CRITICAL: Conditional marking based on success/failure
+        // ============================================================
+        const allSuccess = failedSponsors.length === 0 && successCount === sponsors.length;
+        
+        if (allSuccess) {
+            // ✅ ALL SUCCESS → mark fully processed
+            try {
+                await update(ref(db, `users/${userUid}/packages/${packageId}`), {
+                    commissionProcessed: true,
+                    commissionProcessing: false,
+                    commissionProcessedAt: timestamp,
+                    commissionTxIds: processedTxIds,
+                    commissionPartial: false,
+                    commissionFailedLevels: null
+                });
+                console.log('✅ Package marked fully commission-processed:', packageId, `(${successCount}/${sponsors.length})`);
+            } catch (markErr) {
+                console.error('⚠️ Could not mark package as fully processed:', markErr);
+                // Non-critical — Dashboard's own commissionHistory check will protect
+            }
+        } else {
+            // ⚠️ PARTIAL FAILURE → keep retry-able for Dashboard
+            try {
+                await update(ref(db, `users/${userUid}/packages/${packageId}`), {
+                    commissionProcessed: false,   // 🔥 allow retry
+                    commissionProcessing: false,  // 🔥 no active lock
+                    commissionPartial: true,
+                    commissionFailedLevels: failedSponsors,
+                    commissionLastAttemptAt: timestamp,
+                    commissionTxIds: processedTxIds
+                });
+                console.warn(
+                    `⚠️ Partial commission: ${successCount}/${sponsors.length} succeeded. Failed levels:`,
+                    failedSponsors,
+                    `— Dashboard will retry on next load.`
+                );
+            } catch (markErr) {
+                console.error('⚠️ Could not persist partial commission state:', markErr);
+            }
+        }
+        
         return { 
             totalCommission: roundTo8(totalCommission),
             commissionCount, 
             successCount,
             failedCount: sponsors.length - successCount,
-            failedSponsors: failedSponsors
+            failedSponsors: failedSponsors,
+            allSuccess: allSuccess
         };
     } catch (error) {
         console.error('Error distributing referral commission:', error);
@@ -530,16 +666,14 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('packageContent').innerHTML = `
             <div class="row g-4">
                 <div class="col-12">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center">
-                        <h4 class="fw-bold"><i class="bi bi-box-seam text-success me-2"></i>Buy Package</h4>
+                    <div class="page-header-section">
+                        <h4><i class="bi bi-box-seam"></i> Buy Package</h4>
                         <span class="rnd-price-badge"><i class="bi bi-currency-dollar"></i> 1 RND = $${(rndPrice || 1).toFixed(4)}</span>
                     </div>
-                    <hr class="border-secondary">
                 </div>
 
                 <div class="col-12">
                     <div class="card-glass">
-                        <!-- WALLET CARDS: ONLY DEPOSIT + REFERRAL -->
                         <div class="wallet-cards-row">
                             <div class="wallet-card-new deposit">
                                 <div class="wallet-card-header">
@@ -659,7 +793,6 @@ onAuthStateChanged(auth, async (user) => {
             </div>
         `;
 
-        // ---- attach CTA button listeners ----
         document.querySelectorAll('.plan-cta').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -681,7 +814,6 @@ onAuthStateChanged(auth, async (user) => {
             });
         });
 
-        // ---- input realtime calculation ----
         const payAmountInput = document.getElementById('payAmount');
         if (payAmountInput) {
             payAmountInput.addEventListener('input', function() {
@@ -705,7 +837,6 @@ onAuthStateChanged(auth, async (user) => {
             });
         }
 
-        // ---- buy form submission ----
         const buyForm = document.getElementById('buyForm');
         if (buyForm) {
             buyForm.addEventListener('submit', async (e) => {
@@ -771,6 +902,7 @@ onAuthStateChanged(auth, async (user) => {
                         
                         if (commissionResult.failedCount > 0) {
                             console.warn(`⚠️ ${commissionResult.failedCount} referral commissions failed for levels:`, commissionResult.failedSponsors);
+                            console.log('ℹ️ Dashboard will auto-retry failed commissions on next load.');
                         }
                     } catch (commissionError) {
                         console.warn('Referral commission error (non-critical):', commissionError);

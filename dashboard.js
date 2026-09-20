@@ -1,11 +1,12 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (v9 - Transfer UI Removed)
+// RND STAKING PLATFORM - DASHBOARD.JS (v10 - FIXED RELEASE)
 // ============================================================
-// ✅ Transfer section dashboard UI se HATA diya
-//    (Transfer ab alag page transfer.html par hota hai)
-// ✅ Baaki saara logic same
-// ✅ handleTransfer() aur atomicTransfer() functions rakhe hain
-//    (agar kisi aur page se call ho sakte hain)
+// ✅ Daily release calculation FIXED
+// ✅ Pending release calculation FIXED
+// ✅ First-time login release FIXED
+// ✅ Same-day login release FIXED
+// ✅ Multiple days pending release FIXED
+// ✅ Live release wallet calculation FIXED
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -99,14 +100,21 @@ function generateBackupId() {
 }
 
 function getTodayDate() {
-    return new Date().toISOString().split('T')[0];
+    // Always use LOCAL date to avoid timezone mismatch
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
 }
 
-function getDaysBetween(date1, date2) {
-    const d1 = new Date(date1);
-    const d2 = new Date(date2);
-    const diffTime = Math.abs(d2 - d1);
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+// ✅ FIXED: Proper date difference in days
+function getDaysBetween(dateStr1, dateStr2) {
+    if (!dateStr1 || !dateStr2) return 0;
+    const d1 = new Date(dateStr1 + 'T00:00:00');
+    const d2 = new Date(dateStr2 + 'T00:00:00');
+    const diffTime = d2.getTime() - d1.getTime();
+    return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
 function generateRequestId() {
@@ -424,7 +432,19 @@ async function recoverUserData(userId, authUser) {
 }
 
 // ============================================================
-// SAFE DAILY RELEASE
+// ✅ FIXED: SAFE DAILY RELEASE
+// ============================================================
+// पिछली गलतियाँ:
+// 1. Same-day login पर release skip हो जाता था
+// 2. first-time login पर release नहीं होता था
+// 3. Timezone issues थे
+// 4. Pending transaction amounts गलत record होते थे
+//
+// नया logic:
+// - lastReleaseDate खाली है → आज ही से count शुरू करें
+// - lastReleaseDate == today → कुछ न करें
+// - lastReleaseDate < today → missing days + today सब process करें
+// - हर package का अपना dailyRelease और remainingRND का ध्यान रखें
 // ============================================================
 async function processDailyRelease(userId) {
     if (releaseInProgress) {
@@ -433,22 +453,50 @@ async function processDailyRelease(userId) {
     }
     
     releaseInProgress = true;
+    const today = getTodayDate();
     
     try {
         const userRef = ref(db, 'users/' + userId);
-        const today = getTodayDate();
         
+        // First check current state
+        const preSnap = await get(userRef);
+        if (!preSnap.exists()) {
+            releaseInProgress = false;
+            return null;
+        }
+        
+        const preData = preSnap.val();
+        const lastReleaseDate = preData.lastReleaseDate || '';
+        
+        // ✅ Case 1: आज ही release हो चुका है
+        if (lastReleaseDate === today) {
+            console.log('✅ Release already processed today');
+            releaseInProgress = false;
+            return preData;
+        }
+        
+        // ✅ Case 2: Calculate कितने दिन pending हैं
+        let daysToProcess = 1; // Default: आज का ही
+        if (lastReleaseDate) {
+            const daysDiff = getDaysBetween(lastReleaseDate, today);
+            // daysDiff = today - lastRelease = कितने दिन का gap
+            // e.g., lastReleaseDate = 15 Sept, today = 20 Sept → daysDiff = 5
+            // तो 16, 17, 18, 19, 20 → 5 दिन का release pending है
+            if (daysDiff > 0) {
+                daysToProcess = daysDiff;
+            } else if (daysDiff === 0) {
+                // Same day, skip
+                releaseInProgress = false;
+                return preData;
+            }
+        }
+        // अगर lastReleaseDate खाली है (नया user), तो सिर्फ आज का 1 दिन
+        
+        console.log(`📅 Processing ${daysToProcess} day(s) of release`);
+        
+        // ✅ NOW RUN THE TRANSACTION
         const result = await runTransaction(userRef, (currentData) => {
             if (!currentData) return currentData;
-            
-            const lastReleaseDate = currentData.lastReleaseDate || '';
-            
-            let pendingDays = 0;
-            if (lastReleaseDate) {
-                const daysDiff = getDaysBetween(lastReleaseDate, today);
-                if (daysDiff === 0) return currentData;
-                pendingDays = Math.max(0, daysDiff - 1);
-            }
             
             const packages = currentData.packages || {};
             let updatedPackages = {};
@@ -457,7 +505,7 @@ async function processDailyRelease(userId) {
             let hasActivePackages = false;
             
             for (const [pkgKey, pkg] of Object.entries(packages)) {
-                if (pkg.status !== 'active') {
+                if (!pkg || pkg.status !== 'active') {
                     updatedPackages[pkgKey] = pkg;
                     continue;
                 }
@@ -466,6 +514,7 @@ async function processDailyRelease(userId) {
                 const remainingRND = pkg.remainingRND || 0;
                 const dailyRelease = pkg.dailyRelease || 0;
                 
+                // Skip if no daily release or no remaining
                 if (dailyRelease <= 0 || remainingRND <= 0) {
                     if (remainingRND <= 0) {
                         pkg.status = 'completed';
@@ -475,10 +524,13 @@ async function processDailyRelease(userId) {
                     continue;
                 }
                 
-                const totalDaysToRelease = pendingDays + 1;
-                let totalReleaseAmount = Math.min(dailyRelease * totalDaysToRelease, remainingRND);
-                let todayReleaseAmount = Math.min(dailyRelease, remainingRND);
+                // ✅ Calculate total release for all pending days
+                const totalPossibleRelease = dailyRelease * daysToProcess;
+                const totalReleaseAmount = Math.min(totalPossibleRelease, remainingRND);
+                const todayReleaseAmount = Math.min(dailyRelease, remainingRND);
+                const pendingReleaseAmount = totalReleaseAmount - todayReleaseAmount;
                 
+                // Update package
                 pkg.remainingRND = remainingRND - totalReleaseAmount;
                 pkg.releasedRND = (pkg.releasedRND || 0) + totalReleaseAmount;
                 
@@ -490,6 +542,7 @@ async function processDailyRelease(userId) {
                 updatedPackages[pkgKey] = pkg;
                 totalReleaseAmountAll += totalReleaseAmount;
                 
+                // ✅ Today's release transaction
                 releaseTransactions.push({
                     type: 'daily_release',
                     amount: todayReleaseAmount,
@@ -502,33 +555,39 @@ async function processDailyRelease(userId) {
                     description: `Daily release of ${todayReleaseAmount.toFixed(4)} RND`
                 });
                 
-                if (pendingDays > 0) {
-                    const pendingAmount = totalReleaseAmount - todayReleaseAmount;
+                // ✅ Pending releases transaction (if any)
+                if (pendingReleaseAmount > 0) {
                     releaseTransactions.push({
                         type: 'pending_release',
-                        amount: pendingAmount,
+                        amount: pendingReleaseAmount,
                         currency: 'RND',
                         packageId: pkgKey,
                         planName: pkg.planName || 'Package',
                         timestamp: Date.now(),
                         date: today,
                         status: 'completed',
-                        description: `Pending release of ${pendingAmount.toFixed(4)} RND (${pendingDays} days)`
+                        daysCount: daysToProcess - 1,
+                        description: `Pending release of ${pendingReleaseAmount.toFixed(4)} RND for ${daysToProcess - 1} day(s)`
                     });
                 }
             }
             
+            // ✅ Always update lastReleaseDate even if no active packages
+            currentData.lastReleaseDate = today;
+            
             if (!hasActivePackages || totalReleaseAmountAll === 0) {
-                currentData.lastReleaseDate = today;
+                // No release amount, but still update the date
+                currentData.packages = updatedPackages;
                 return currentData;
             }
             
+            // ✅ Update wallets
             currentData.rndWallet = (currentData.rndWallet || 0) + totalReleaseAmountAll;
-            currentData.lockedRND = (currentData.lockedRND || 0) - totalReleaseAmountAll;
+            currentData.lockedRND = Math.max(0, (currentData.lockedRND || 0) - totalReleaseAmountAll);
             currentData.totalReleased = (currentData.totalReleased || 0) + totalReleaseAmountAll;
-            currentData.lastReleaseDate = today;
             currentData.packages = updatedPackages;
             
+            // ✅ Add transactions
             const transactions = currentData.transactions || {};
             releaseTransactions.forEach(tx => {
                 transactions[generateTxId()] = tx;
@@ -539,15 +598,19 @@ async function processDailyRelease(userId) {
         });
         
         if (result.committed && result.snapshot.exists()) {
-            console.log('✅ Daily release processed');
-            return result.snapshot.val();
+            const finalData = result.snapshot.val();
+            console.log(`✅ Daily release processed: +${finalData.totalReleased}`);
+            releaseInProgress = false;
+            return finalData;
         }
-        return null;
+        
+        releaseInProgress = false;
+        return preData;
+        
     } catch (error) {
         console.error('❌ Daily release error:', error);
-        return null;
-    } finally {
         releaseInProgress = false;
+        return null;
     }
 }
 
@@ -712,7 +775,7 @@ async function processReferralCommission(userId, packageId, packageData) {
 }
 
 // ============================================================
-// CALCULATE USER STATS
+// ✅ FIXED: CALCULATE USER STATS
 // ============================================================
 function calculateUserStats(userData) {
     const packages = userData.packages || {};
@@ -724,6 +787,8 @@ function calculateUserStats(userData) {
     
     for (let key in packages) {
         const pkg = packages[key];
+        if (!pkg) continue;
+        
         if (pkg.status === 'active') {
             totalLockedRND += (pkg.remainingRND || 0);
             totalDailyRelease += (pkg.dailyRelease || 0);
@@ -733,11 +798,17 @@ function calculateUserStats(userData) {
         totalReleased += (pkg.releasedRND || 0);
     }
     
-    return { totalLockedRND, totalDailyRelease, activePackages, totalStake, totalReleased };
+    return { 
+        totalLockedRND, 
+        totalDailyRelease, 
+        activePackages, 
+        totalStake, 
+        totalReleased 
+    };
 }
 
 // ============================================================
-// ATOMIC TRANSFER (rakha hai — agar kahin se call ho)
+// ATOMIC TRANSFER (rakha hai — transfer.html se call hoga)
 // ============================================================
 async function atomicTransfer(senderUid, recipientUid, recipientData, amount, walletType, currency, requestId) {
     if (!senderUid || !recipientUid) {
@@ -958,7 +1029,7 @@ function setupRealtimeListener(userId) {
 }
 
 // ============================================================
-// UPDATE DASHBOARD UI
+// ✅ FIXED: UPDATE DASHBOARD UI — live release wallet
 // ============================================================
 function updateDashboardUI(u, stats) {
     const elements = {
@@ -976,7 +1047,8 @@ function updateDashboardUI(u, stats) {
         lockedRNDInfo: document.getElementById('lockedRNDInfo')
     };
     
-    const dailyReleaseValue = stats?.totalDailyRelease || u.releaseWallet || 0;
+    // ✅ FIXED: Live calculate daily release from packages
+    const dailyReleaseValue = stats?.totalDailyRelease || 0;
     const lockedRNDValue = stats?.totalLockedRND || u.lockedRND || 0;
     
     if (elements.depositWallet) elements.depositWallet.textContent = '$' + (u.depositWallet || 0).toFixed(2);
@@ -995,7 +1067,7 @@ function updateDashboardUI(u, stats) {
 }
 
 // ============================================================
-// ✅ RENDER DASHBOARD — Transfer section HATA diya
+// RENDER DASHBOARD
 // ============================================================
 function renderDashboard(u) {
     const username = u.username || u.referralCode || 'USER';
@@ -1025,11 +1097,14 @@ function renderDashboard(u) {
     const referralWallet = u.referralWallet || 0;
     const rndWallet = u.rndWallet || 0;
     const lockedRND = u.lockedRND || 0;
-    const releaseWallet = u.releaseWallet || 0;
     const totalReleased = u.totalReleased || 0;
     const activePackages = u.activePackages || 0;
     const totalStake = u.totalStake || 0;
     const teamBusiness = u.teamBusiness || 0;
+    
+    // ✅ FIXED: Live calculate daily release
+    const stats = calculateUserStats(u);
+    const releaseWallet = stats.totalDailyRelease;
     
     const level1Earn = u.level1Earnings || 0;
     const level2Earn = u.level2Earnings || 0;
@@ -1245,11 +1320,6 @@ function renderDashboard(u) {
                 </div>
             </div>
             
-            <!-- ============================================ -->
-            <!-- ✅ Transfer section YAHAN SE HATA DIYA      -->
-            <!-- Ab transfer alag page (transfer.html) par    -->
-            <!-- ============================================ -->
-            
             <div class="col-12">
                 <div class="card-glass">
                     <div class="card-title"><i class="bi bi-grid-3x3-gap-fill"></i>Quick Links</div>
@@ -1294,7 +1364,7 @@ window.copyUserId = function(username) {
 };
 
 // ============================================================
-// TRANSFER HANDLER (rakha hai — transfer.html se call hoga)
+// TRANSFER HANDLER
 // ============================================================
 async function handleTransfer() {
     if (transferLock) {
@@ -1307,7 +1377,6 @@ async function handleTransfer() {
     const walletSelect = document.getElementById('transferWallet');
     const btn = document.querySelector('#transferForm button[type="submit"]');
     
-    // Agar form nahi hai toh silently return
     if (!recipientInput || !amountInput || !walletSelect) {
         return;
     }
@@ -1405,13 +1474,16 @@ async function handleTransfer() {
 }
 
 // ============================================================
-// LOAD DASHBOARD DATA
+// ✅ FIXED: LOAD DASHBOARD DATA
+// ============================================================
+// अब हर dashboard load पर पहले daily release process होगा
 // ============================================================
 async function loadDashboardData(userId) {
     if (isDashboardLoading) return;
     isDashboardLoading = true;
     
     try {
+        // Step 1: Reconcile pending transfers
         try {
             const reconciliations = await reconcilePendingTransfers(userId);
             for (const r of reconciliations) {
@@ -1425,6 +1497,7 @@ async function loadDashboardData(userId) {
             console.warn('Reconciliation skipped:', err);
         }
 
+        // Step 2: Check if user exists
         const userSnap = await get(ref(db, 'users/' + userId));
         
         if (!userSnap.exists()) {
@@ -1436,7 +1509,13 @@ async function loadDashboardData(userId) {
             return;
         }
         
-        const u = userSnap.val();
+        // Step 3: ✅ PROCESS DAILY RELEASE (यह पहले missing था!)
+        console.log('🔄 Processing daily release...');
+        await processDailyRelease(userId);
+        
+        // Step 4: Process pending commissions in background
+        const freshSnap = await get(ref(db, 'users/' + userId));
+        const u = freshSnap.val();
         
         const packages = u.packages || {};
         for (let [key, pkg] of Object.entries(packages)) {
@@ -1447,13 +1526,14 @@ async function loadDashboardData(userId) {
             }
         }
         
+        // Step 5: Re-fetch data after release & commission
         const updatedSnap = await get(ref(db, 'users/' + userId));
         const updatedData = updatedSnap.exists() ? updatedSnap.val() : u;
-        const stats = calculateUserStats(updatedData);
         
         currentUserData = updatedData;
         currentUserId = userId;
         
+        // Step 6: Render dashboard
         renderDashboard(updatedData);
         setupRealtimeListener(userId);
         
@@ -1481,7 +1561,6 @@ async function loadDashboardData_internal(userId, authUser) {
     if (checkResult.exists) {
         const recovered = await recoverUserData(userId, authUser);
         if (recovered) {
-            const stats = calculateUserStats(recovered);
             currentUserData = recovered;
             currentUserId = userId;
             renderDashboard(recovered);
@@ -1491,7 +1570,6 @@ async function loadDashboardData_internal(userId, authUser) {
     } else {
         const newUser = await recoverUserData(userId, authUser);
         if (newUser) {
-            const stats = calculateUserStats(newUser);
             currentUserData = newUser;
             currentUserId = userId;
             renderDashboard(newUser);

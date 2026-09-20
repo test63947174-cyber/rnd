@@ -1,4 +1,4 @@
-\// ============================================================
+// ============================================================
 // 🔥 FIREBASE CONFIG (rwebsite-e031b)
 // ============================================================
 import { initializeApp } from "firebase/app";
@@ -8,11 +8,10 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithCustomToken,
   sendPasswordResetEmail,
   signOut,
 } from "firebase/auth";
-import { getDatabase, ref, get } from "firebase/database";
+import { getDatabase, ref, get, set } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -30,8 +29,8 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
 
-// ⚠️ अपना backend URL यहाँ डालें (deploy के बाद)
-const BACKEND_URL = "https://your-backend-url.com";
+// RP (Relying Party) name — browser prompt में दिखेगा
+const RP_NAME = "RND Staking";
 
 // ============================================================
 // 🍞 TOAST
@@ -40,7 +39,10 @@ function showToast(message, type = "success") {
   const container = document.getElementById("toastContainer");
   const toast = document.createElement("div");
   toast.className = `toast-custom ${type}`;
-  const icon = type === "success" ? "bi-check-circle-fill text-success" : "bi-exclamation-triangle-fill text-danger";
+  const icon =
+    type === "success"
+      ? "bi-check-circle-fill text-success"
+      : "bi-exclamation-triangle-fill text-danger";
   toast.innerHTML = `<i class="bi ${icon}"></i><span class="toast-msg">${message}</span>`;
   container.appendChild(toast);
   setTimeout(() => {
@@ -51,7 +53,7 @@ function showToast(message, type = "success") {
 }
 
 // ============================================================
-// 🔐 WEBAUTHN HELPERS
+// 🔐 BASE64 HELPERS
 // ============================================================
 function bufferToBase64url(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -59,6 +61,7 @@ function bufferToBase64url(buffer) {
   for (const b of bytes) str += String.fromCharCode(b);
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
 function base64urlToBuffer(base64url) {
   const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
   const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
@@ -67,12 +70,41 @@ function base64urlToBuffer(base64url) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
 }
+
 function isWebAuthnSupported() {
   return window.PublicKeyCredential !== undefined;
 }
 
 // ============================================================
-// 🔐 SET UP PASSKEY (after password login)
+// 🔐 LOCAL CREDENTIAL STORAGE (per browser)
+// ============================================================
+const STORAGE_KEY = "rnd_passkeys";
+
+function getStoredCredentials() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCredential(cred) {
+  const list = getStoredCredentials();
+  list.push(cred);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function hasAnyCredentialForEmail(email) {
+  return getStoredCredentials().some((c) => c.email === email);
+}
+
+function getCredentialsForEmail(email) {
+  return getStoredCredentials().filter((c) => c.email === email);
+}
+
+// ============================================================
+// 🔐 SET UP PASSKEY — runs after password login only
 // ============================================================
 async function setupPasskey() {
   const user = auth.currentUser;
@@ -86,53 +118,67 @@ async function setupPasskey() {
   }
 
   try {
-    // 1. Get registration options from backend
-    const beginRes = await fetch(`${BACKEND_URL}/api/webauthn/register/begin`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email,
-      }),
-    });
-    const options = await beginRes.json();
-    if (!beginRes.ok) throw new Error(options.error || "Begin failed");
+    // Challenge generate करें
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
 
-    // 2. Convert challenge and user.id from base64url
-    options.challenge = base64urlToBuffer(options.challenge);
-    options.user.id = base64urlToBuffer(options.user.id);
-    if (options.excludeCredentials) {
-      options.excludeCredentials = options.excludeCredentials.map((c) => ({
-        ...c,
-        id: base64urlToBuffer(c.id),
-      }));
-    }
+    const userId = new TextEncoder().encode(user.uid);
 
-    // 3. Create credential via device biometric
-    const credential = await navigator.credentials.create({ publicKey: options });
-    if (!credential) throw new Error("Credential creation failed");
-
-    // 4. Send to backend for verification + storage
-    const attestationResponse = {
-      id: credential.id,
-      rawId: bufferToBase64url(credential.rawId),
-      type: credential.type,
-      response: {
-        attestationObject: bufferToBase64url(credential.response.attestationObject),
-        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+    const options = {
+      publicKey: {
+        challenge: challenge,
+        rp: {
+          name: RP_NAME,
+          // Firebase Auth domain — same-origin trick
+          id: window.location.hostname,
+        },
+        user: {
+          id: userId,
+          name: user.email || user.uid,
+          displayName: user.displayName || user.email || user.uid,
+        },
+        pubKeyCredParams: [
+          { alg: -7, type: "public-key" },   // ES256
+          { alg: -257, type: "public-key" }, // RS256
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          userVerification: "required",
+          residentKey: "preferred",
+        },
+        timeout: 60000,
+        attestation: "none",
       },
-      clientExtensionResults: credential.getClientExtensionResults(),
     };
 
-    const finishRes = await fetch(`${BACKEND_URL}/api/webauthn/register/finish`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: user.uid, credential: attestationResponse }),
-    });
-    const finishData = await finishRes.json();
-    if (!finishRes.ok || !finishData.verified) {
-      throw new Error(finishData.error || "Verification failed");
+    // Device biometric prompt
+    const credential = await navigator.credentials.create(options);
+    if (!credential) throw new Error("Credential creation failed");
+
+    // Save locally (no fingerprint data — only credential ID)
+    const credData = {
+      credentialId: bufferToBase64url(credential.rawId),
+      email: user.email,
+      uid: user.uid,
+      createdAt: Date.now(),
+      deviceName: navigator.userAgent.includes("Mobile")
+        ? "Mobile Device"
+        : "Desktop / Laptop",
+    };
+    saveCredential(credData);
+
+    // Firebase में भी reference save करें (backup)
+    try {
+      await set(
+        ref(db, `users/${user.uid}/passkeys/${credData.credentialId}`),
+        {
+          credentialId: credData.credentialId,
+          createdAt: credData.createdAt,
+          deviceName: credData.deviceName,
+        }
+      );
+    } catch (e) {
+      console.warn("RTDB save skipped:", e.message);
     }
 
     showToast("✅ Fingerprint / Passkey successfully set up!", "success");
@@ -159,64 +205,67 @@ async function loginWithPasskey() {
     return;
   }
 
-  // Ask user for email (needed to fetch their registered credentials)
-  const email = document.getElementById("loginEmail").value.trim() ||
-                prompt("Enter your email to login with Passkey:");
+  // Email लें input से
+  const emailInput = document.getElementById("loginEmail");
+  let email = emailInput ? emailInput.value.trim() : "";
+  if (!email) {
+    email = prompt("Enter your email to login with Passkey:") || "";
+  }
   if (!email) return;
 
+  // इस browser में इस email के credentials हैं?
+  const creds = getCredentialsForEmail(email);
+  if (creds.length === 0) {
+    showToast(
+      "⚠️ No passkey found on this device. Please login with password first.",
+      "error"
+    );
+    return;
+  }
+
+  // ⚠️ Pure client-side limitation:
+  // Browser session पहले से active होना चाहिए (Firebase persistence).
+  // अगर active है → सीधे dashboard
+  // अगर नहीं है → password fallback
+
+  // Pehle biometric verify करें
   try {
-    // 1. Get authentication options from backend
-    const beginRes = await fetch(`${BACKEND_URL}/api/webauthn/login/begin`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const options = await beginRes.json();
-    if (!beginRes.ok) throw new Error(options.error || "Begin failed");
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
 
-    // 2. Convert challenge and allowCredentials
-    options.challenge = base64urlToBuffer(options.challenge);
-    if (options.allowCredentials) {
-      options.allowCredentials = options.allowCredentials.map((c) => ({
-        ...c,
-        id: base64urlToBuffer(c.id),
-      }));
-    }
+    const allowCredentials = creds.map((c) => ({
+      id: base64urlToBuffer(c.credentialId),
+      type: "public-key",
+      transports: ["internal"],
+    }));
 
-    // 3. Get assertion via device biometric
-    const assertion = await navigator.credentials.get({ publicKey: options });
-    if (!assertion) throw new Error("Authentication failed");
-
-    // 4. Send to backend for verification
-    const assertionResponse = {
-      id: assertion.id,
-      rawId: bufferToBase64url(assertion.rawId),
-      type: assertion.type,
-      response: {
-        authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
-        clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON),
-        signature: bufferToBase64url(assertion.response.signature),
-        userHandle: assertion.response.userHandle
-          ? bufferToBase64url(assertion.response.userHandle)
-          : null,
+    const options = {
+      publicKey: {
+        challenge: challenge,
+        rpId: window.location.hostname,
+        allowCredentials,
+        userVerification: "required",
+        timeout: 60000,
       },
-      clientExtensionResults: assertion.getClientExtensionResults(),
     };
 
-    const finishRes = await fetch(`${BACKEND_URL}/api/webauthn/login/finish`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, assertion: assertionResponse }),
-    });
-    const finishData = await finishRes.json();
-    if (!finishRes.ok || !finishData.verified) {
-      throw new Error(finishData.error || "Verification failed");
-    }
+    const assertion = await navigator.credentials.get(options);
+    if (!assertion) throw new Error("Verification failed");
 
-    // 5. Sign in to Firebase with custom token
-    await signInWithCustomToken(auth, finishData.customToken);
-    showToast("✅ Passkey verified! Logging in...", "success");
-    // onAuthStateChanged will redirect to dashboard
+    // Biometric सफल — अब Firebase session check करें
+    if (auth.currentUser && auth.currentUser.email === email) {
+      // Session active है — सीधे dashboard
+      showToast("✅ Passkey verified! Logging in...", "success");
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 600);
+    } else {
+      // Session expired — password चाहिए
+      showToast(
+        "⚠️ Session expired. Please login with password (one time).",
+        "error"
+      );
+    }
   } catch (err) {
     console.error("Passkey login error:", err);
     if (err.name === "NotAllowedError") {
@@ -235,39 +284,43 @@ function updatePasskeyUI(user) {
   if (!section) return;
 
   if (!user) {
-    // Not logged in — show passkey login button (assumes user has previously set up)
+    // Not logged in — show passkey login button
     section.innerHTML = `
-      <button id="passkeyLoginBtn" class="passkey-btn">
+      <button id="passkeyLoginBtn" class="passkey-btn" type="button">
         <i class="bi bi-fingerprint"></i> Login with Fingerprint / Passkey
       </button>
     `;
-    document.getElementById("passkeyLoginBtn").addEventListener("click", loginWithPasskey);
+    document
+      .getElementById("passkeyLoginBtn")
+      .addEventListener("click", loginWithPasskey);
     return;
   }
 
-  // Logged in — check if passkey exists (via backend or RTDB)
-  // We use RTDB: users/{uid}/passkeys
-  get(ref(db, `users/${user.uid}/passkeys`)).then((snap) => {
-    const hasKey = snap.exists() && Object.keys(snap.val()).length > 0;
-    if (hasKey) {
-      section.innerHTML = `
-        <button id="passkeyLoginBtn" class="passkey-btn">
-          <i class="bi bi-fingerprint"></i> Login with Fingerprint / Passkey
-        </button>
-      `;
-      document.getElementById("passkeyLoginBtn").addEventListener("click", loginWithPasskey);
-    } else {
-      section.innerHTML = `
-        <button id="setupPasskeyBtnInline" class="passkey-btn">
-          <i class="bi bi-fingerprint"></i> Set Up Fingerprint / Passkey
-        </button>
-      `;
-      document.getElementById("setupPasskeyBtnInline").addEventListener("click", async () => {
+  // Logged in — check if this browser has passkey for this user
+  const hasKey = hasAnyCredentialForEmail(user.email);
+
+  if (hasKey) {
+    section.innerHTML = `
+      <button id="passkeyLoginBtn" class="passkey-btn" type="button">
+        <i class="bi bi-fingerprint"></i> Login with Fingerprint / Passkey
+      </button>
+    `;
+    document
+      .getElementById("passkeyLoginBtn")
+      .addEventListener("click", loginWithPasskey);
+  } else {
+    section.innerHTML = `
+      <button id="setupPasskeyBtnInline" class="passkey-btn" type="button">
+        <i class="bi bi-fingerprint"></i> Set Up Fingerprint / Passkey
+      </button>
+    `;
+    document
+      .getElementById("setupPasskeyBtnInline")
+      .addEventListener("click", async () => {
         const ok = await setupPasskey();
         if (ok && auth.currentUser) updatePasskeyUI(auth.currentUser);
       });
-    }
-  });
+  }
 }
 
 // ============================================================
@@ -275,6 +328,7 @@ function updatePasskeyUI(user) {
 // ============================================================
 function showSetupPrompt() {
   const modal = document.getElementById("setupPromptModal");
+  if (!modal) return;
   modal.classList.add("active");
 
   document.getElementById("setupPasskeyBtn").onclick = async () => {
@@ -282,7 +336,10 @@ function showSetupPrompt() {
     const ok = await setupPasskey();
     if (ok && auth.currentUser) updatePasskeyUI(auth.currentUser);
   };
-  document.getElementById("maybeLaterBtn").onclick = () => modal.classList.remove("active");
+
+  document.getElementById("maybeLaterBtn").onclick = () => {
+    modal.classList.remove("active");
+  };
 }
 
 // ============================================================
@@ -291,6 +348,7 @@ function showSetupPrompt() {
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     localStorage.setItem("rnd_last_email", user.email || "");
+
     try {
       const snapshot = await get(ref(db, "users/" + user.uid));
       if (snapshot.exists() && snapshot.val().banned) {
@@ -298,19 +356,19 @@ onAuthStateChanged(auth, async (user) => {
         await signOut(auth);
         return;
       }
-      // Check passkeys
-      const passSnap = await get(ref(db, `users/${user.uid}/passkeys`));
-      const hasKey = passSnap.exists() && Object.keys(passSnap.val()).length > 0;
 
-      if (!hasKey && sessionStorage.getItem("rnd_prompted") !== "1") {
-        // First time after this login — show setup prompt
+      // अगर passkey setup नहीं है — prompt दिखाएँ (सिर्फ एक बार per session)
+      if (
+        !hasAnyCredentialForEmail(user.email) &&
+        sessionStorage.getItem("rnd_prompted") !== "1"
+      ) {
         sessionStorage.setItem("rnd_prompted", "1");
         showSetupPrompt();
       } else {
         window.location.href = "dashboard.html";
       }
     } catch (e) {
-      console.error(e);
+      console.error("Auth check error:", e);
       window.location.href = "dashboard.html";
     }
   } else {
@@ -327,21 +385,28 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const pass = document.getElementById("loginPassword").value;
   const btn = document.getElementById("loginBtn");
 
-  if (!email || !pass) { showToast("❌ Please enter email and password", "error"); return; }
+  if (!email || !pass) {
+    showToast("❌ Please enter email and password", "error");
+    return;
+  }
 
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
+  btn.innerHTML =
+    '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
 
   try {
     sessionStorage.removeItem("rnd_prompted");
     await signInWithEmailAndPassword(auth, email, pass);
-    // onAuthStateChanged will handle redirect / setup prompt
+    // onAuthStateChanged handle करेगा
   } catch (err) {
     console.error("Login error:", err);
     let msg = "❌ Invalid email or password.";
-    if (err.code === "auth/user-not-found") msg = "❌ No account found with this email.";
-    else if (err.code === "auth/wrong-password") msg = "❌ Incorrect password.";
-    else if (err.code === "auth/too-many-requests") msg = "❌ Too many attempts. Try later.";
+    if (err.code === "auth/user-not-found")
+      msg = "❌ No account found with this email.";
+    else if (err.code === "auth/wrong-password")
+      msg = "❌ Incorrect password.";
+    else if (err.code === "auth/too-many-requests")
+      msg = "❌ Too many attempts. Try later.";
     showToast(msg, "error");
     btn.disabled = false;
     btn.innerHTML = 'Sign In <i class="bi bi-arrow-right ms-2"></i>';
@@ -354,7 +419,8 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 document.getElementById("googleLoginBtn").addEventListener("click", async () => {
   const btn = document.getElementById("googleLoginBtn");
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
+  btn.innerHTML =
+    '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
   try {
     sessionStorage.removeItem("rnd_prompted");
     await signInWithPopup(auth, provider);
@@ -369,15 +435,22 @@ document.getElementById("googleLoginBtn").addEventListener("click", async () => 
 // ============================================================
 // FORGOT PASSWORD
 // ============================================================
-document.getElementById("forgotPasswordLink").addEventListener("click", async (e) => {
-  e.preventDefault();
-  const email = prompt("Enter your email address to receive password reset link:");
-  if (email) {
-    try {
-      await sendPasswordResetEmail(auth, email);
-      showToast("✅ Password reset link sent to " + email, "success");
-    } catch (err) {
-      showToast("❌ " + (err.message || "Failed to send reset email"), "error");
+document
+  .getElementById("forgotPasswordLink")
+  .addEventListener("click", async (e) => {
+    e.preventDefault();
+    const email = prompt(
+      "Enter your email address to receive password reset link:"
+    );
+    if (email) {
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showToast("✅ Password reset link sent to " + email, "success");
+      } catch (err) {
+        showToast(
+          "❌ " + (err.message || "Failed to send reset email"),
+          "error"
+        );
+      }
     }
-  }
-});
+  });

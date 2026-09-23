@@ -1,22 +1,16 @@
 // ============================================================
-// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v12 - Active-Slot Idempotency)
+// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v10 - Production Hardened)
 // ============================================================
-// 🔥 Fixes over v11:
-//   1. Permanent deterministic key REMOVED. Instead, a single ACTIVE slot
-//      per user (users/{uid}/withdrawalActiveSlot) is used.
-//      - Same details + same slot → retry (reuse requestId)
-//      - Slot cleared on success → future identical withdrawal gets new ID
-//   2. STALE_PROCESSING_MS auto-fail REMOVED. Requests never auto-fail due
-//      to time alone — we wait for actual evidence (transaction present or
-//      user/admin resolution).
-//   3. hiddenHandler (500ms lock release) REMOVED. isSubmitting is only
-//      released in the actual flow's finally block.
-//   4. updateRequestSlot() return values are now checked; failures are
-//      surfaced, not silently ignored.
-//   5. crypto.subtle SHA-256 used for any hashing needs (not for slot key,
-//      which is a fixed path).
-//   6. processAtomicWithdrawal() derives currency from config, not caller.
-//   7. History + error rendering no longer interpolate DB values via innerHTML.
+// 🔥 Fixes over v9:
+//   - Pending requestId is USER-SPECIFIC (per-uid sessionStorage key)
+//   - Pending intent stores requestId + walletType + amount + currency + address
+//     → requestId is reused ONLY if all details match; otherwise a new one is created
+//   - `checking` state is NOT treated as duplicate-completed; it is re-reconciled
+//   - Request state machine enforced (processing / checking / root_pending / completed / failed)
+//   - Root withdrawal write failure → request status `root_pending` (retried on next load)
+//   - Request marked `completed` ONLY AFTER root write succeeds
+//   - Transactions object cloned inside transaction (no mutation)
+//   - Local saved-address state only updated when Firebase save succeeds
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -27,7 +21,7 @@ import {
     EmailAuthProvider,
     reauthenticateWithCredential
 } from "firebase/auth";
-import { getDatabase, ref, get, set, update, remove, runTransaction } from "firebase/database";
+import { getDatabase, ref, get, set, update, runTransaction, remove } from "firebase/database";
 
 // ============================================================
 // 🔥 FIREBASE CONFIG
@@ -61,7 +55,7 @@ const BEP20_REGEX = /^0x[a-fA-F0-9]{40}$/;
 const PASSWORD_MIN_LEN = 6;
 const AMOUNT_REGEX = /^\d+(?:\.\d{1,8})?$/;
 
-// 🔥 Allowed state transitions (unchanged)
+// 🔥 Allowed state transitions for a withdrawal request
 const ALLOWED_TRANSITIONS = {
     processing:   ['checking', 'root_pending', 'completed', 'failed'],
     checking:     ['processing', 'root_pending', 'completed', 'failed'],
@@ -71,14 +65,14 @@ const ALLOWED_TRANSITIONS = {
 };
 
 function isTransitionAllowed(from, to) {
-    if (!from) return true;
+    if (!from) return true; // first write
     const allowed = ALLOWED_TRANSITIONS[from];
     if (!allowed) return false;
     return allowed.includes(to);
 }
 
 // ============================================================
-// 🔐 WITHDRAWAL PASSWORD HASH (kept as-is — user requested no change)
+// 🔐 HASH (djb2-based, salted with uid)
 // ============================================================
 function hashWithdrawalPassword(uid, password) {
     const input = `rnd_${uid}_${password}_stake_v6`;
@@ -110,22 +104,16 @@ function generateRequestId() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
     }
-    // Fallback: crypto.getRandomValues
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        const arr = new Uint8Array(16);
-        crypto.getRandomValues(arr);
-        const hex = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-        return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
-    }
     return 'wd_req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
 }
 
+// 🔥 Deterministic withdrawal ID derived from requestId
 function deriveWithdrawalId(requestId) {
     const clean = String(requestId).replace(/[^a-zA-Z0-9_-]/g, '');
     return 'wd_' + clean.slice(0, 60);
 }
 
-// 🔥 XSS-safe toast
+// 🔥 XSS-safe toast (uses textContent)
 function showToast(message, type = 'success', customDuration = null) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -239,13 +227,16 @@ if (logoutBtn) {
 }
 
 // ============================================================
-// 🔥 GET USER DATA / HISTORY
+// 🔥 GET USER DATA
 // ============================================================
 async function getUserData(uid) {
     const snap = await get(ref(db, 'users/' + uid));
     return snap.exists() ? snap.val() : null;
 }
 
+// ============================================================
+// 🔥 GET WITHDRAWAL HISTORY
+// ============================================================
 async function getWithdrawalHistory(uid) {
     const userSnap = await get(ref(db, 'users/' + uid));
     if (!userSnap.exists()) return [];
@@ -269,6 +260,7 @@ async function getWithdrawalHistory(uid) {
 // 🔐 WITHDRAWAL SETTINGS
 // ============================================================
 async function getWithdrawalSettings(uid) {
+    // Do not swallow network errors
     const snap = await get(ref(db, `users/${uid}/withdrawalSettings`));
     if (!snap.exists()) {
         return { savedAddress: '', addressUpdatedAt: 0, passwordHash: '', passwordUpdatedAt: 0 };
@@ -307,6 +299,7 @@ async function verifyWithdrawalPasswordFromDB(uid, password) {
         return { ok: false, error: 'Could not verify password. Please try again.' };
     }
     const storedHash = String(settings.passwordHash || '').trim();
+
     if (!storedHash) {
         return { ok: false, error: 'NO_PASSWORD_SET' };
     }
@@ -346,112 +339,7 @@ async function verifyAccountPassword(user, password) {
 }
 
 // ============================================================
-// 🔥 ACTIVE SLOT (single per user — the new idempotency primitive)
-// ============================================================
-// Path: users/{uid}/withdrawalActiveSlot
-//
-// Contains: { requestId, walletType, amount, currency, address, createdAt }
-//
-// Semantics:
-//   - Only one active withdrawal intent at a time per user.
-//   - If a slot exists and details MATCH → retry; reuse requestId.
-//   - If a slot exists and details DON'T match → earlier attempt stuck;
-//     block + force reconciliation.
-//   - On successful completion → slot is DELETED.
-//     (So a future identical withdrawal gets a fresh requestId.)
-// ============================================================
-async function readActiveSlot(uid) {
-    const snap = await get(ref(db, `users/${uid}/withdrawalActiveSlot`));
-    return snap.exists() ? snap.val() : null;
-}
-
-function slotDetailsMatch(slot, details) {
-    if (!slot) return false;
-    return (
-        slot.walletType === details.walletType &&
-        roundTo8(slot.amount) === roundTo8(details.amount) &&
-        slot.currency === details.currency &&
-        String(slot.address || '').toLowerCase() === String(details.address || '').toLowerCase()
-    );
-}
-
-// 🔥 Try to claim the active slot atomically.
-// Returns:
-//   { claimed: true,  requestId }             → fresh claim
-//   { claimed: false, reason: 'retry', slot } → same details already claimed
-//   { claimed: false, reason: 'conflict', slot } → different details present
-async function claimActiveSlot(uid, details) {
-    const slotRef = ref(db, `users/${uid}/withdrawalActiveSlot`);
-    try {
-        const result = await runTransaction(slotRef, (current) => {
-            if (current === null) {
-                // No active slot → claim it
-                return {
-                    requestId: details.requestId,
-                    walletType: details.walletType,
-                    amount: details.amount,
-                    currency: details.currency,
-                    address: details.address,
-                    createdAt: Date.now()
-                };
-            }
-
-            // Slot exists → check if it matches
-            const same = (
-                current.walletType === details.walletType &&
-                roundTo8(current.amount) === roundTo8(details.amount) &&
-                current.currency === details.currency &&
-                String(current.address || '').toLowerCase() === String(details.address || '').toLowerCase()
-            );
-
-            if (same) {
-                // Retry — keep existing slot, don't overwrite
-                return;
-            }
-
-            // Conflict — different details, don't overwrite
-            return;
-        });
-
-        if (!result.committed) {
-            return { claimed: false, reason: 'write-failed' };
-        }
-
-        const finalSlot = result.snapshot.exists() ? result.snapshot.val() : null;
-
-        if (finalSlot && finalSlot.requestId === details.requestId) {
-            return { claimed: true, requestId: finalSlot.requestId };
-        }
-
-        if (finalSlot && slotDetailsMatch(finalSlot, details)) {
-            return { claimed: false, reason: 'retry', slot: finalSlot };
-        }
-
-        return { claimed: false, reason: 'conflict', slot: finalSlot };
-    } catch (err) {
-        console.error('Claim active slot error:', err);
-        return { claimed: false, reason: 'error', error: err };
-    }
-}
-
-// 🔥 Release the active slot (only if it matches the requestId we own)
-async function releaseActiveSlot(uid, requestId) {
-    const slotRef = ref(db, `users/${uid}/withdrawalActiveSlot`);
-    try {
-        await runTransaction(slotRef, (current) => {
-            if (current === null) return; // abort — nothing to release
-            if (current.requestId !== requestId) return; // abort — not ours
-            return null; // 🔥 null here is INTENTIONAL: delete this node
-        });
-        return true;
-    } catch (err) {
-        console.warn('Release active slot error:', err);
-        return false;
-    }
-}
-
-// ============================================================
-// 🔥 PENDING INTENT (UX POINTER — never trusted as truth)
+// 🔥 PENDING REQUEST INTENT (per-user, per-details)
 // ============================================================
 function getPendingKey(uid) {
     return `rnd_pending_withdrawal_${uid}`;
@@ -473,26 +361,47 @@ function setPendingIntent(uid, intent) {
     try {
         if (intent) sessionStorage.setItem(getPendingKey(uid), JSON.stringify(intent));
         else sessionStorage.removeItem(getPendingKey(uid));
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
 }
 
 function clearPendingIntent(uid) {
     try { sessionStorage.removeItem(getPendingKey(uid)); } catch (e) {}
 }
 
-// ============================================================
-// 🔥 READ / RESERVE REQUEST SLOT (per-request record)
-// ============================================================
-async function readRequestSlot(uid, requestId) {
-    const snap = await get(ref(db, `users/${uid}/withdrawalRequests/${requestId}`));
-    return snap.exists() ? snap.val() : null;
+function intentMatches(intent, details) {
+    if (!intent) return false;
+    return (
+        intent.walletType === details.walletType &&
+        roundTo8(intent.amount) === roundTo8(details.amount) &&
+        intent.currency === details.currency &&
+        String(intent.address || '').toLowerCase() === String(details.address || '').toLowerCase()
+    );
 }
 
+// ============================================================
+// 🔥 CHECK DUPLICATE REQUEST
+// ============================================================
+async function checkDuplicateRequest(uid, requestId) {
+    try {
+        const snap = await get(ref(db, `users/${uid}/withdrawalRequests/${requestId}`));
+        if (snap.exists()) {
+            return { isDuplicate: true, data: snap.val(), statusUnknown: false };
+        }
+        return { isDuplicate: false, statusUnknown: false };
+    } catch (err) {
+        console.warn('Duplicate check error:', err);
+        return { isDuplicate: false, statusUnknown: true, error: err };
+    }
+}
+
+// ============================================================
+// 🔥 RESERVE REQUEST SLOT
+// ============================================================
 async function reserveRequestSlot(uid, requestId, payload) {
     const slotRef = ref(db, `users/${uid}/withdrawalRequests/${requestId}`);
     try {
         const result = await runTransaction(slotRef, (currentData) => {
-            if (currentData !== null) return; // abort — already reserved
+            if (currentData !== null) return; // abort (undefined)
             return {
                 requestId,
                 uid,
@@ -504,46 +413,41 @@ async function reserveRequestSlot(uid, requestId, payload) {
                 createdAt: Date.now()
             };
         });
-        if (result.committed) return { ok: true, reserved: true };
-        return { ok: true, reserved: false };
+        return result.committed;
     } catch (err) {
         console.error('Reserve slot error:', err);
-        return { ok: false, reserved: false, error: err };
+        return false;
     }
 }
 
 // ============================================================
-// 🔥 UPDATE REQUEST SLOT (returns result, does NOT swallow)
+// 🔥 UPDATE REQUEST SLOT (state-machine enforced)
 // ============================================================
 async function updateRequestSlot(uid, requestId, updates) {
-    const slotRef = ref(db, `users/${uid}/withdrawalRequests/${requestId}`);
     try {
-        const result = await runTransaction(slotRef, (currentData) => {
-            if (currentData === null) return; // abort — must exist
+        const slotRef = ref(db, `users/${uid}/withdrawalRequests/${requestId}`);
+        await runTransaction(slotRef, (currentData) => {
+            if (currentData === null) return; // abort
             const nextStatus = updates.status;
             if (nextStatus && currentData.status && nextStatus !== currentData.status) {
                 if (!isTransitionAllowed(currentData.status, nextStatus)) {
-                    return; // abort — invalid transition
+                    console.warn('⚠️ Invalid state transition blocked:', currentData.status, '→', nextStatus);
+                    return; // abort
                 }
             }
             return { ...currentData, ...updates };
         });
-        if (result.committed) return { ok: true, updated: true };
-        return { ok: true, updated: false, reason: 'transition-blocked-or-missing' };
     } catch (err) {
         console.warn('Could not update request slot:', err);
-        return { ok: false, updated: false, error: err };
     }
 }
 
 // ============================================================
-// 🔥 ATOMIC WITHDRAWAL (currency derived from config, not caller)
+// 🔥 ATOMIC WITHDRAWAL PROCESS
 // ============================================================
-async function processAtomicWithdrawal(uid, walletType, amount, address, withdrawalId, requestId) {
+async function processAtomicWithdrawal(uid, walletType, amount, address, currency, withdrawalId, requestId) {
     const cfg = WITHDRAW_CONFIG[walletType];
     if (!cfg) return { success: false, error: 'Invalid wallet type.' };
-
-    const canonicalCurrency = cfg.currency;
 
     if (!BEP20_REGEX.test(String(address || ''))) {
         return { success: false, error: 'Invalid BEP20 address.' };
@@ -551,7 +455,7 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, withdra
 
     const amt = roundTo8(amount);
     if (!Number.isFinite(amt) || amt <= 0) return { success: false, error: 'Invalid amount.' };
-    if (amt < cfg.min) return { success: false, error: `Minimum withdrawal is ${cfg.min} ${canonicalCurrency}.` };
+    if (amt < cfg.min) return { success: false, error: `Minimum withdrawal is ${cfg.min} ${cfg.currency}.` };
 
     const userRef = ref(db, 'users/' + uid);
     const now = Date.now();
@@ -560,6 +464,7 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, withdra
         const result = await runTransaction(userRef, (currentData) => {
             if (!currentData) return;
 
+            // 🔥 Clone transactions (do not mutate original)
             const transactions = { ...(currentData.transactions || {}) };
 
             for (let key in transactions) {
@@ -569,6 +474,7 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, withdra
                     tx.type === 'withdrawal' &&
                     (tx.requestId === requestId || tx.withdrawalId === withdrawalId)
                 ) {
+                    console.warn('⚠️ Duplicate withdrawal detected:', requestId);
                     return;
                 }
             }
@@ -587,13 +493,13 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, withdra
                 withdrawalId,
                 requestId,
                 amount: amt,
-                currency: canonicalCurrency,
+                currency,
                 walletType,
                 walletAddress: address,
                 timestamp: now,
                 date: new Date().toDateString(),
                 status: 'pending',
-                description: `Withdrawal of ${amt} ${canonicalCurrency} to ${address.substring(0, 15)}...`
+                description: `Withdrawal of ${amt} ${currency} to ${address.substring(0, 15)}...`
             };
 
             return {
@@ -606,8 +512,10 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, withdra
         if (result.committed && result.snapshot && result.snapshot.exists()) {
             const updated = result.snapshot.val();
             const newBal = roundTo8(updated[walletType] || 0);
+            console.log('✅ Atomic withdrawal committed:', withdrawalId, '| New balance:', newBal);
             return { success: true, withdrawalId, newBalance: newBal };
         } else {
+            console.warn('⚠️ Atomic withdrawal not committed:', withdrawalId);
             return { success: false, error: 'Insufficient balance or duplicate request' };
         }
     } catch (err) {
@@ -617,19 +525,14 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, withdra
 }
 
 // ============================================================
-// 🔥 ROOT WITHDRAWAL (deterministic key = withdrawalId)
+// 🔥 ROOT WITHDRAWAL (deterministic, idempotent)
 // ============================================================
 async function writeRootWithdrawal(withdrawalId, payload) {
     await set(ref(db, 'withdrawals/' + withdrawalId), payload);
 }
 
-async function readRootWithdrawal(withdrawalId) {
-    const snap = await get(ref(db, 'withdrawals/' + withdrawalId));
-    return snap.exists() ? snap.val() : null;
-}
-
 // ============================================================
-// 🔥 RECONCILE PENDING REQUESTS (no time-based auto-fail)
+// 🔥 RECONCILE PENDING REQUESTS
 // ============================================================
 async function reconcilePendingRequests(uid) {
     try {
@@ -640,6 +543,7 @@ async function reconcilePendingRequests(uid) {
         const requests = snap.val();
         const results = [];
 
+        // Read user data once
         let userData = null;
         try {
             const userSnap = await get(ref(db, 'users/' + uid));
@@ -655,14 +559,11 @@ async function reconcilePendingRequests(uid) {
             if (!data || !data.status) continue;
             if (data.status === 'completed' || data.status === 'failed') continue;
 
+            // Look for matching transaction
             let txFound = null;
             for (let key in transactions) {
                 const tx = transactions[key];
-                if (
-                    tx &&
-                    tx.type === 'withdrawal' &&
-                    (tx.requestId === requestId || tx.withdrawalId === data.withdrawalId)
-                ) {
+                if (tx && tx.type === 'withdrawal' && tx.requestId === requestId) {
                     txFound = tx;
                     break;
                 }
@@ -671,15 +572,17 @@ async function reconcilePendingRequests(uid) {
             const withdrawalId = data.withdrawalId || deriveWithdrawalId(requestId);
 
             if (txFound) {
+                // Transaction exists → check root withdrawal
                 let rootOk = false;
                 try {
-                    const root = await readRootWithdrawal(withdrawalId);
-                    rootOk = !!root;
+                    const rootSnap = await get(ref(db, 'withdrawals/' + withdrawalId));
+                    rootOk = rootSnap.exists();
                 } catch (err) {
                     console.warn('Reconcile: root read error:', err);
                 }
 
                 if (!rootOk) {
+                    // Write root (idempotent since deterministic)
                     try {
                         await writeRootWithdrawal(withdrawalId, {
                             uid,
@@ -704,8 +607,6 @@ async function reconcilePendingRequests(uid) {
                         withdrawalId,
                         completedAt: Date.now()
                     });
-                    // Release active slot if it belongs to this request
-                    await releaseActiveSlot(uid, requestId);
                     results.push({ requestId, status: 'completed' });
                 } else {
                     await updateRequestSlot(uid, requestId, {
@@ -716,10 +617,10 @@ async function reconcilePendingRequests(uid) {
                     results.push({ requestId, status: 'root_pending' });
                 }
             } else {
-                // No transaction found yet. Two sub-cases:
-                //   (a) still in flight (network slow) → keep as checking
-                //   (b) genuinely stuck → we do NOT auto-fail by time.
-                //       We mark as 'checking' and let user/admin resolve.
+                // Transaction not found. Could be:
+                //   - genuinely failed (never committed)
+                //   - or read failed / still pending
+                // Mark as `checking` and let the user retry after verifying.
                 if (data.status !== 'checking') {
                     await updateRequestSlot(uid, requestId, {
                         status: 'checking',
@@ -737,89 +638,8 @@ async function reconcilePendingRequests(uid) {
 }
 
 // ============================================================
-// 🔥 RENDER WITHDRAWAL UI (XSS-safe history rendering)
+// 🔥 RENDER WITHDRAWAL UI
 // ============================================================
-function buildHistoryHtml(withdrawals) {
-    const wrap = document.createElement('div');
-
-    if (withdrawals.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        const icon = document.createElement('i');
-        icon.className = 'bi bi-inbox';
-        const p = document.createElement('p');
-        p.textContent = 'No withdrawal requests yet.';
-        empty.append(icon, p);
-        wrap.appendChild(empty);
-        return wrap;
-    }
-
-    const history = document.createElement('div');
-    history.className = 'withdrawal-history';
-
-    withdrawals.forEach((w) => {
-        const item = document.createElement('div');
-        item.className = 'transaction-item';
-
-        const left = document.createElement('div');
-
-        const amt = document.createElement('div');
-        amt.className = 'amount';
-        const currency = w.currency || 'RND';
-        amt.textContent = `${Number(w.amount).toFixed(4)} ${currency}`;
-
-        const walletLbl = document.createElement('div');
-        walletLbl.style.fontSize = '0.72rem';
-        walletLbl.style.color = 'var(--text-secondary)';
-        walletLbl.style.marginTop = '2px';
-        walletLbl.textContent = w.walletType === 'referralWallet' ? '💳 Referral Wallet' : '📊 RND Wallet';
-
-        const date = document.createElement('div');
-        date.className = 'date';
-        date.textContent = w.timestamp
-            ? new Date(w.timestamp).toLocaleString('en-IN')
-            : 'N/A';
-
-        left.append(amt, walletLbl, date);
-
-        if (w.walletAddress) {
-            const addr = document.createElement('div');
-            addr.style.fontSize = '0.62rem';
-            addr.style.color = 'var(--text-muted)';
-            addr.style.fontFamily = "'Courier New',monospace";
-            addr.style.marginTop = '2px';
-            addr.textContent = String(w.walletAddress).substring(0, 24) + '...';
-            left.appendChild(addr);
-        }
-
-        const right = document.createElement('div');
-        const status = document.createElement('span');
-        if (w.status === 'pending') {
-            status.className = 'status-pending';
-            status.innerHTML = '<i class="bi bi-clock"></i>';
-            status.append(' Pending');
-        } else if (w.status === 'approved') {
-            status.className = 'status-approved';
-            status.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
-            status.append(' Approved');
-        } else if (w.status === 'rejected') {
-            status.className = 'status-rejected';
-            status.innerHTML = '<i class="bi bi-x-circle-fill"></i>';
-            status.append(' Rejected');
-        } else {
-            status.className = 'status-pending';
-            status.textContent = 'Pending';
-        }
-        right.appendChild(status);
-
-        item.append(left, right);
-        history.appendChild(item);
-    });
-
-    wrap.appendChild(history);
-    return wrap;
-}
-
 function renderWithdrawalUI(userData, withdrawals) {
     const container = document.getElementById('withdrawalContent');
     if (!container) return;
@@ -828,6 +648,40 @@ function renderWithdrawalUI(userData, withdrawals) {
     const referralWallet = Number(userData.referralWallet) || 0;
     const rndWallet      = Number(userData.rndWallet) || 0;
     const lockedRND      = Number(userData.lockedRND) || 0;
+
+    let historyHtml = '';
+    if (withdrawals.length === 0) {
+        historyHtml = `
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <p>No withdrawal requests yet.</p>
+            </div>
+        `;
+    } else {
+        historyHtml = `<div class="withdrawal-history">` + withdrawals.map((w) => {
+            let statusHtml = '';
+            if (w.status === 'pending')        statusHtml = '<span class="status-pending"><i class="bi bi-clock"></i>Pending</span>';
+            else if (w.status === 'approved')  statusHtml = '<span class="status-approved"><i class="bi bi-check-circle-fill"></i>Approved</span>';
+            else if (w.status === 'rejected')  statusHtml = '<span class="status-rejected"><i class="bi bi-x-circle-fill"></i>Rejected</span>';
+            else                                statusHtml = '<span class="status-pending">Pending</span>';
+
+            const currency = w.currency || 'RND';
+            const walletLabel = w.walletType === 'referralWallet' ? '💳 Referral Wallet' : '📊 RND Wallet';
+            const dateStr = w.timestamp ? new Date(w.timestamp).toLocaleString('en-IN') : 'N/A';
+
+            return `
+                <div class="transaction-item">
+                    <div>
+                        <div class="amount">${Number(w.amount).toFixed(4)} ${currency}</div>
+                        <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:2px;">${walletLabel}</div>
+                        <div class="date">${dateStr}</div>
+                        ${w.walletAddress ? `<div style="font-size:0.62rem;color:var(--text-muted);font-family:'Courier New',monospace;margin-top:2px;">${w.walletAddress.substring(0, 24)}...</div>` : ''}
+                    </div>
+                    <div>${statusHtml}</div>
+                </div>
+            `;
+        }).join('') + `</div>`;
+    }
 
     container.innerHTML = `
         <div class="row g-4">
@@ -986,16 +840,11 @@ function renderWithdrawalUI(userData, withdrawals) {
             <div class="col-lg-7 mx-auto">
                 <div class="card-glass">
                     <div class="card-title"><i class="bi bi-clock-history"></i> Withdrawal History</div>
-                    <div id="historyContainer"></div>
+                    ${historyHtml}
                 </div>
             </div>
         </div>
     `;
-
-    const historyContainer = document.getElementById('historyContainer');
-    if (historyContainer) {
-        historyContainer.appendChild(buildHistoryHtml(withdrawals));
-    }
 }
 
 // ============================================================
@@ -1284,63 +1133,39 @@ async function initializeWithdrawalAddressUI(uid) {
         return;
     }
 
-    // XSS-safe rendering via textContent
     const shortAddress = `${savedAddress.substring(0, 10)}...${savedAddress.slice(-8)}`;
 
     savedAddressBox.style.display = 'block';
-    savedAddressBox.innerHTML = '';
-
-    const card = document.createElement('div');
-    card.style.border = '1px solid rgba(46,204,113,.30)';
-    card.style.background = 'rgba(46,204,113,.06)';
-    card.style.borderRadius = '12px';
-    card.style.padding = '14px';
-
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.justifyContent = 'space-between';
-    row.style.alignItems = 'center';
-    row.style.gap = '10px';
-    row.style.flexWrap = 'wrap';
-
-    const left = document.createElement('div');
-    left.style.minWidth = '0';
-    left.style.flex = '1';
-
-    const label = document.createElement('div');
-    label.style.color = '#2ecc71';
-    label.style.fontSize = '.78rem';
-    label.style.fontWeight = '700';
-    label.style.marginBottom = '5px';
-    label.innerHTML = '<i class="bi bi-shield-check"></i> SAVED BEP20 ADDRESS';
-
-    const addr = document.createElement('div');
-    addr.style.fontFamily = "'Courier New',monospace";
-    addr.style.fontSize = '.82rem';
-    addr.style.color = '#e2e8f0';
-    addr.style.wordBreak = 'break-all';
-    addr.textContent = shortAddress;
-
-    left.append(label, addr);
-
-    const changeBtn = document.createElement('button');
-    changeBtn.type = 'button';
-    changeBtn.className = 'btn-outline-custom';
-    changeBtn.id = 'changeAddressBtn';
-    changeBtn.style.width = 'auto';
-    changeBtn.style.padding = '8px 14px';
-    changeBtn.style.fontSize = '.78rem';
-    changeBtn.style.whiteSpace = 'nowrap';
-    changeBtn.innerHTML = '<i class="bi bi-pencil"></i> Change';
-
-    row.append(left, changeBtn);
-    card.appendChild(row);
-    savedAddressBox.appendChild(card);
+    savedAddressBox.innerHTML = `
+        <div style="border:1px solid rgba(46,204,113,.30);
+                    background:rgba(46,204,113,.06);
+                    border-radius:12px; padding:14px;">
+            <div style="display:flex; justify-content:space-between;
+                        align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="min-width:0; flex:1;">
+                    <div style="color:#2ecc71; font-size:.78rem;
+                                font-weight:700; margin-bottom:5px;">
+                        <i class="bi bi-shield-check"></i> SAVED BEP20 ADDRESS
+                    </div>
+                    <div style="font-family:'Courier New',monospace;
+                                font-size:.82rem; color:#e2e8f0;
+                                word-break:break-all;">
+                        ${shortAddress}
+                    </div>
+                </div>
+                <button type="button" class="btn-outline-custom"
+                        id="changeAddressBtn"
+                        style="width:auto; padding:8px 14px; font-size:.78rem; white-space:nowrap;">
+                    <i class="bi bi-pencil"></i> Change
+                </button>
+            </div>
+        </div>
+    `;
 
     addressInputBox.style.display = 'none';
     window.currentSavedWithdrawalAddress = savedAddress;
 
-    changeBtn.addEventListener('click', async () => {
+    document.getElementById('changeAddressBtn')?.addEventListener('click', async () => {
         let currentSettings;
         try {
             currentSettings = await getWithdrawalSettings(uid);
@@ -1475,7 +1300,7 @@ function showChangeAddressUI(oldAddress) {
 }
 
 // ============================================================
-// 🔥 ATTACH WITHDRAW FORM HANDLER (v12 — no hiddenHandler, no auto-fail)
+// 🔥 ATTACH WITHDRAW FORM HANDLER (v10)
 // ============================================================
 function attachWithdrawHandler(user) {
     const form = document.getElementById('withdrawForm');
@@ -1527,7 +1352,7 @@ function attachWithdrawHandler(user) {
             return;
         }
 
-        // 🔥 LOCK — released ONLY in the flow's finally block below.
+        // LOCK
         isSubmitting = true;
         if (btn) {
             btn.disabled = true;
@@ -1543,150 +1368,64 @@ function attachWithdrawHandler(user) {
         };
 
         try {
+            // Fresh balance check
             const freshUser = await getUserData(user.uid);
-            if (!freshUser) { showToast('❌ Unable to verify your balance. Please try again.', 'error'); return; }
+            if (!freshUser) { showToast('❌ Unable to verify your balance. Please try again.', 'error'); releaseLock(); return; }
 
             const freshBalance = Number(freshUser[walletType]);
             if (!Number.isFinite(freshBalance) || freshBalance < 0) {
-                showToast('❌ Unable to verify your balance. Please try again.', 'error'); return;
+                showToast('❌ Unable to verify your balance. Please try again.', 'error'); releaseLock(); return;
             }
             if (freshBalance < amount) {
                 showToast(`❌ Insufficient balance! You have only ${freshBalance.toFixed(4)} ${cfg.currency}.`, 'error');
-                return;
+                releaseLock(); return;
             }
 
+            // Password settings
             let settings;
             try {
                 settings = await getWithdrawalSettings(user.uid);
             } catch (err) {
                 showToast('❌ Could not load settings. Please try again.', 'error');
-                return;
+                releaseLock(); return;
             }
             const hasPassword = !!(settings.passwordHash && String(settings.passwordHash).trim());
             const pwdMode = hasPassword ? 'verify' : 'set';
 
-            // 🔥 Do NOT add a hiddenHandler. The lock stays until the full
-            // flow (including onSuccess) completes, then finally releases it.
-            await new Promise((resolve) => {
-                openWithdrawPasswordModal(user.uid, {
-                    mode: pwdMode,
-                    onSuccess: async () => {
-                        try {
-                            // ============================================================
-                            // STEP 1: Compute a candidate requestId for this attempt.
-                            //   - If a matching active slot exists, we reuse its id.
-                            //   - Otherwise we generate a new one.
-                            // ============================================================
-                            const thisDetails = { walletType, amount, currency: cfg.currency, address };
+            // Pre-verify pending intent state BEFORE password modal
+            const currentIntent = getPendingIntent(user.uid);
+            const thisIntent = { walletType, amount, currency: cfg.currency, address };
 
-                            const existingSlot = await readActiveSlot(user.uid);
+            // If a previous pending intent exists for the SAME details, warn the user
+            if (currentIntent && intentMatches(currentIntent, thisIntent)) {
+                showToast('⚠️ A previous attempt with the same details is still pending. Verifying...', 'warning', 5000);
+            } else if (currentIntent) {
+                // Different details → drop the stale intent safely
+                clearPendingIntent(user.uid);
+            }
 
-                            if (existingSlot && existingSlot.requestId) {
-                                if (slotDetailsMatch(existingSlot, thisDetails)) {
-                                    // Same intent — reuse its requestId
-                                    // We'll claimActiveSlot below; the claim will see the
-                                    // matching slot and return {claimed:false, reason:'retry'}
-                                } else {
-                                    // Different intent — earlier attempt stuck.
-                                    showToast('⏳ Ek previous withdrawal abhi verify ho raha hai. Please wait...', 'warning', 8000);
-                                    try { await reconcilePendingRequests(user.uid); } catch (e) {}
-                                    setTimeout(() => window.location.reload(), 2500);
-                                    return;
-                                }
-                            }
+            const modalEl = document.getElementById('withdrawPasswordModal');
+            let hiddenHandler = null;
+            if (modalEl) {
+                hiddenHandler = () => {
+                    setTimeout(() => { if (isSubmitting) releaseLock(); }, 500);
+                    modalEl.removeEventListener('hidden.bs.modal', hiddenHandler);
+                };
+                modalEl.addEventListener('hidden.bs.modal', hiddenHandler);
+            }
 
-                            const candidateRequestId = generateRequestId();
+            openWithdrawPasswordModal(user.uid, {
+                mode: pwdMode,
+                onSuccess: async () => {
+                    try {
+                        // 🔥 Resolve requestId from pending intent if details match
+                        let requestId = '';
+                        let existingIntent = getPendingIntent(user.uid);
 
-                            // ============================================================
-                            // STEP 2: Claim the ACTIVE slot atomically.
-                            //   - First attempt: claims and returns claimed:true
-                            //   - Retry (same details): returns claimed:false reason:'retry'
-                            // ============================================================
-                            const claim = await claimActiveSlot(user.uid, {
-                                requestId: candidateRequestId,
-                                ...thisDetails
-                            });
-
-                            let requestId;
-
-                            if (claim.claimed) {
-                                requestId = candidateRequestId;
-                            } else if (claim.reason === 'retry' && claim.slot) {
-                                requestId = claim.slot.requestId;
-                                showToast('⚠️ Aapka previous attempt detect hua. Same request resume ho rahi hai...', 'info', 6000);
-                            } else if (claim.reason === 'conflict') {
-                                showToast('⏳ Ek previous withdrawal abhi pending hai. Please wait...', 'warning', 8000);
-                                try { await reconcilePendingRequests(user.uid); } catch (e) {}
-                                setTimeout(() => window.location.reload(), 2500);
-                                return;
-                            } else if (claim.reason === 'write-failed' || claim.reason === 'error') {
-                                showToast('❌ Could not lock request. Please try again.', 'error');
-                                return;
-                            } else {
-                                showToast('❌ Could not lock request. Please try again.', 'error');
-                                return;
-                            }
-
-                            const withdrawalId = deriveWithdrawalId(requestId);
-
-                            // ============================================================
-                            // STEP 3: Check existing request record (idempotency)
-                            // ============================================================
-                            let existing = null;
-                            try {
-                                existing = await readRequestSlot(user.uid, requestId);
-                            } catch (err) {
-                                console.warn('Request slot read error:', err);
-                                showToast('⚠️ Could not verify request status. Please try again.', 'warning', 8000);
-                                return;
-                            }
-
-                            if (existing && existing.status) {
-                                const st = String(existing.status);
-
-                                if (st === 'completed') {
-                                    showToast('⚠️ Yeh withdrawal already complete ho chuki hai.', 'warning');
-                                    clearPendingIntent(user.uid);
-                                    await releaseActiveSlot(user.uid, requestId);
-                                    setTimeout(() => window.location.reload(), 1500);
-                                    return;
-                                }
-                                if (st === 'processing' || st === 'checking' || st === 'root_pending') {
-                                    showToast('⏳ Aapka previous withdrawal abhi verify ho raha hai. Please wait...', 'warning', 8000);
-                                    try { await reconcilePendingRequests(user.uid); } catch (e) {}
-                                    setTimeout(() => window.location.reload(), 2500);
-                                    return;
-                                }
-                                if (st === 'failed') {
-                                    // Failed slot — its requestId must not be reused.
-                                    // Release active slot so a NEW attempt can proceed.
-                                    await releaseActiveSlot(user.uid, requestId);
-                                    showToast('⚠️ Previous attempt failed. Please click Submit Withdrawal again.', 'warning', 6000);
-                                    return;
-                                }
-                            }
-
-                            // ============================================================
-                            // STEP 4: Reserve request record
-                            // ============================================================
-                            const reserve = await reserveRequestSlot(user.uid, requestId, {
-                                walletType, amount, currency: cfg.currency, address
-                            });
-
-                            if (!reserve.ok) {
-                                showToast('❌ Could not reserve request. Please try again.', 'error');
-                                await releaseActiveSlot(user.uid, requestId);
-                                return;
-                            }
-
-                            if (!reserve.reserved) {
-                                showToast('⏳ Yeh request already process ho rahi hai. Please wait...', 'warning');
-                                try { await reconcilePendingRequests(user.uid); } catch (e) {}
-                                setTimeout(() => window.location.reload(), 2500);
-                                return;
-                            }
-
-                            // UX pointer only
+                        if (existingIntent && intentMatches(existingIntent, thisIntent)) {
+                            requestId = existingIntent.requestId;
+                        } else {
+                            requestId = generateRequestId();
                             setPendingIntent(user.uid, {
                                 requestId,
                                 walletType,
@@ -1695,120 +1434,169 @@ function attachWithdrawHandler(user) {
                                 address,
                                 createdAt: Date.now()
                             });
+                        }
 
-                            // ============================================================
-                            // STEP 5: Atomic balance deduction
-                            // ============================================================
-                            const result = await processAtomicWithdrawal(
-                                user.uid, walletType, amount, address, withdrawalId, requestId
-                            );
+                        const withdrawalId = deriveWithdrawalId(requestId);
 
-                            if (!result.success) {
-                                const upd = await updateRequestSlot(user.uid, requestId, {
-                                    status: 'failed',
-                                    error: result.error,
-                                    failedAt: Date.now()
-                                });
-                                if (!upd.ok) console.warn('Failed to mark request failed:', upd.error);
+                        // Duplicate check
+                        const dupCheck = await checkDuplicateRequest(user.uid, requestId);
 
-                                await releaseActiveSlot(user.uid, requestId);
+                        if (dupCheck.statusUnknown) {
+                            showToast('⚠️ Request status could not be verified. Please try again.', 'warning', 8000);
+                            releaseLock();
+                            return;
+                        }
+
+                        if (dupCheck.isDuplicate) {
+                            const reqStatus = String(dupCheck.data?.status || '');
+
+                            if (reqStatus === 'completed') {
+                                showToast('⚠️ Yeh withdrawal already complete ho chuki hai.', 'warning');
                                 clearPendingIntent(user.uid);
-                                showToast('❌ ' + (result.error || 'Withdrawal failed. Please try again.'), 'error');
+                                setTimeout(() => window.location.reload(), 1500);
+                                releaseLock();
                                 return;
                             }
 
-                            // ============================================================
-                            // STEP 6: Root write then completed
-                            // ============================================================
-                            let rootOk = false;
-                            try {
-                                await writeRootWithdrawal(withdrawalId, {
-                                    uid: user.uid,
-                                    withdrawalId,
-                                    requestId,
-                                    amount,
-                                    currency: cfg.currency,
-                                    walletType,
-                                    wallet: address,
-                                    status: 'pending',
-                                    timestamp: Date.now()
-                                });
-                                rootOk = true;
-                            } catch (err) {
-                                console.warn('Root withdrawal write failed:', err);
+                            if (reqStatus === 'failed') {
+                                // Failed state → allow fresh attempt with new requestId
+                                clearPendingIntent(user.uid);
+                                showToast('⚠️ Previous attempt failed. Please submit again.', 'warning', 6000);
+                                releaseLock();
+                                return;
                             }
 
-                            if (rootOk) {
-                                const upd = await updateRequestSlot(user.uid, requestId, {
-                                    status: 'completed',
-                                    withdrawalId,
-                                    completedAt: Date.now()
-                                });
-                                if (!upd.ok) console.warn('Failed to mark completed:', upd.error);
-
-                                // 🔥 Release active slot — future identical withdrawal
-                                //    will get a fresh requestId.
-                                await releaseActiveSlot(user.uid, requestId);
-                            } else {
-                                const upd = await updateRequestSlot(user.uid, requestId, {
-                                    status: 'root_pending',
-                                    withdrawalId,
-                                    rootPendingAt: Date.now()
-                                });
-                                if (!upd.ok) console.warn('Failed to mark root_pending:', upd.error);
-                                // Keep active slot — reconciliation will retry root write
-                            }
-
-                            // Save address
-                            const shouldSave = window.addressChangeMode ||
-                                              document.getElementById('saveWithdrawalAddress')?.checked;
-
-                            let addressSaved = false;
-                            if (shouldSave) {
+                            if (reqStatus === 'processing' || reqStatus === 'checking' || reqStatus === 'root_pending') {
+                                // Previous attempt is uncertain. Trigger reconciliation and ask user to wait.
+                                showToast('⏳ A previous withdrawal is being verified. Please wait while we check...', 'warning', 8000);
                                 try {
-                                    await saveWithdrawalAddress(user.uid, address);
-                                    addressSaved = true;
-                                } catch (err) {
-                                    console.warn('Address save failed:', err);
-                                }
+                                    await reconcilePendingRequests(user.uid);
+                                } catch (e) {}
+                                setTimeout(() => window.location.reload(), 2500);
+                                releaseLock();
+                                return;
                             }
 
+                            // Unknown state → treat as pending, force reconcile
+                            showToast('⏳ Previous request status is being verified. Please wait...', 'warning', 8000);
+                            try { await reconcilePendingRequests(user.uid); } catch (e) {}
+                            setTimeout(() => window.location.reload(), 2500);
+                            releaseLock();
+                            return;
+                        }
+
+                        // Reserve slot
+                        const reserved = await reserveRequestSlot(user.uid, requestId, {
+                            walletType, amount, currency: cfg.currency, address
+                        });
+                        if (!reserved) {
+                            showToast('⏳ Yeh request already process ho rahi hai. Please wait...', 'warning');
+                            try { await reconcilePendingRequests(user.uid); } catch (e) {}
+                            releaseLock();
+                            return;
+                        }
+
+                        // Atomic withdrawal
+                        const result = await processAtomicWithdrawal(
+                            user.uid, walletType, amount, address, cfg.currency, withdrawalId, requestId
+                        );
+
+                        if (!result.success) {
+                            await updateRequestSlot(user.uid, requestId, {
+                                status: 'failed',
+                                error: result.error,
+                                failedAt: Date.now()
+                            });
                             clearPendingIntent(user.uid);
+                            showToast('❌ ' + (result.error || 'Withdrawal failed. Please try again.'), 'error');
+                            releaseLock();
+                            return;
+                        }
 
-                            if (rootOk) {
-                                showToast(`✅ Withdrawal request submitted! ${amount} ${cfg.currency} will be processed by admin.`, 'success', 6000);
-                            } else {
-                                showToast(`⚠️ Withdrawal created but admin record pending. It will sync automatically.`, 'warning', 8000);
-                            }
-
-                            document.getElementById('withAmount').value = '';
-                            window.addressChangeMode = false;
-
-                            if (addressSaved) {
-                                window.currentSavedWithdrawalAddress = address;
-                            }
-
-                            setTimeout(() => { window.location.reload(); }, 2500);
-
+                        // 🔥 ROOT WRITE FIRST, then mark completed
+                        let rootOk = false;
+                        try {
+                            await writeRootWithdrawal(withdrawalId, {
+                                uid: user.uid,
+                                withdrawalId,
+                                requestId,
+                                amount,
+                                currency: cfg.currency,
+                                walletType,
+                                wallet: address,
+                                status: 'pending',
+                                timestamp: Date.now()
+                            });
+                            rootOk = true;
                         } catch (err) {
-                            console.error('Withdrawal error:', err);
-                            if (err?.message?.includes('network') || err?.code === 'NETWORK_ERROR') {
-                                showToast('⚠️ Network issue — aapka request process ho sakti hai. DO NOT submit again.', 'warning', 10000);
-                            } else {
-                                showToast('❌ Error submitting withdrawal. Please try again.', 'error');
+                            console.warn('Root withdrawal write failed:', err);
+                        }
+
+                        if (rootOk) {
+                            await updateRequestSlot(user.uid, requestId, {
+                                status: 'completed',
+                                withdrawalId,
+                                completedAt: Date.now()
+                            });
+                        } else {
+                            await updateRequestSlot(user.uid, requestId, {
+                                status: 'root_pending',
+                                withdrawalId,
+                                rootPendingAt: Date.now()
+                            });
+                        }
+
+                        // Save address on success
+                        const shouldSave = window.addressChangeMode ||
+                                          document.getElementById('saveWithdrawalAddress')?.checked;
+
+                        let addressSaved = false;
+                        if (shouldSave) {
+                            try {
+                                await saveWithdrawalAddress(user.uid, address);
+                                addressSaved = true;
+                            } catch (err) {
+                                console.warn('Address save failed:', err);
                             }
-                        } finally {
-                            resolve();
+                        }
+
+                        clearPendingIntent(user.uid);
+
+                        if (rootOk) {
+                            showToast(`✅ Withdrawal request submitted! ${amount} ${cfg.currency} will be processed by admin.`, 'success', 6000);
+                        } else {
+                            showToast(`⚠️ Withdrawal created but admin record pending. It will sync automatically.`, 'warning', 8000);
+                        }
+
+                        document.getElementById('withAmount').value = '';
+                        window.addressChangeMode = false;
+
+                        if (addressSaved) {
+                            window.currentSavedWithdrawalAddress = address;
+                        }
+
+                        setTimeout(() => { window.location.reload(); }, 2500);
+
+                    } catch (err) {
+                        console.error('Withdrawal error:', err);
+
+                        if (err?.message?.includes('network') || err?.code === 'NETWORK_ERROR') {
+                            showToast('⚠️ Network issue — aapka request process ho sakti hai. DO NOT submit again. Page refresh karke check karein.', 'warning', 10000);
+                        } else if (!err?.message?.includes('aborted') && !err?.message?.includes('reserve')) {
+                            showToast('❌ Error submitting withdrawal. Please try again.', 'error');
+                        }
+                    } finally {
+                        releaseLock();
+                        if (modalEl && hiddenHandler) {
+                            modalEl.removeEventListener('hidden.bs.modal', hiddenHandler);
                         }
                     }
-                });
+                }
             });
 
         } catch (err) {
             console.error('Pre-withdrawal error:', err);
             showToast('❌ Something went wrong. Please try again.', 'error');
-        } finally {
-            // 🔥 Lock released ONLY here — after the entire flow
             releaseLock();
         }
     });
@@ -1861,36 +1649,18 @@ onAuthStateChanged(auth, async (user) => {
         console.error('Error loading withdrawal page:', error);
         const container = document.getElementById('withdrawalContent');
         if (container) {
-            container.innerHTML = '';
-
-            const wrap = document.createElement('div');
-            wrap.className = 'empty-state';
-            wrap.style.padding = '60px 20px';
-
-            const icon = document.createElement('i');
-            icon.className = 'bi bi-exclamation-triangle';
-            icon.style.color = 'var(--red)';
-            icon.style.opacity = '0.8';
-
-            const h4 = document.createElement('h4');
-            h4.style.color = '#fff';
-            h4.style.marginBottom = '8px';
-            h4.textContent = 'Error Loading Page';
-
-            const p = document.createElement('p');
-            p.style.color = 'var(--text-muted)';
-            p.style.marginBottom = '20px';
-            p.textContent = error.message || 'Please check your internet connection.';
-
-            const btn = document.createElement('button');
-            btn.className = 'btn-primary-custom';
-            btn.style.maxWidth = '200px';
-            btn.style.margin = '0 auto';
-            btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh Page';
-            btn.onclick = () => location.reload();
-
-            wrap.append(icon, h4, p, btn);
-            container.appendChild(wrap);
+            container.innerHTML = `
+                <div class="empty-state" style="padding: 60px 20px;">
+                    <i class="bi bi-exclamation-triangle" style="color:var(--red);opacity:0.8;"></i>
+                    <h4 style="color:#fff;margin-bottom:8px;">Error Loading Page</h4>
+                    <p style="color:var(--text-muted);margin-bottom:20px;">
+                        ${error.message || 'Please check your internet connection.'}
+                    </p>
+                    <button class="btn-primary-custom" onclick="location.reload()" style="max-width:200px;margin:0 auto;">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Page
+                    </button>
+                </div>
+            `;
         }
     }
 });

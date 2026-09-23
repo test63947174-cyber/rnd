@@ -8,9 +8,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        /* ============================================================
-           ROOT VARIABLES & RESET (Same as Dashboard)
-           ============================================================ */
         :root {
             --primary: #2ecc71;
             --primary-dark: #27ae60;
@@ -33,7 +30,6 @@
             --radius-lg: 22px;
             --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
             --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.35);
-            --shadow-glow: 0 0 40px rgba(46, 204, 113, 0.08);
         }
 
         * {
@@ -49,7 +45,6 @@
             min-height: 100vh;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
 
         body::before {
@@ -63,7 +58,6 @@
             z-index: 0;
         }
 
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: rgba(46, 204, 113, 0.03); border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: rgba(46, 204, 113, 0.25); border-radius: 10px; }
@@ -91,14 +85,10 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            transition: all 0.3s ease;
         }
 
         .navbar-custom .navbar-brand:hover { color: var(--primary) !important; }
 
-        /* ============================================================
-           SIDEBAR TOGGLE
-           ============================================================ */
         .sidebar-toggle {
             background: rgba(46, 204, 113, 0.08);
             border: 1px solid var(--border-color);
@@ -116,15 +106,6 @@
             overflow: hidden;
         }
 
-        .sidebar-toggle::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, rgba(46, 204, 113, 0.2), transparent);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
         .sidebar-toggle:hover {
             background: rgba(46, 204, 113, 0.15);
             border-color: var(--border-hover);
@@ -132,11 +113,8 @@
             box-shadow: 0 6px 20px rgba(46, 204, 113, 0.2);
         }
 
-        .sidebar-toggle:hover::before { opacity: 1; }
-        .sidebar-toggle i { position: relative; z-index: 1; }
-
         /* ============================================================
-           SIDEBAR OVERLAY & PANEL
+           SIDEBAR
            ============================================================ */
         .sidebar-overlay {
             position: fixed;
@@ -164,7 +142,6 @@
             border-left: 1px solid var(--border-color);
             z-index: 1070;
             transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 0;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -265,33 +242,16 @@
             overflow: hidden;
         }
 
-        .sidebar-panel .nav-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 3px;
-            height: 0;
-            background: var(--primary);
-            border-radius: 0 4px 4px 0;
-            transition: height 0.3s ease;
-        }
-
         .sidebar-panel .nav-item:hover {
             background: rgba(46, 204, 113, 0.06);
             color: #fff;
             transform: translateX(4px);
         }
 
-        .sidebar-panel .nav-item:hover::before { height: 20px; }
-
         .sidebar-panel .nav-item.active {
             background: linear-gradient(90deg, rgba(46, 204, 113, 0.12), rgba(46, 204, 113, 0.02));
             color: var(--primary);
         }
-
-        .sidebar-panel .nav-item.active::before { height: 24px; }
 
         .sidebar-panel .nav-item i {
             font-size: 1.15rem;
@@ -327,8 +287,6 @@
             color: var(--red);
         }
 
-        .sidebar-panel .sidebar-footer .nav-item::before { background: var(--red); }
-
         /* ============================================================
            DASHBOARD CONTAINER
            ============================================================ */
@@ -340,7 +298,6 @@
             z-index: 1;
         }
 
-        /* Page Header */
         .page-header-section {
             background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(26, 122, 58, 0.03));
             border-radius: var(--radius-lg);
@@ -349,32 +306,11 @@
             margin-bottom: 24px;
             position: relative;
             overflow: hidden;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             display: flex;
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-        }
-
-        .page-header-section::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -20%;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(46, 204, 113, 0.1), transparent 70%);
-            pointer-events: none;
-        }
-
-        .page-header-section::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(46, 204, 113, 0.4), transparent);
         }
 
         .page-header-section h4 {
@@ -383,8 +319,6 @@
             color: #fff;
             letter-spacing: -0.5px;
             margin: 0;
-            position: relative;
-            z-index: 1;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -403,47 +337,21 @@
             border-radius: var(--radius-md);
             padding: 20px 18px;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-            box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
             height: 100%;
-        }
-
-        .wallet-card-new::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--primary), transparent);
-            opacity: 0;
-            transition: opacity 0.4s ease;
         }
 
         .wallet-card-new:hover {
             border-color: var(--border-hover);
             transform: translateY(-5px);
-            box-shadow: var(--shadow-md), 0 0 30px rgba(46, 204, 113, 0.1);
+            box-shadow: var(--shadow-md);
             background: var(--bg-card-hover);
         }
-
-        .wallet-card-new:hover::before { opacity: 1; }
-
-        .wallet-card-new.gold::before { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
-        .wallet-card-new.gold:hover { border-color: rgba(251, 191, 36, 0.4); box-shadow: var(--shadow-md), 0 0 30px rgba(251, 191, 36, 0.1); }
-
-        .wallet-card-new.blue::before { background: linear-gradient(90deg, transparent, var(--blue), transparent); }
-        .wallet-card-new.blue:hover { border-color: rgba(96, 165, 250, 0.4); box-shadow: var(--shadow-md), 0 0 30px rgba(96, 165, 250, 0.1); }
-
-        .wallet-card-new.purple::before { background: linear-gradient(90deg, transparent, var(--purple), transparent); }
-        .wallet-card-new.purple:hover { border-color: rgba(167, 139, 250, 0.4); box-shadow: var(--shadow-md), 0 0 30px rgba(167, 139, 250, 0.1); }
 
         .wallet-card-new .wallet-card-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 14px;
-            position: relative;
-            z-index: 1;
         }
 
         .wallet-card-new .wallet-card-label {
@@ -463,25 +371,18 @@
             justify-content: center;
             font-size: 1.3rem;
             flex-shrink: 0;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .wallet-card-new:hover .wallet-card-icon {
-            transform: scale(1.12) rotate(-5deg);
-        }
-
-        .wallet-card-new.deposit .wallet-card-icon { background: rgba(46, 204, 113, 0.12); color: var(--primary); box-shadow: 0 0 20px rgba(46, 204, 113, 0.12); }
-        .wallet-card-new.referral .wallet-card-icon { background: rgba(251, 191, 36, 0.12); color: var(--gold); box-shadow: 0 0 20px rgba(251, 191, 36, 0.12); }
-        .wallet-card-new.rnd .wallet-card-icon { background: rgba(59, 130, 246, 0.12); color: var(--blue); box-shadow: 0 0 20px rgba(59, 130, 246, 0.12); }
-        .wallet-card-new.locked .wallet-card-icon { background: rgba(139, 92, 246, 0.12); color: var(--purple); box-shadow: 0 0 20px rgba(139, 92, 246, 0.12); }
+        .wallet-card-new.deposit .wallet-card-icon { background: rgba(46, 204, 113, 0.12); color: var(--primary); }
+        .wallet-card-new.referral .wallet-card-icon { background: rgba(251, 191, 36, 0.12); color: var(--gold); }
+        .wallet-card-new.rnd .wallet-card-icon { background: rgba(59, 130, 246, 0.12); color: var(--blue); }
+        .wallet-card-new.locked .wallet-card-icon { background: rgba(139, 92, 246, 0.12); color: var(--purple); }
 
         .wallet-card-new .wallet-card-value {
             font-size: 1.7rem;
             font-weight: 800;
             letter-spacing: -1px;
             line-height: 1.2;
-            position: relative;
-            z-index: 1;
         }
 
         .wallet-card-new.deposit .wallet-card-value { color: var(--primary); }
@@ -508,16 +409,8 @@
             font-size: 0.65rem;
             color: var(--text-muted);
             font-weight: 500;
-            position: relative;
-            z-index: 1;
             flex-wrap: wrap;
         }
-
-        .wallet-card-new .wallet-card-footer i { font-size: 0.85rem; }
-        .wallet-card-new.deposit .wallet-card-footer i { color: var(--primary); }
-        .wallet-card-new.referral .wallet-card-footer i { color: var(--gold); }
-        .wallet-card-new.rnd .wallet-card-footer i { color: var(--blue); }
-        .wallet-card-new.locked .wallet-card-footer i { color: var(--purple); }
 
         .badge-mini-pill {
             font-size: 0.6rem;
@@ -531,7 +424,7 @@
         .pill-red { background: rgba(239, 68, 68, 0.1); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.15); }
 
         /* ============================================================
-           GLASS CARDS
+           CARDS
            ============================================================ */
         .card-glass {
             background: var(--bg-card);
@@ -540,10 +433,8 @@
             border: 1px solid var(--border-color);
             border-radius: var(--radius-lg);
             padding: 1.5rem;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
-            box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
         }
 
         .card-glass .card-title {
@@ -570,8 +461,6 @@
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             text-align: center;
-            position: relative;
-            overflow: hidden;
             height: 100%;
         }
 
@@ -590,7 +479,6 @@
         .withdraw-option-card .option-icon { font-size: 1.6rem; margin-bottom: 4px; }
         .withdraw-option-card .option-label { font-weight: 700; color: #fff; font-size: 0.85rem; }
         .withdraw-option-card .option-balance { color: var(--gold); font-weight: 700; font-size: 0.95rem; margin-top: 2px; }
-        .withdraw-option-card .option-currency { color: var(--text-secondary); font-size: 0.7rem; }
 
         .min-label {
             font-size: 0.6rem;
@@ -601,7 +489,7 @@
         .min-label.rnd-min { color: var(--blue); }
 
         /* ============================================================
-           FORM CONTROLS
+           FORM
            ============================================================ */
         .form-control-custom {
             background: rgba(6, 11, 20, 0.8) !important;
@@ -621,7 +509,6 @@
         }
 
         .form-control-custom::placeholder { color: var(--text-muted) !important; font-weight: 400; }
-        .form-control-custom:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .form-label {
             font-weight: 600;
@@ -629,7 +516,6 @@
             font-size: 0.82rem;
             margin-bottom: 6px;
             display: block;
-            letter-spacing: 0.2px;
         }
 
         .form-label .required { color: var(--red); }
@@ -654,10 +540,9 @@
             border-radius: 14px;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             font-size: 0.95rem;
-            letter-spacing: 0.2px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.2);
             width: 100%;
             cursor: pointer;
             display: inline-flex;
@@ -666,24 +551,13 @@
             gap: 8px;
         }
 
-        .btn-primary-custom::before {
-            content: '';
-            position: absolute;
-            top: 0; left: -100%;
-            width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
-            transition: left 0.6s ease;
-        }
-
         .btn-primary-custom:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 12px 35px rgba(46, 204, 113, 0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+            box-shadow: 0 12px 35px rgba(46, 204, 113, 0.4);
             color: #fff;
         }
 
-        .btn-primary-custom:hover:not(:disabled)::before { left: 100%; }
-        .btn-primary-custom:active:not(:disabled) { transform: translateY(0); }
-        .btn-primary-custom:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+        .btn-primary-custom:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .btn-outline-custom {
             border: 2px solid rgba(46, 204, 113, 0.25);
@@ -700,6 +574,7 @@
             background: transparent;
             font-size: 0.9rem;
             width: 100%;
+            cursor: pointer;
         }
 
         .btn-outline-custom:hover {
@@ -707,7 +582,6 @@
             color: var(--primary);
             background: rgba(46, 204, 113, 0.05);
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.12);
         }
 
         /* ============================================================
@@ -728,7 +602,7 @@
         .info-alert i { margin-right: 6px; }
 
         /* ============================================================
-           TRANSACTION / WITHDRAWAL HISTORY ITEMS
+           HISTORY
            ============================================================ */
         .withdrawal-history {
             max-height: 400px;
@@ -753,8 +627,6 @@
         .transaction-item:hover {
             border-color: rgba(46, 204, 113, 0.2);
             background: rgba(6, 11, 20, 0.6);
-            transform: translateX(4px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
         .transaction-item .amount {
@@ -832,7 +704,7 @@
             border-radius: var(--radius-md);
             padding: 16px 22px;
             color: var(--text-primary);
-            box-shadow: var(--shadow-md), 0 0 30px rgba(46, 204, 113, 0.08);
+            box-shadow: var(--shadow-md);
             display: flex;
             align-items: center;
             gap: 14px;
@@ -857,6 +729,28 @@
         }
 
         /* ============================================================
+           OTP-STYLE PASSWORD INPUT
+           ============================================================ */
+        .pin-input-wrap {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 6px 0 4px;
+        }
+
+        .pin-input {
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            font-size: 1.6rem !important;
+            letter-spacing: 12px;
+            font-weight: 800 !important;
+            font-family: 'Courier New', monospace !important;
+            padding: 14px 16px !important;
+            padding-left: 26px !important;
+        }
+
+        /* ============================================================
            RESPONSIVE
            ============================================================ */
         @media (max-width: 992px) {
@@ -872,6 +766,7 @@
             .wallet-card-new .wallet-card-value { font-size: 1.5rem; }
             .card-glass { padding: 1.25rem; border-radius: var(--radius-md); }
             .toast-container { top: 12px; right: 12px; left: 12px; max-width: none; }
+            .pin-input { font-size: 1.35rem !important; letter-spacing: 8px; }
         }
 
         @media (max-width: 480px) {
@@ -882,30 +777,27 @@
             .wallet-card-new .wallet-card-value { font-size: 1.35rem; }
             .navbar-custom .navbar-brand { font-size: 1.1rem; }
             .withdraw-option-card { padding: 14px 10px; }
+            .pin-input { font-size: 1.2rem !important; letter-spacing: 6px; }
         }
     </style>
 </head>
 <body>
 
-<!-- ====== TOAST CONTAINER ====== -->
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ====== NAVBAR ====== -->
 <nav class="navbar navbar-custom">
     <div class="container-fluid px-3">
-        <a class="navbar-brand" href="dashboard.html">
-            RND Staking
-        </a>
+        <a class="navbar-brand" href="dashboard.html">RND Staking</a>
         <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Menu">
             <i class="bi bi-list"></i>
         </button>
     </div>
 </nav>
 
-<!-- ====== SIDEBAR OVERLAY ====== -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<!-- ====== SIDEBAR (Dashboard exact match) ====== -->
+<!-- ====== SIDEBAR ====== -->
 <div class="sidebar-panel" id="sidebarPanel">
     <div class="sidebar-header">
         <h5><i class="bi bi-grid-1x2-fill"></i> Menu</h5>
@@ -922,62 +814,21 @@
         </div>
     </div>
 
-    <a href="dashboard.html" class="nav-item">
-        <i class="bi bi-speedometer2"></i>
-        <span>Dashboard</span>
-    </a>
-    <a href="deposit.html" class="nav-item">
-        <i class="bi bi-arrow-down-circle"></i>
-        <span>Deposit</span>
-    </a>
-    <a href="withdrawal.html" class="nav-item active">
-        <i class="bi bi-arrow-up-circle"></i>
-        <span>Withdraw</span>
-    </a>
-    <a href="buy-package.html" class="nav-item">
-        <i class="bi bi-box-seam"></i>
-        <span>Buy Package</span>
-    </a>
-    <a href="referrals.html" class="nav-item">
-        <i class="bi bi-people"></i>
-        <span>Referrals</span>
-        <span class="badge" id="referralBadge">0</span>
-    </a>
-    <a href="transfer.html" class="nav-item">
-        <i class="bi bi-arrow-left-right"></i>
-        <span>Transfer</span>
-        <span class="badge" id="transferBadge">0</span>
-    </a>
-    <a href="rank-reward.html" class="nav-item">
-        <i class="bi bi-trophy"></i>
-        <span>Rank Reward</span>
-    </a>
-    <a href="direct-offer.html" class="nav-item direct-offer-nav" id="directOfferNav">
-        <i class="bi bi-gift"></i>
-        <span>Direct Offer</span>
-    </a>
-    <a href="transactions.html" class="nav-item">
-        <i class="bi bi-receipt"></i>
-        <span>Transactions</span>
-    </a>
-    <a href="invoice.html" class="nav-item">
-        <i class="bi bi-file-text"></i>
-        <span>Invoice</span>
-    </a>
-    <a href="profile.html" class="nav-item">
-        <i class="bi bi-person"></i>
-        <span>Profile</span>
-    </a>
-    <a href="#" onclick="window.open('support.html', '_blank'); return false;" class="nav-item">
-        <i class="bi bi-headset"></i>
-        <span>Support Center</span>
-    </a>
+    <a href="dashboard.html" class="nav-item"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+    <a href="deposit.html" class="nav-item"><i class="bi bi-arrow-down-circle"></i><span>Deposit</span></a>
+    <a href="withdrawal.html" class="nav-item active"><i class="bi bi-arrow-up-circle"></i><span>Withdraw</span></a>
+    <a href="buy-package.html" class="nav-item"><i class="bi bi-box-seam"></i><span>Buy Package</span></a>
+    <a href="referrals.html" class="nav-item"><i class="bi bi-people"></i><span>Referrals</span><span class="badge" id="referralBadge">0</span></a>
+    <a href="transfer.html" class="nav-item"><i class="bi bi-arrow-left-right"></i><span>Transfer</span></a>
+    <a href="rank-reward.html" class="nav-item"><i class="bi bi-trophy"></i><span>Rank Reward</span></a>
+    <a href="direct-offer.html" class="nav-item"><i class="bi bi-gift"></i><span>Direct Offer</span></a>
+    <a href="transactions.html" class="nav-item"><i class="bi bi-receipt"></i><span>Transactions</span></a>
+    <a href="invoice.html" class="nav-item"><i class="bi bi-file-text"></i><span>Invoice</span></a>
+    <a href="profile.html" class="nav-item"><i class="bi bi-person"></i><span>Profile</span></a>
+    <a href="#" onclick="window.open('support.html', '_blank'); return false;" class="nav-item"><i class="bi bi-headset"></i><span>Support Center</span></a>
 
     <div class="sidebar-footer">
-        <a href="#" class="nav-item" id="logoutBtnSidebar">
-            <i class="bi bi-box-arrow-right"></i>
-            <span>Logout</span>
-        </a>
+        <a href="#" class="nav-item" id="logoutBtnSidebar"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
     </div>
 </div>
 
@@ -989,7 +840,108 @@
     </div>
 </div>
 
-<!-- ====== SCRIPTS ====== -->
+<!-- ============================================================
+     WITHDRAWAL PASSWORD MODAL (Verify or Set)
+     ============================================================ -->
+<div class="modal fade" id="withdrawPasswordModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background:#111827; color:#e2e8f0; border:1px solid rgba(255,255,255,.10); border-radius:16px;">
+            <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,.06);">
+                <h5 class="modal-title" id="wdPwdModalTitle" style="display:flex; align-items:center; gap:10px; font-size:1.05rem; font-weight:700;">
+                    <i class="bi bi-shield-lock-fill" style="color:var(--primary);"></i>
+                    Withdrawal Password
+                </h5>
+                <button type="button" class="btn-close btn-close-white" id="wdPwdCloseBtn" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <div id="wdPwdInfo" style="font-size:.85rem; color:#94a3b8; margin-bottom:15px; line-height:1.5;">
+                    Enter your 6-digit withdrawal password to continue.
+                </div>
+
+                <label class="form-label" for="withdrawPasswordInput">Withdrawal Password (6 digits)</label>
+                <div class="pin-input-wrap">
+                    <input type="password" id="withdrawPasswordInput"
+                           class="form-control form-control-custom pin-input"
+                           inputmode="numeric" maxlength="6" pattern="[0-9]*"
+                           autocomplete="new-password"
+                           placeholder="••••••">
+                </div>
+                <div style="font-size:.7rem; color:var(--text-muted); margin-top:6px; text-align:center;">
+                    <i class="bi bi-eye-slash"></i> Digits are hidden for your security
+                </div>
+
+                <div id="withdrawPasswordError" style="display:none; color:#f87171; font-size:.8rem; margin-top:10px; line-height:1.4;"></div>
+
+                <div style="margin-top:12px; text-align:right;">
+                    <button type="button" id="forgotWithdrawPasswordBtn" class="btn btn-link p-0" style="color:#60a5fa; font-size:.82rem; text-decoration:none;">
+                        <i class="bi bi-question-circle"></i> Forgot Password?
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,.06); padding:14px 20px;">
+                <button type="button" class="btn-outline-custom" data-bs-dismiss="modal" style="width:auto; padding:10px 20px;">Cancel</button>
+                <button type="button" class="btn-primary-custom" id="confirmWithdrawPasswordBtn" style="width:auto; padding:10px 20px;">
+                    <i class="bi bi-shield-check"></i> <span id="wdPwdBtnText">Verify</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     FORGOT PASSWORD MODAL
+     ============================================================ -->
+<div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background:#111827; color:#e2e8f0; border:1px solid rgba(255,255,255,.10); border-radius:16px;">
+            <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,.06);">
+                <h5 class="modal-title" style="display:flex; align-items:center; gap:10px; font-size:1.05rem; font-weight:700;">
+                    <i class="bi bi-key-fill" style="color:#fbbf24;"></i>
+                    Forgot Withdrawal Password
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <div style="font-size:.85rem; color:#94a3b8; margin-bottom:15px; line-height:1.5;">
+                    To reset your withdrawal password, first verify your <strong style="color:#93c5fd;">current withdrawal password</strong>, then set a new one.
+                </div>
+
+                <label class="form-label" for="fpOldPassword">Current Withdrawal Password</label>
+                <input type="password" id="fpOldPassword"
+                       class="form-control form-control-custom"
+                       inputmode="numeric" maxlength="6" pattern="[0-9]*"
+                       autocomplete="new-password"
+                       placeholder="Enter current 6-digit password"
+                       style="text-align:center; letter-spacing:10px; font-weight:800; font-size:1.3rem;">
+
+                <label class="form-label" for="fpNewPassword" style="margin-top:14px;">New Withdrawal Password</label>
+                <input type="password" id="fpNewPassword"
+                       class="form-control form-control-custom"
+                       inputmode="numeric" maxlength="6" pattern="[0-9]*"
+                       autocomplete="new-password"
+                       placeholder="Enter new 6-digit password"
+                       style="text-align:center; letter-spacing:10px; font-weight:800; font-size:1.3rem;">
+
+                <label class="form-label" for="fpConfirmPassword" style="margin-top:14px;">Confirm New Password</label>
+                <input type="password" id="fpConfirmPassword"
+                       class="form-control form-control-custom"
+                       inputmode="numeric" maxlength="6" pattern="[0-9]*"
+                       autocomplete="new-password"
+                       placeholder="Re-enter new password"
+                       style="text-align:center; letter-spacing:10px; font-weight:800; font-size:1.3rem;">
+
+                <div id="fpError" style="display:none; color:#f87171; font-size:.8rem; margin-top:10px; line-height:1.4;"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,.06); padding:14px 20px;">
+                <button type="button" class="btn-outline-custom" data-bs-dismiss="modal" style="width:auto; padding:10px 20px;">Cancel</button>
+                <button type="button" class="btn-primary-custom" id="confirmForgotPasswordBtn" style="width:auto; padding:10px 20px;">
+                    <i class="bi bi-arrow-repeat"></i> Reset Password
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 
 <script type="importmap">

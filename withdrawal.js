@@ -1,5 +1,5 @@
 // ============================================================
-// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v6 - Password + Protected Change)
+// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v7 - Final)
 // ============================================================
 // 🔥 Security features:
 //   - Idempotency key (requestId) prevents double submission
@@ -12,6 +12,8 @@
 //   - Saved BEP20 address (Firebase-backed)
 //   - Change Address requires withdrawal password verification
 //   - Forgot password requires ACCOUNT password (Firebase re-auth)
+//   - First-time password set does NOT auto-withdraw (user submits again)
+//   - Change Address has dedicated Save/Cancel buttons
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -754,9 +756,9 @@ function openWithdrawPasswordModal(uid, { mode, onSuccess }) {
             if (mode === 'set') {
                 const hash = hashWithdrawalPassword(uid, pwd);
                 await saveWithdrawalPasswordHash(uid, hash);
-                showToast('✅ Withdrawal password set successfully.', 'success');
+                showToast('✅ Withdrawal password set successfully. Now click "Submit Withdrawal" again to proceed.', 'success', 7000);
                 modal.hide();
-                await onSuccess();
+                // 🔥 Do NOT auto-continue. User must click "Submit Withdrawal" again.
                 return;
             }
 
@@ -888,6 +890,9 @@ function openForgotPasswordModal(uid, onSuccess) {
 // 💳 SAVED ADDRESS UI
 // ============================================================
 async function initializeWithdrawalAddressUI(uid) {
+    // 🔥 Store uid globally so change-address Save/Cancel can use it
+    window.__currentUid = uid;
+
     const savedAddressBox = document.getElementById('savedAddressBox');
     const addressInputBox = document.getElementById('addressInputBox');
     if (!savedAddressBox || !addressInputBox) return;
@@ -896,6 +901,10 @@ async function initializeWithdrawalAddressUI(uid) {
     const savedAddress = String(settings.savedAddress || '').trim();
 
     window.addressChangeMode = false;
+
+    // Remove any existing action row from previous renders
+    const existingRow = document.getElementById('changeAddressActionRow');
+    if (existingRow) existingRow.remove();
 
     if (!savedAddress) {
         savedAddressBox.style.display = 'block';
@@ -965,22 +974,20 @@ async function initializeWithdrawalAddressUI(uid) {
 
     // 🔥 CHANGE ADDRESS → पहले withdrawal password verify होगा
     document.getElementById('changeAddressBtn')?.addEventListener('click', async () => {
-        const settings = await getWithdrawalSettings(uid);
-        const hasPassword = !!(settings.passwordHash && String(settings.passwordHash).trim());
+        const currentSettings = await getWithdrawalSettings(uid);
+        const hasPassword = !!(currentSettings.passwordHash && String(currentSettings.passwordHash).trim());
 
         if (!hasPassword) {
             showToast('Please set a withdrawal password first.', 'warning');
             openWithdrawPasswordModal(uid, {
                 mode: 'set',
                 onSuccess: () => {
-                    // After setting password, allow address change
                     showChangeAddressUI(savedAddress);
                 }
             });
             return;
         }
 
-        // Password पूछो, सही होने पर ही address input खोलो
         openWithdrawPasswordModal(uid, {
             mode: 'verify',
             onSuccess: () => {
@@ -997,6 +1004,7 @@ function showChangeAddressUI(oldAddress) {
     const savedAddressBox = document.getElementById('savedAddressBox');
     const addressInputBox = document.getElementById('addressInputBox');
     const addressInput = document.getElementById('withAddr');
+    const saveOpt = document.getElementById('saveAddressOption');
 
     if (!savedAddressBox || !addressInputBox || !addressInput) return;
 
@@ -1009,7 +1017,7 @@ function showChangeAddressUI(oldAddress) {
                 <i class="bi bi-exclamation-triangle"></i> Change Wallet Address
             </div>
             <div style="font-size:.78rem; color:var(--text-secondary);">
-                Make sure the new address is your correct BEP20 wallet address.
+                Enter your new BEP20 address below and click <strong>Save Address</strong>.
             </div>
         </div>
     `;
@@ -1018,8 +1026,86 @@ function showChangeAddressUI(oldAddress) {
     addressInput.value = '';
     addressInput.focus();
 
-    const saveOpt = document.getElementById('saveAddressOption');
-    if (saveOpt) saveOpt.style.display = 'block';
+    if (saveOpt) saveOpt.style.display = 'none';
+
+    // 🔥 Add a dedicated action row (Save + Cancel) if not present
+    let actionRow = document.getElementById('changeAddressActionRow');
+    if (!actionRow) {
+        actionRow = document.createElement('div');
+        actionRow.id = 'changeAddressActionRow';
+        actionRow.style.display = 'flex';
+        actionRow.style.gap = '8px';
+        actionRow.style.marginTop = '10px';
+        actionRow.innerHTML = `
+            <button type="button" class="btn-primary-custom" id="saveNewAddressBtn"
+                    style="flex:1; padding:10px 16px; font-size:.85rem;">
+                <i class="bi bi-check-circle"></i> Save Address
+            </button>
+            <button type="button" class="btn-outline-custom" id="cancelChangeAddressBtn"
+                    style="flex:1; padding:10px 16px; font-size:.85rem;">
+                <i class="bi bi-x-circle"></i> Cancel
+            </button>
+        `;
+        addressInputBox.appendChild(actionRow);
+    } else {
+        actionRow.style.display = 'flex';
+    }
+
+    // 🔥 Cancel button — revert to old address
+    document.getElementById('cancelChangeAddressBtn').onclick = async () => {
+        actionRow.style.display = 'none';
+        addressInput.value = '';
+        window.addressChangeMode = false;
+        await initializeWithdrawalAddressUI(window.__currentUid);
+    };
+
+    // 🔥 Save button — validate & save new address
+    document.getElementById('saveNewAddressBtn').onclick = async () => {
+        const newAddr = String(addressInput.value || '').trim();
+
+        if (!BEP20_REGEX.test(newAddr)) {
+            showToast('❌ Please enter a valid BEP20 wallet address (0x + 40 hex chars).', 'error');
+            return;
+        }
+
+        if (newAddr.toLowerCase() === String(oldAddress || '').toLowerCase()) {
+            showToast('⚠️ This is already your saved address.', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('saveNewAddressBtn');
+        btn.disabled = true;
+        const orig = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Saving...`;
+
+        try {
+            const uid = window.__currentUid;
+            if (!uid) {
+                throw new Error('Session issue. Please refresh the page.');
+            }
+
+            await saveWithdrawalAddress(uid, newAddr);
+
+            // Update local state
+            window.currentSavedWithdrawalAddress = newAddr;
+            window.addressChangeMode = false;
+
+            showToast('✅ Wallet address updated successfully.', 'success');
+
+            // Hide action row
+            actionRow.style.display = 'none';
+
+            // Re-render saved address box
+            await initializeWithdrawalAddressUI(uid);
+
+        } catch (err) {
+            console.error('Save address error:', err);
+            showToast('❌ ' + (err.message || 'Could not save address. Please try again.'), 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+        }
+    };
 
     window.addressChangeMode = true;
     window.previousWithdrawalAddress = oldAddress;
@@ -1116,6 +1202,26 @@ function attachWithdrawHandler(user) {
         const settings = await getWithdrawalSettings(user.uid);
         const hasPassword = !!(settings.passwordHash && String(settings.passwordHash).trim());
         const pwdMode = hasPassword ? 'verify' : 'set';
+
+        // Release lock if modal closed without verifying (also handles "set" mode)
+        const modalEl = document.getElementById('withdrawPasswordModal');
+        let releaseLock = null;
+
+        if (modalEl) {
+            releaseLock = () => {
+                setTimeout(() => {
+                    if (isSubmitting) {
+                        isSubmitting = false;
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="bi bi-arrow-up-circle"></i> Submit Withdrawal';
+                        }
+                    }
+                }, 500);
+                modalEl.removeEventListener('hidden.bs.modal', releaseLock);
+            };
+            modalEl.addEventListener('hidden.bs.modal', releaseLock);
+        }
 
         openWithdrawPasswordModal(user.uid, {
             mode: pwdMode,
@@ -1214,27 +1320,12 @@ function attachWithdrawHandler(user) {
                         btn.disabled = false;
                         btn.innerHTML = '<i class="bi bi-arrow-up-circle"></i> Submit Withdrawal';
                     }
+                    if (modalEl && releaseLock) {
+                        modalEl.removeEventListener('hidden.bs.modal', releaseLock);
+                    }
                 }
             }
         });
-
-        // Release lock if modal closed without verifying
-        const modalEl = document.getElementById('withdrawPasswordModal');
-        if (modalEl) {
-            const releaseLock = () => {
-                setTimeout(() => {
-                    if (isSubmitting) {
-                        isSubmitting = false;
-                        if (btn) {
-                            btn.disabled = false;
-                            btn.innerHTML = '<i class="bi bi-arrow-up-circle"></i> Submit Withdrawal';
-                        }
-                    }
-                }, 500);
-                modalEl.removeEventListener('hidden.bs.modal', releaseLock);
-            };
-            modalEl.addEventListener('hidden.bs.modal', releaseLock);
-        }
     });
 }
 

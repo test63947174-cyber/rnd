@@ -1,5 +1,5 @@
 // ============================================================
-// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v5 - DB Password + Saved Address)
+// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v6 - Password + Protected Change)
 // ============================================================
 // 🔥 Security features:
 //   - Idempotency key (requestId) prevents double submission
@@ -8,13 +8,20 @@
 //   - Pending request tracking (survives refresh/back/multiple tabs)
 //   - Network error safe: reply with UNKNOWN state, don't double-charge
 //   - Hardened amount & address validation
-//   - NEW: 6-digit withdrawal password (hashed, in Firebase DB)
-//   - NEW: Saved BEP20 address (Firebase-backed)
-//   - NEW: Forgot password via DB verification (no Firebase Auth touch)
+//   - Withdrawal password (strong, hashed, Firebase DB)
+//   - Saved BEP20 address (Firebase-backed)
+//   - Change Address requires withdrawal password verification
+//   - Forgot password requires ACCOUNT password (Firebase re-auth)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import {
+    getAuth,
+    onAuthStateChanged,
+    signOut,
+    EmailAuthProvider,
+    reauthenticateWithCredential
+} from "firebase/auth";
 import { getDatabase, ref, get, set, push, runTransaction, remove } from "firebase/database";
 
 // ============================================================
@@ -46,20 +53,18 @@ const WITHDRAW_CONFIG = {
 };
 
 const BEP20_REGEX = /^0x[a-fA-F0-9]{40}$/;
-const PASSWORD_REGEX = /^\d{6}$/;
+const PASSWORD_MIN_LEN = 6;
 
-// 🔥 Simple hash function for withdrawal password (djb2 + salt)
-// ⚠️ NOTE: This is NOT cryptographically strong. For a production money
-// system, replace with a proper hashing mechanism (e.g. Cloud Function
-// + bcrypt). But it does prevent plaintext storage in the DB.
+// ============================================================
+// 🔐 HASH (djb2-based, salted with uid)
+// ============================================================
 function hashWithdrawalPassword(uid, password) {
-    const input = `rnd_${uid}_${password}_stake`;
+    const input = `rnd_${uid}_${password}_stake_v6`;
     let hash = 5381;
     for (let i = 0; i < input.length; i++) {
         hash = ((hash << 5) + hash) + input.charCodeAt(i);
         hash = hash & 0xffffffff;
     }
-    // Produce a longer hex string by running two passes
     let h2 = 52711;
     for (let i = input.length - 1; i >= 0; i--) {
         h2 = ((h2 << 5) + h2) ^ input.charCodeAt(i);
@@ -187,7 +192,7 @@ async function getWithdrawalHistory(uid) {
 }
 
 // ============================================================
-// 🔐 WITHDRAWAL SETTINGS (Saved Address + Password)
+// 🔐 WITHDRAWAL SETTINGS
 // ============================================================
 async function getWithdrawalSettings(uid) {
     try {
@@ -219,8 +224,8 @@ async function saveWithdrawalPasswordHash(uid, passwordHash) {
 }
 
 async function verifyWithdrawalPasswordFromDB(uid, password) {
-    if (!PASSWORD_REGEX.test(String(password || ''))) {
-        return { ok: false, error: 'Password must be exactly 6 digits.' };
+    if (!password || String(password).length < PASSWORD_MIN_LEN) {
+        return { ok: false, error: `Password must be at least ${PASSWORD_MIN_LEN} characters.` };
     }
     const settings = await getWithdrawalSettings(uid);
     const storedHash = String(settings.passwordHash || '').trim();
@@ -236,7 +241,45 @@ async function verifyWithdrawalPasswordFromDB(uid, password) {
 }
 
 // ============================================================
-// 🔥 CHECK DUPLICATE REQUEST (Idempotency)
+// 🔐 ACCOUNT PASSWORD RE-AUTHENTICATION (Firebase Auth — read-only)
+// ============================================================
+// This ONLY verifies the user's account password (the one they
+// used while registering). It does NOT change it, does NOT read
+// it, does NOT store it anywhere. Just returns true / throws.
+async function verifyAccountPassword(user, password) {
+    if (!user) {
+        throw new Error('Session expired. Please login again.');
+    }
+    if (!user.email) {
+        throw new Error('Your account does not have an email address for verification.');
+    }
+    if (!password) {
+        throw new Error('Please enter your account password.');
+    }
+
+    const credential = EmailAuthProvider.credential(user.email, password);
+
+    try {
+        await reauthenticateWithCredential(user, credential);
+        return true;
+    } catch (err) {
+        console.error('Account re-auth failed:', err);
+        if (
+            err.code === 'auth/wrong-password' ||
+            err.code === 'auth/invalid-credential' ||
+            err.code === 'auth/invalid-login-credentials'
+        ) {
+            throw new Error('Incorrect account password.');
+        }
+        if (err.code === 'auth/too-many-requests') {
+            throw new Error('Too many failed attempts. Please try again later.');
+        }
+        throw new Error('Account verification failed. Please try again.');
+    }
+}
+
+// ============================================================
+// 🔥 CHECK DUPLICATE REQUEST
 // ============================================================
 async function checkDuplicateRequest(uid, requestId) {
     try {
@@ -252,13 +295,13 @@ async function checkDuplicateRequest(uid, requestId) {
 }
 
 // ============================================================
-// 🔥 RESERVE REQUEST SLOT (Atomic)
+// 🔥 RESERVE REQUEST SLOT
 // ============================================================
 async function reserveRequestSlot(uid, requestId, payload) {
     const slotRef = ref(db, `users/${uid}/withdrawalRequests/${requestId}`);
     try {
         const result = await runTransaction(slotRef, (currentData) => {
-            if (currentData !== null) return; // abort — duplicate
+            if (currentData !== null) return;
             return {
                 requestId,
                 uid,
@@ -292,7 +335,7 @@ async function updateRequestSlot(uid, requestId, updates) {
 }
 
 // ============================================================
-// 🔥 ATOMIC WITHDRAWAL PROCESS (Hardened — UNCHANGED)
+// 🔥 ATOMIC WITHDRAWAL PROCESS
 // ============================================================
 async function processAtomicWithdrawal(uid, walletType, amount, address, currency, withdrawalId, requestId) {
     const userRef = ref(db, 'users/' + uid);
@@ -302,7 +345,6 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, currenc
         const result = await runTransaction(userRef, (currentData) => {
             if (!currentData) return null;
 
-            // STEP 1: Duplicate withdrawalId check
             const transactions = currentData.transactions || {};
             for (let key in transactions) {
                 const tx = transactions[key];
@@ -312,31 +354,16 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, currenc
                 }
             }
 
-            // STEP 2: Validate balance & amount
             const balance = roundTo8(currentData[walletType] || 0);
             const amt = roundTo8(amount);
 
-            if (!Number.isFinite(balance) || balance < 0) {
-                console.warn('⚠️ Invalid wallet balance:', balance);
-                return null;
-            }
-            if (!Number.isFinite(amt) || amt <= 0) {
-                console.warn('⚠️ Invalid withdrawal amount:', amt);
-                return null;
-            }
-            if (balance < amt) {
-                console.warn('⚠️ Insufficient balance:', balance, 'needed:', amt);
-                return null;
-            }
+            if (!Number.isFinite(balance) || balance < 0) return null;
+            if (!Number.isFinite(amt) || amt <= 0) return null;
+            if (balance < amt) return null;
 
-            // STEP 3: Compute new balance
             const newBalance = roundTo8(balance - amt);
-            if (newBalance < 0 || !Number.isFinite(newBalance)) {
-                console.warn('⚠️ Invalid resulting balance:', newBalance);
-                return null;
-            }
+            if (newBalance < 0 || !Number.isFinite(newBalance)) return null;
 
-            // STEP 4: Transaction record
             const txId = 'wd_' + now + '_' + Math.random().toString(36).substr(2, 8);
             transactions[txId] = {
                 type: 'withdrawal',
@@ -376,7 +403,7 @@ async function processAtomicWithdrawal(uid, walletType, amount, address, currenc
 }
 
 // ============================================================
-// 🔥 RECONCILE PENDING REQUESTS (UNCHANGED)
+// 🔥 RECONCILE PENDING REQUESTS
 // ============================================================
 async function reconcilePendingRequests(uid) {
     try {
@@ -663,6 +690,201 @@ function attachOptionHandlers() {
 }
 
 // ============================================================
+// 🔐 WITHDRAWAL PASSWORD MODAL (set / verify)
+// ============================================================
+function openWithdrawPasswordModal(uid, { mode, onSuccess }) {
+    const modalEl = document.getElementById('withdrawPasswordModal');
+    if (!modalEl) {
+        showToast('Password UI unavailable.', 'error');
+        return;
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    const titleEl = document.getElementById('wdPwdModalTitle');
+    const infoEl = document.getElementById('wdPwdInfo');
+    const inputEl = document.getElementById('withdrawPasswordInput');
+    const confirmWrap = document.getElementById('wdPwdConfirmWrap');
+    const confirmEl = document.getElementById('withdrawPasswordConfirm');
+    const errEl = document.getElementById('withdrawPasswordError');
+    const confirmBtn = document.getElementById('confirmWithdrawPasswordBtn');
+    const btnText = document.getElementById('wdPwdBtnText');
+    const forgotBtn = document.getElementById('forgotWithdrawPasswordBtn');
+
+    inputEl.value = '';
+    confirmEl.value = '';
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+
+    if (mode === 'set') {
+        titleEl.innerHTML = `<i class="bi bi-shield-lock-fill" style="color:var(--primary);"></i> Set Withdrawal Password`;
+        infoEl.innerHTML = `Set a <strong style="color:#2ecc71;">strong withdrawal password</strong> (min 6 characters). You will need it for every withdrawal and to change your saved address.`;
+        btnText.textContent = 'Set Password';
+        forgotBtn.style.display = 'none';
+        confirmWrap.style.display = 'block';
+    } else {
+        titleEl.innerHTML = `<i class="bi bi-shield-lock-fill" style="color:var(--primary);"></i> Withdrawal Password`;
+        infoEl.innerHTML = `Enter your <strong style="color:#2ecc71;">withdrawal password</strong> to continue.`;
+        btnText.textContent = 'Verify';
+        forgotBtn.style.display = 'inline-block';
+        confirmWrap.style.display = 'none';
+    }
+
+    confirmBtn.onclick = async () => {
+        const pwd = String(inputEl.value || '');
+        const confirmPwd = String(confirmEl.value || '');
+
+        if (!pwd || pwd.length < PASSWORD_MIN_LEN) {
+            errEl.textContent = `Password must be at least ${PASSWORD_MIN_LEN} characters.`;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        if (mode === 'set' && pwd !== confirmPwd) {
+            errEl.textContent = 'Password and confirm password do not match.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        confirmBtn.disabled = true;
+        const origHTML = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Please wait...`;
+        errEl.style.display = 'none';
+
+        try {
+            if (mode === 'set') {
+                const hash = hashWithdrawalPassword(uid, pwd);
+                await saveWithdrawalPasswordHash(uid, hash);
+                showToast('✅ Withdrawal password set successfully.', 'success');
+                modal.hide();
+                await onSuccess();
+                return;
+            }
+
+            const check = await verifyWithdrawalPasswordFromDB(uid, pwd);
+            if (!check.ok) {
+                if (check.error === 'NO_PASSWORD_SET') {
+                    errEl.textContent = 'No withdrawal password set yet. Please set one now.';
+                    errEl.style.display = 'block';
+                    setTimeout(() => {
+                        modal.hide();
+                        openWithdrawPasswordModal(uid, { mode: 'set', onSuccess });
+                    }, 900);
+                    return;
+                }
+                errEl.textContent = check.error || 'Incorrect password.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            modal.hide();
+            await onSuccess();
+
+        } catch (err) {
+            console.error('Withdrawal password error:', err);
+            errEl.textContent = err.message || 'Something went wrong. Please try again.';
+            errEl.style.display = 'block';
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = origHTML;
+        }
+    };
+
+    forgotBtn.onclick = () => {
+        modal.hide();
+        setTimeout(() => openForgotPasswordModal(uid, onSuccess), 350);
+    };
+
+    modal.show();
+    setTimeout(() => inputEl.focus(), 300);
+}
+
+// ============================================================
+// 🔐 FORGOT PASSWORD MODAL
+// ============================================================
+// Step 1: Verify ACCOUNT password (register-time password via Firebase Auth)
+// Step 2: Set new withdrawal password + confirm
+function openForgotPasswordModal(uid, onSuccess) {
+    const modalEl = document.getElementById('forgotPasswordModal');
+    if (!modalEl) {
+        showToast('Forgot-password UI unavailable.', 'error');
+        return;
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    const accEl = document.getElementById('fpAccountPassword');
+    const newEl = document.getElementById('fpNewPassword');
+    const confEl = document.getElementById('fpConfirmPassword');
+    const errEl = document.getElementById('fpError');
+    const btn = document.getElementById('confirmForgotPasswordBtn');
+
+    accEl.value = '';
+    newEl.value = '';
+    confEl.value = '';
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+
+    btn.onclick = async () => {
+        const accountPwd = String(accEl.value || '');
+        const newPwd = String(newEl.value || '');
+        const confPwd = String(confEl.value || '');
+
+        if (!accountPwd) {
+            errEl.textContent = 'Please enter your account password.';
+            errEl.style.display = 'block';
+            return;
+        }
+        if (!newPwd || newPwd.length < PASSWORD_MIN_LEN) {
+            errEl.textContent = `New withdrawal password must be at least ${PASSWORD_MIN_LEN} characters.`;
+            errEl.style.display = 'block';
+            return;
+        }
+        if (newPwd !== confPwd) {
+            errEl.textContent = 'New password and confirm password do not match.';
+            errEl.style.display = 'block';
+            return;
+        }
+        if (newPwd === accountPwd) {
+            errEl.textContent = 'Withdrawal password should be different from your account password.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        btn.disabled = true;
+        const origHTML = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Please wait...`;
+        errEl.style.display = 'none';
+
+        try {
+            // STEP 1: Verify account password (register-time password)
+            const currentUser = auth.currentUser;
+            await verifyAccountPassword(currentUser, accountPwd);
+
+            // STEP 2: Save new withdrawal password hash
+            const newHash = hashWithdrawalPassword(uid, newPwd);
+            await saveWithdrawalPasswordHash(uid, newHash);
+
+            showToast('✅ Withdrawal password reset successfully.', 'success');
+            modal.hide();
+
+            if (typeof onSuccess === 'function') {
+                setTimeout(() => onSuccess(), 400);
+            }
+
+        } catch (err) {
+            console.error('Forgot password error:', err);
+            errEl.textContent = err.message || 'Something went wrong. Please try again.';
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+        }
+    };
+
+    modal.show();
+    setTimeout(() => accEl.focus(), 300);
+}
+
+// ============================================================
 // 💳 SAVED ADDRESS UI
 // ============================================================
 async function initializeWithdrawalAddressUI(uid) {
@@ -675,7 +897,6 @@ async function initializeWithdrawalAddressUI(uid) {
 
     window.addressChangeMode = false;
 
-    // NO SAVED ADDRESS
     if (!savedAddress) {
         savedAddressBox.style.display = 'block';
         savedAddressBox.innerHTML = `
@@ -710,7 +931,6 @@ async function initializeWithdrawalAddressUI(uid) {
         return;
     }
 
-    // SAVED ADDRESS EXISTS
     const shortAddress = `${savedAddress.substring(0, 10)}...${savedAddress.slice(-8)}`;
 
     savedAddressBox.style.display = 'block';
@@ -743,13 +963,35 @@ async function initializeWithdrawalAddressUI(uid) {
     addressInputBox.style.display = 'none';
     window.currentSavedWithdrawalAddress = savedAddress;
 
+    // 🔥 CHANGE ADDRESS → पहले withdrawal password verify होगा
     document.getElementById('changeAddressBtn')?.addEventListener('click', () => {
-        showChangeAddressUI(savedAddress);
+        const settings = await getWithdrawalSettings(uid);
+        const hasPassword = !!(settings.passwordHash && String(settings.passwordHash).trim());
+
+        if (!hasPassword) {
+            showToast('Please set a withdrawal password first.', 'warning');
+            openWithdrawPasswordModal(uid, {
+                mode: 'set',
+                onSuccess: () => {
+                    // After setting password, allow address change
+                    showChangeAddressUI(savedAddress);
+                }
+            });
+            return;
+        }
+
+        // Password पूछो, सही होने पर ही address input खोलो
+        openWithdrawPasswordModal(uid, {
+            mode: 'verify',
+            onSuccess: () => {
+                showChangeAddressUI(savedAddress);
+            }
+        });
     });
 }
 
 // ============================================================
-// 🔄 CHANGE SAVED ADDRESS UI
+// 🔄 CHANGE SAVED ADDRESS UI (called only after password verified)
 // ============================================================
 function showChangeAddressUI(oldAddress) {
     const savedAddressBox = document.getElementById('savedAddressBox');
@@ -784,211 +1026,6 @@ function showChangeAddressUI(oldAddress) {
 }
 
 // ============================================================
-// 🔐 WITHDRAWAL PASSWORD MODAL LOGIC
-// ============================================================
-function openWithdrawPasswordModal(uid, { mode, onSuccess }) {
-    const modalEl = document.getElementById('withdrawPasswordModal');
-    if (!modalEl) {
-        showToast('Password UI unavailable.', 'error');
-        return;
-    }
-
-    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    const titleEl = document.getElementById('wdPwdModalTitle');
-    const infoEl = document.getElementById('wdPwdInfo');
-    const inputEl = document.getElementById('withdrawPasswordInput');
-    const errEl = document.getElementById('withdrawPasswordError');
-    const confirmBtn = document.getElementById('confirmWithdrawPasswordBtn');
-    const btnText = document.getElementById('wdPwdBtnText');
-    const forgotBtn = document.getElementById('forgotWithdrawPasswordBtn');
-    const closeBtn = document.getElementById('wdPwdCloseBtn');
-
-    inputEl.value = '';
-    errEl.style.display = 'none';
-    errEl.textContent = '';
-
-    // Mode: 'verify' or 'set'
-    if (mode === 'set') {
-        titleEl.innerHTML = `<i class="bi bi-shield-lock-fill" style="color:var(--primary);"></i> Set Withdrawal Password`;
-        infoEl.innerHTML = `You are setting up your <strong style="color:#2ecc71;">6-digit withdrawal password</strong>. You will need this password every time you withdraw.`;
-        btnText.textContent = 'Set Password';
-        forgotBtn.style.display = 'none';
-    } else {
-        titleEl.innerHTML = `<i class="bi bi-shield-lock-fill" style="color:var(--primary);"></i> Withdrawal Password`;
-        infoEl.innerHTML = `Enter your <strong style="color:#2ecc71;">6-digit withdrawal password</strong> to continue.`;
-        btnText.textContent = 'Verify';
-        forgotBtn.style.display = 'inline-block';
-    }
-
-    // Force numeric only
-    inputEl.oninput = () => {
-        inputEl.value = inputEl.value.replace(/\D/g, '').slice(0, 6);
-    };
-
-    confirmBtn.onclick = async () => {
-        const pwd = String(inputEl.value || '').trim();
-
-        if (!PASSWORD_REGEX.test(pwd)) {
-            errEl.textContent = 'Please enter exactly 6 digits.';
-            errEl.style.display = 'block';
-            return;
-        }
-
-        confirmBtn.disabled = true;
-        const origHTML = confirmBtn.innerHTML;
-        confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Please wait...`;
-        errEl.style.display = 'none';
-
-        try {
-            if (mode === 'set') {
-                const hash = hashWithdrawalPassword(uid, pwd);
-                await saveWithdrawalPasswordHash(uid, hash);
-                showToast('✅ Withdrawal password set successfully.', 'success');
-                modal.hide();
-                await onSuccess();
-                return;
-            }
-
-            // mode === 'verify'
-            const check = await verifyWithdrawalPasswordFromDB(uid, pwd);
-            if (!check.ok) {
-                if (check.error === 'NO_PASSWORD_SET') {
-                    // Auto-switch to set mode
-                    errEl.textContent = 'No withdrawal password set yet. Please set one now.';
-                    errEl.style.display = 'block';
-                    setTimeout(() => {
-                        modal.hide();
-                        openWithdrawPasswordModal(uid, { mode: 'set', onSuccess });
-                    }, 900);
-                    return;
-                }
-                errEl.textContent = check.error || 'Incorrect password.';
-                errEl.style.display = 'block';
-                return;
-            }
-
-            modal.hide();
-            await onSuccess();
-
-        } catch (err) {
-            console.error('Withdrawal password error:', err);
-            errEl.textContent = err.message || 'Something went wrong. Please try again.';
-            errEl.style.display = 'block';
-        } finally {
-            confirmBtn.disabled = false;
-            confirmBtn.innerHTML = origHTML;
-        }
-    };
-
-    // Forgot password flow
-    forgotBtn.onclick = () => {
-        modal.hide();
-        setTimeout(() => openForgotPasswordModal(uid, onSuccess), 350);
-    };
-
-    // Prevent close during verification — but allow cancel (just leave)
-    modal.show();
-    setTimeout(() => inputEl.focus(), 300);
-}
-
-// ============================================================
-// 🔐 FORGOT PASSWORD MODAL LOGIC
-// ============================================================
-function openForgotPasswordModal(uid, onSuccess) {
-    const modalEl = document.getElementById('forgotPasswordModal');
-    if (!modalEl) {
-        showToast('Forgot-password UI unavailable.', 'error');
-        return;
-    }
-
-    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    const oldEl = document.getElementById('fpOldPassword');
-    const newEl = document.getElementById('fpNewPassword');
-    const confEl = document.getElementById('fpConfirmPassword');
-    const errEl = document.getElementById('fpError');
-    const btn = document.getElementById('confirmForgotPasswordBtn');
-
-    oldEl.value = '';
-    newEl.value = '';
-    confEl.value = '';
-    errEl.style.display = 'none';
-    errEl.textContent = '';
-
-    [oldEl, newEl, confEl].forEach(el => {
-        el.oninput = () => { el.value = el.value.replace(/\D/g, '').slice(0, 6); };
-    });
-
-    btn.onclick = async () => {
-        const oldPwd = String(oldEl.value || '').trim();
-        const newPwd = String(newEl.value || '').trim();
-        const confPwd = String(confEl.value || '').trim();
-
-        if (!PASSWORD_REGEX.test(oldPwd)) {
-            errEl.textContent = 'Please enter your current 6-digit password.';
-            errEl.style.display = 'block';
-            return;
-        }
-        if (!PASSWORD_REGEX.test(newPwd)) {
-            errEl.textContent = 'New password must be exactly 6 digits.';
-            errEl.style.display = 'block';
-            return;
-        }
-        if (newPwd !== confPwd) {
-            errEl.textContent = 'New password and confirm password do not match.';
-            errEl.style.display = 'block';
-            return;
-        }
-        if (oldPwd === newPwd) {
-            errEl.textContent = 'New password must be different from old password.';
-            errEl.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        const origHTML = btn.innerHTML;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Please wait...`;
-        errEl.style.display = 'none';
-
-        try {
-            // Verify current password first
-            const check = await verifyWithdrawalPasswordFromDB(uid, oldPwd);
-            if (!check.ok) {
-                if (check.error === 'NO_PASSWORD_SET') {
-                    errEl.textContent = 'No withdrawal password set yet. Please set one from the withdrawal page.';
-                } else {
-                    errEl.textContent = check.error || 'Current password is incorrect.';
-                }
-                errEl.style.display = 'block';
-                return;
-            }
-
-            // Save new hashed password
-            const newHash = hashWithdrawalPassword(uid, newPwd);
-            await saveWithdrawalPasswordHash(uid, newHash);
-
-            showToast('✅ Withdrawal password reset successfully.', 'success');
-            modal.hide();
-
-            // Continue to withdrawal automatically after successful reset
-            if (typeof onSuccess === 'function') {
-                setTimeout(() => onSuccess(), 400);
-            }
-
-        } catch (err) {
-            console.error('Forgot password error:', err);
-            errEl.textContent = err.message || 'Something went wrong. Please try again.';
-            errEl.style.display = 'block';
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = origHTML;
-        }
-    };
-
-    modal.show();
-    setTimeout(() => oldEl.focus(), 300);
-}
-
-// ============================================================
 // 🔥 ATTACH WITHDRAW FORM HANDLER
 // ============================================================
 function attachWithdrawHandler(user) {
@@ -1000,7 +1037,6 @@ function attachWithdrawHandler(user) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // LAYER 1: JS lock
         if (isSubmitting) {
             showToast('⏳ Please wait, aapka request already process ho raha hai...', 'warning');
             return;
@@ -1016,7 +1052,6 @@ function attachWithdrawHandler(user) {
             return;
         }
 
-        // LAYER 2: Amount validation
         const amount = Number(amountRaw);
 
         if (!Number.isFinite(amount) || amount <= 0) {
@@ -1026,7 +1061,6 @@ function attachWithdrawHandler(user) {
 
         const amountString = String(amountRaw).trim();
         const decimalPart = amountString.includes('.') ? amountString.split('.')[1] : '';
-
         if (decimalPart.length > 8) {
             showToast('❌ Maximum 8 decimal places are allowed.', 'error');
             return;
@@ -1037,7 +1071,7 @@ function attachWithdrawHandler(user) {
             return;
         }
 
-        // LAYER 3: Resolve address
+        // Resolve address
         let address = '';
         const savedAddress = String(window.currentSavedWithdrawalAddress || '').trim();
 
@@ -1053,7 +1087,7 @@ function attachWithdrawHandler(user) {
             return;
         }
 
-        // LAYER 4: Fresh balance from server
+        // Fresh balance
         const freshUser = await getUserData(user.uid);
 
         if (!freshUser) {
@@ -1073,24 +1107,20 @@ function attachWithdrawHandler(user) {
             return;
         }
 
-        // Lock UI
         isSubmitting = true;
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Processing...';
         }
 
-        // Determine password mode
         const settings = await getWithdrawalSettings(user.uid);
         const hasPassword = !!(settings.passwordHash && String(settings.passwordHash).trim());
         const pwdMode = hasPassword ? 'verify' : 'set';
 
-        // LAYER 5: Open withdrawal password modal
         openWithdrawPasswordModal(user.uid, {
             mode: pwdMode,
             onSuccess: async () => {
                 try {
-                    // LAYER 6: Idempotency + reservation
                     const requestId = generateRequestId();
                     const withdrawalId = 'wd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
 
@@ -1108,7 +1138,6 @@ function attachWithdrawHandler(user) {
                         throw new Error('Could not reserve request slot');
                     }
 
-                    // LAYER 7: Atomic withdrawal
                     const result = await processAtomicWithdrawal(
                         user.uid,
                         walletType,
@@ -1129,14 +1158,12 @@ function attachWithdrawHandler(user) {
                         return;
                     }
 
-                    // LAYER 8: Mark completed
                     await updateRequestSlot(user.uid, requestId, {
                         status: 'completed',
                         withdrawalId,
                         completedAt: Date.now()
                     });
 
-                    // LAYER 9: Admin visibility
                     try {
                         await push(ref(db, 'withdrawals'), {
                             uid: user.uid,
@@ -1153,7 +1180,6 @@ function attachWithdrawHandler(user) {
                         console.warn('Root withdrawal save warning (non-critical):', err);
                     }
 
-                    // LAYER 10: Save address after successful withdrawal
                     const shouldSave = window.addressChangeMode ||
                                       document.getElementById('saveWithdrawalAddress')?.checked;
 
@@ -1192,12 +1218,10 @@ function attachWithdrawHandler(user) {
             }
         });
 
-        // If user cancels the password modal (closes without verifying),
-        // we must release the lock. Attach a one-time listener.
+        // Release lock if modal closed without verifying
         const modalEl = document.getElementById('withdrawPasswordModal');
         if (modalEl) {
             const releaseLock = () => {
-                // Small delay so the onSuccess (if triggered) has time to start
                 setTimeout(() => {
                     if (isSubmitting) {
                         isSubmitting = false;
@@ -1254,7 +1278,6 @@ onAuthStateChanged(auth, async (user) => {
         attachOptionHandlers();
         attachWithdrawHandler(user);
 
-        // Initialize saved address UI
         await initializeWithdrawalAddressUI(user.uid);
 
     } catch (error) {

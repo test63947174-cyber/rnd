@@ -964,7 +964,7 @@ async function initializeWithdrawalAddressUI(uid) {
     window.currentSavedWithdrawalAddress = savedAddress;
 
     // 🔥 CHANGE ADDRESS → पहले withdrawal password verify होगा
-    document.getElementById('changeAddressBtn')?.addEventListener('click', () => {
+    document.getElementById('changeAddressBtn')?.addEventListener('click', async () => {
         const settings = await getWithdrawalSettings(uid);
         const hasPassword = !!(settings.passwordHash && String(settings.passwordHash).trim());
 

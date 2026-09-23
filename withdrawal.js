@@ -1,5 +1,5 @@
 // ============================================================
-// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v7 - Final)
+// 🔥 WITHDRAWAL PAGE LOGIC - RND STAKING (v8 - Final + Eye Toggle)
 // ============================================================
 // 🔥 Security features:
 //   - Idempotency key (requestId) prevents double submission
@@ -14,6 +14,7 @@
 //   - Forgot password requires ACCOUNT password (Firebase re-auth)
 //   - First-time password set does NOT auto-withdraw (user submits again)
 //   - Change Address has dedicated Save/Cancel buttons
+//   - Eye toggle on all password fields
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -125,6 +126,41 @@ function showToast(message, type = 'success') {
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => toast.remove(), 300);
     }, duration);
+}
+
+// ============================================================
+// 👁️ PASSWORD EYE TOGGLE
+// ============================================================
+function attachPasswordEyeToggles() {
+    const pairs = [
+        ['withdrawPasswordInput', 'toggleWdPwd1'],
+        ['withdrawPasswordConfirm', 'toggleWdPwd2'],
+        ['fpAccountPassword', 'toggleFpAcc'],
+        ['fpNewPassword', 'toggleFpNew'],
+        ['fpConfirmPassword', 'toggleFpConfirm']
+    ];
+
+    pairs.forEach(([inputId, btnId]) => {
+        const input = document.getElementById(inputId);
+        const btn = document.getElementById(btnId);
+        if (!input || !btn) return;
+
+        if (btn.dataset.eyeBound === '1') return;
+        btn.dataset.eyeBound = '1';
+
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+            }
+            btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+            input.focus();
+        });
+    });
 }
 
 // ============================================================
@@ -245,9 +281,6 @@ async function verifyWithdrawalPasswordFromDB(uid, password) {
 // ============================================================
 // 🔐 ACCOUNT PASSWORD RE-AUTHENTICATION (Firebase Auth — read-only)
 // ============================================================
-// This ONLY verifies the user's account password (the one they
-// used while registering). It does NOT change it, does NOT read
-// it, does NOT store it anywhere. Just returns true / throws.
 async function verifyAccountPassword(user, password) {
     if (!user) {
         throw new Error('Session expired. Please login again.');
@@ -717,6 +750,14 @@ function openWithdrawPasswordModal(uid, { mode, onSuccess }) {
     errEl.style.display = 'none';
     errEl.textContent = '';
 
+    // 🔥 Reset eye toggles to "hidden" state
+    [inputEl, confirmEl].forEach((el) => {
+        if (el) el.type = 'password';
+    });
+    document.querySelectorAll('#withdrawPasswordModal .pwd-eye-btn i').forEach((ic) => {
+        ic.className = 'bi bi-eye';
+    });
+
     if (mode === 'set') {
         titleEl.innerHTML = `<i class="bi bi-shield-lock-fill" style="color:var(--primary);"></i> Set Withdrawal Password`;
         infoEl.innerHTML = `Set a <strong style="color:#2ecc71;">strong withdrawal password</strong> (min 6 characters). You will need it for every withdrawal and to change your saved address.`;
@@ -824,6 +865,14 @@ function openForgotPasswordModal(uid, onSuccess) {
     confEl.value = '';
     errEl.style.display = 'none';
     errEl.textContent = '';
+
+    // 🔥 Reset eye toggles to "hidden" state
+    [accEl, newEl, confEl].forEach((el) => {
+        if (el) el.type = 'password';
+    });
+    document.querySelectorAll('#forgotPasswordModal .pwd-eye-btn i').forEach((ic) => {
+        ic.className = 'bi bi-eye';
+    });
 
     btn.onclick = async () => {
         const accountPwd = String(accEl.value || '');
@@ -1368,6 +1417,9 @@ onAuthStateChanged(auth, async (user) => {
         renderWithdrawalUI(userData, withdrawals);
         attachOptionHandlers();
         attachWithdrawHandler(user);
+
+        // 👁️ Attach eye toggle buttons on all password fields
+        attachPasswordEyeToggles();
 
         await initializeWithdrawalAddressUI(user.uid);
 

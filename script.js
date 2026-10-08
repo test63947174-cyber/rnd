@@ -1,12 +1,26 @@
 // ============================================================
+// RND $50 PACKAGE DIRECT REFERRAL OFFER — FINAL PRODUCTION SCRIPT
+// Campaign: direct_offer_50pack_oct2026
+//
+// All Fixes Applied:
+//   FIX 1–21  : Original production fixes
+//   FIX A     : Withdrawal write failure — verify before rollback
+//   FIX B     : Active campaign — button truly disabled
+//   FIX C     : processWithdrawal — entry-level UI lock + finally restore
+//   FIX 1 (new) : Prevent duplicate Firebase onValue() listeners
+//   FIX 2 (new) : Correct isWithdrawalFinalized state
+//   FIX 3 (new) : Clean up Firebase listener on page unload
+// ============================================================
+
+// ============================================================
 // FIREBASE IMPORTS
 // ============================================================
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase, ref, get, update, set, onValue, runTransaction } from "firebase/database";
+import { getDatabase, ref, get, update, onValue, runTransaction } from "firebase/database";
 
 // ============================================================
-// FIREBASE CONFIG
+// FIREBASE CONFIG (UNCHANGED)
 // ============================================================
 const firebaseConfig = {
     apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -24,17 +38,17 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 
 // ============================================================
-// NEW CAMPAIGN CONFIGURATION — 14 DAY $50 PACKAGE OFFER
+// CAMPAIGN CONFIGURATION (UNCHANGED)
 // ============================================================
 const CAMPAIGN = {
     campaignId: 'direct_offer_50pack_oct2026',
     startDate: new Date('2026-10-10T00:00:00+05:30'),
     endDate: new Date('2026-10-24T23:59:59+05:30'),
-    requiredPackageAmount: 50,      // Only $50 package qualifies
-    rewardPerReferral: 10,          // $10 per qualified referral
-    cycleSize: 5,                   // 5 referrals = $50 cycle
-    cycleReward: 50,                // $50 per cycle
-    maxQualifying: Infinity         // Unlimited cycles
+    requiredPackageAmount: 50,
+    rewardPerReferral: 10,
+    cycleSize: 5,
+    cycleReward: 50,
+    maxQualifying: Infinity
 };
 
 // ============================================================
@@ -119,6 +133,12 @@ let isWithdrawalFinalized = false;
 let isProcessingWithdrawal = false;
 let referralRefreshInterval = null;
 let firebaseServerOffset = 0;
+
+// NEW FIX 1 — Firebase listener unsubscribe handle
+let withdrawalListenerUnsubscribe = null;
+
+// FIX 19 — DOM LISTENER DUPLICATION PROTECTION
+let listenersInitialized = false;
 
 // ============================================================
 // FIREBASE SERVER-ADJUSTED TIME
@@ -215,14 +235,12 @@ function hasCampaignActivePackage(userData) {
 
         if (String(pkg.status || '').toLowerCase() !== 'active') continue;
 
-        // Only $50 package qualifies for this offer
         const pkgAmount = Number(pkg.usdtAmount || 0);
         if (pkgAmount !== CAMPAIGN.requiredPackageAmount) continue;
 
         const activationTime = getPackageActivationTime(pkg);
         if (!activationTime) continue;
 
-        // Must become active during campaign
         if (activationTime >= CAMPAIGN.startDate.getTime() && activationTime <= CAMPAIGN.endDate.getTime()) {
             return true;
         }
@@ -255,17 +273,14 @@ async function getCampaignDirectReferrals(userId) {
 
             let isDirect = false;
 
-            // Canonical UID
             if (candidate.sponsorUid && String(candidate.sponsorUid) === String(userId)) {
                 isDirect = true;
             }
 
-            // Legacy UID
             if (!isDirect && candidate.referredByUid && String(candidate.referredByUid) === String(userId)) {
                 isDirect = true;
             }
 
-            // Legacy code/username
             if (!isDirect) {
                 const legacySponsor = candidate.referredBy || candidate.sponsor || null;
                 if (legacySponsor && (
@@ -278,17 +293,19 @@ async function getCampaignDirectReferrals(userId) {
             }
 
             if (!isDirect) continue;
-
-            // Must be active
             if (!isUserActive(candidate)) continue;
-
-            // Must have $50 package active during campaign
             if (!hasCampaignActivePackage(candidate)) continue;
 
             counted.add(candidateUid);
         }
 
-        return Math.min(counted.size, CAMPAIGN.maxQualifying);
+        return Math.max(
+            0,
+            Math.min(
+                Number(counted.size) || 0,
+                CAMPAIGN.maxQualifying
+            )
+        );
 
     } catch (error) {
         console.error('Campaign direct referral calculation failed:', error);
@@ -297,17 +314,33 @@ async function getCampaignDirectReferrals(userId) {
 }
 
 // ============================================================
-// NEW REWARD CALCULATION — $10 PER QUALIFIED REFERRAL
+// FIX 4 — REWARD CALCULATION NORMALIZED
 // ============================================================
 function calculateReward(directCount) {
-    if (directCount <= 0) return 0;
-    return directCount * CAMPAIGN.rewardPerReferral;
+    const count = Math.max(0, Number(directCount) || 0);
+
+    if (count <= 0) {
+        return 0;
+    }
+
+    return Number(
+        (count * CAMPAIGN.rewardPerReferral).toFixed(2)
+    );
 }
 
+// ============================================================
+// FIX 2 — CURRENT CYCLE PROGRESS
+// ============================================================
 function getCurrentCycleProgress(directCount) {
-    if (directCount <= 0) return 0;
-    const remainder = directCount % CAMPAIGN.cycleSize;
-    return remainder === 0 ? CAMPAIGN.cycleSize : remainder;
+    const count = Math.max(0, Number(directCount) || 0);
+
+    if (count === 0) return 0;
+
+    const remainder = count % CAMPAIGN.cycleSize;
+
+    return remainder === 0
+        ? CAMPAIGN.cycleSize
+        : remainder;
 }
 
 function getTotalCyclesCompleted(directCount) {
@@ -315,12 +348,21 @@ function getTotalCyclesCompleted(directCount) {
 }
 
 // ============================================================
-// CAMPAIGN STATUS WITH SERVER TIME
+// FIX 6 — CAMPAIGN STATUS TIME LOGIC
 // ============================================================
 function getCampaignStatus() {
-    const now = getCampaignNow();
-    if (now < CAMPAIGN.startDate) return 'UPCOMING';
-    if (now >= CAMPAIGN.startDate && now <= CAMPAIGN.endDate) return 'ACTIVE';
+    const now = getCampaignNow().getTime();
+    const start = CAMPAIGN.startDate.getTime();
+    const end = CAMPAIGN.endDate.getTime();
+
+    if (now < start) {
+        return 'UPCOMING';
+    }
+
+    if (now <= end) {
+        return 'ACTIVE';
+    }
+
     return 'ENDED';
 }
 
@@ -358,45 +400,81 @@ function formatTimeRemaining(time) {
 }
 
 // ============================================================
-// CAMPAIGN REWARD SNAPSHOT
+// FIX 7 — GET CAMPAIGN REWARD SNAPSHOT (DOUBLE-CALL SAFE)
 // ============================================================
 async function getCampaignRewardSnapshot(userId) {
     try {
-        const snap = await get(ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`));
-        if (snap.exists()) {
-            const data = snap.val();
-            isWithdrawalFinalized = true;
-            return data;
+        if (!db || !userId) {
+            return null;
         }
-        return null;
+
+        const snap = await get(
+            ref(
+                db,
+                `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`
+            )
+        );
+
+        if (!snap.exists()) {
+            return null;
+        }
+
+        const data = snap.val();
+
+        if (data && data.isFinalized === true) {
+            isWithdrawalFinalized = true;
+        }
+
+        return data;
     } catch (error) {
-        console.error('Error getting campaign snapshot:', error);
+        console.error(
+            'Error getting campaign snapshot:',
+            error
+        );
+
         return null;
     }
 }
 
 // ============================================================
-// FINALIZE CAMPAIGN REWARD WITH TRANSACTION
+// FIX 8 — FINALIZE CAMPAIGN REWARD
 // ============================================================
 async function finalizeCampaignReward(userId) {
     try {
-        if (!db || !userId) return null;
+        if (!db || !userId) {
+            return null;
+        }
 
         if (getCampaignStatus() !== 'ENDED') {
-            console.warn('Campaign cannot be finalized before end time.');
+            console.warn(
+                'Campaign cannot be finalized before end time.'
+            );
             return null;
         }
 
         const existing = await getCampaignRewardSnapshot(userId);
-        if (existing) return existing;
 
-        const finalDirectCount = await getCampaignDirectReferrals(userId);
-        const finalReward = calculateReward(finalDirectCount);
+        if (existing && existing.isFinalized === true) {
+            campaignRewardSnapshot = existing;
+            isWithdrawalFinalized = true;
+            return existing;
+        }
+
+        const finalDirectCount =
+            await getCampaignDirectReferrals(userId);
+
+        const safeDirectCount = Math.max(
+            0,
+            Number(finalDirectCount) || 0
+        );
+
+        const finalReward =
+            calculateReward(safeDirectCount);
 
         const snapshotData = {
             campaignId: CAMPAIGN.campaignId,
             userId: userId,
-            finalDirectCount: finalDirectCount,
+            finalDirectCount: safeDirectCount,
             finalReward: finalReward,
             snapshotAt: Date.now(),
             status: 'available',
@@ -409,49 +487,126 @@ async function finalizeCampaignReward(userId) {
         };
 
         const result = await runTransaction(
-            ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`),
-            (currentData) => {
-                if (currentData) return currentData;
+            ref(
+                db,
+                `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`
+            ),
+            currentData => {
+                if (
+                    currentData &&
+                    currentData.isFinalized === true
+                ) {
+                    return currentData;
+                }
+
                 return snapshotData;
             }
         );
 
-        if (result.committed && result.snapshot.exists()) {
-            campaignRewardSnapshot = result.snapshot.val();
+        if (
+            result.committed &&
+            result.snapshot.exists()
+        ) {
+            campaignRewardSnapshot =
+                result.snapshot.val();
+
             isWithdrawalFinalized = true;
+
             return campaignRewardSnapshot;
         }
 
+        const latest =
+            await getCampaignRewardSnapshot(userId);
+
+        if (latest) {
+            campaignRewardSnapshot = latest;
+            isWithdrawalFinalized =
+                latest.isFinalized === true;
+
+            return latest;
+        }
+
         return null;
 
     } catch (error) {
-        console.error('❌ Error finalizing campaign reward:', error);
+        console.error(
+            '❌ Error finalizing campaign reward:',
+            error
+        );
+
         return null;
     }
 }
 
 // ============================================================
-// WITHDRAWAL MANAGEMENT
+// FIX 13 — CHECK WITHDRAWAL STATUS
 // ============================================================
 async function checkWithdrawalStatus(userId) {
     try {
-        const snap = await get(ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`));
-        if (!snap.exists()) return null;
+        if (!db || !userId) {
+            return null;
+        }
+
+        const snap = await get(
+            ref(
+                db,
+                `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`
+            )
+        );
+
+        if (!snap.exists()) {
+            return null;
+        }
+
         return snap.val();
     } catch (error) {
-        console.error('Error checking withdrawal status:', error);
+        console.error(
+            'Error checking withdrawal status:',
+            error
+        );
+
         return null;
     }
 }
 
+// ============================================================
+// NEW FIX 1 — SETUP WITHDRAWAL LISTENER (DUPLICATE-SAFE)
+// ============================================================
 function setupWithdrawalListener(userId) {
-    const refPath = ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`);
-    onValue(refPath, (snapshot) => {
-        if (snapshot.exists()) {
-            withdrawalData = snapshot.val();
+    // Prevent duplicate Firebase listeners.
+    if (withdrawalListenerUnsubscribe) {
+        withdrawalListenerUnsubscribe();
+        withdrawalListenerUnsubscribe = null;
+    }
+
+    if (!userId) {
+        withdrawalData = null;
+        return;
+    }
+
+    const refPath = ref(
+        db,
+        `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`
+    );
+
+    withdrawalListenerUnsubscribe = onValue(
+        refPath,
+        (snapshot) => {
+            if (snapshot.exists()) {
+                withdrawalData = snapshot.val();
+            } else {
+                withdrawalData = null;
+            }
+
             updateUI();
+        },
+        (error) => {
+            console.error(
+                'Withdrawal listener error:',
+                error
+            );
         }
-    });
+    );
 }
 
 function generateWithdrawalId() {
@@ -462,47 +617,91 @@ function generateTxId() {
     return 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
 }
 
+// ============================================================
+// FIX 20 — WALLET VALIDATION (TRIM-SAFE)
+// ============================================================
 function validateBEP20Wallet(address) {
-    const regex = /^0x[a-fA-F0-9]{40}$/;
-    return regex.test(address);
+    if (typeof address !== 'string') {
+        return false;
+    }
+
+    const value = address.trim();
+
+    return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
 
 // ============================================================
-// ATOMIC WITHDRAWAL CREATION
+// FIX 9 + FIX A — WITHDRAWAL CREATION WITH SAFE ROLLBACK
 // ============================================================
-async function createAtomicWithdrawal(userId, userData, walletAddress) {
+async function createAtomicWithdrawal(
+    userId,
+    userData,
+    walletAddress
+) {
     if (isProcessingWithdrawal) {
-        throw new Error('Withdrawal already in progress');
+        throw new Error(
+            'Withdrawal already in progress'
+        );
     }
 
     isProcessingWithdrawal = true;
 
+    let withdrawalId = null;
+    let txId = null;
+
     try {
         if (getCampaignStatus() !== 'ENDED') {
-            throw new Error('Campaign has not ended yet');
+            throw new Error(
+                'Campaign has not ended yet'
+            );
         }
 
         if (!isUserActive(userData)) {
-            throw new Error('Your ID is not active');
+            throw new Error(
+                'Your ID is not active'
+            );
         }
 
         if (!validateBEP20Wallet(walletAddress)) {
-            throw new Error('Invalid BEP-20 wallet address');
+            throw new Error(
+                'Invalid BEP-20 wallet address'
+            );
         }
 
-        const campaignRef = ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`);
-        const withdrawalId = generateWithdrawalId();
-        const txId = generateTxId();
+        const campaignRef = ref(
+            db,
+            `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`
+        );
+
+        withdrawalId = generateWithdrawalId();
+        txId = generateTxId();
+
         const timestamp = Date.now();
 
         const lockResult = await runTransaction(
             campaignRef,
             current => {
-                if (!current) return;
-                if (!current.isFinalized) return;
-                const reward = Number(current.finalReward || 0);
-                if (reward <= 0) return;
-                if (['pending', 'approved', 'paid'].includes(current.status)) return;
+                if (!current) {
+                    return;
+                }
+
+                if (current.isFinalized !== true) {
+                    return;
+                }
+
+                const reward =
+                    Number(current.finalReward || 0);
+
+                if (!Number.isFinite(reward) || reward <= 0) {
+                    return;
+                }
+
+                if (
+                    ['pending', 'approved', 'paid']
+                        .includes(current.status)
+                ) {
+                    return;
+                }
 
                 return {
                     ...current,
@@ -517,43 +716,69 @@ async function createAtomicWithdrawal(userId, userData, walletAddress) {
         );
 
         if (!lockResult.committed) {
-            throw new Error('Withdrawal already submitted or reward unavailable');
+            throw new Error(
+                'Withdrawal already submitted or reward unavailable'
+            );
         }
 
-        const lockedCampaign = lockResult.snapshot.val();
-        if (!lockedCampaign || lockedCampaign.withdrawalId !== withdrawalId) {
-            throw new Error('Withdrawal request could not be locked');
+        const lockedCampaign =
+            lockResult.snapshot.val();
+
+        if (
+            !lockedCampaign ||
+            lockedCampaign.withdrawalId !== withdrawalId
+        ) {
+            throw new Error(
+                'Withdrawal request could not be locked'
+            );
         }
 
-        const finalReward = Number(lockedCampaign.finalReward || 0);
-        if (finalReward <= 0) {
-            throw new Error('No eligible reward');
+        const finalReward =
+            Number(lockedCampaign.finalReward || 0);
+
+        if (
+            !Number.isFinite(finalReward) ||
+            finalReward <= 0
+        ) {
+            throw new Error(
+                'No eligible reward'
+            );
         }
 
-        const date = new Date(timestamp).toISOString().split('T')[0];
+        const date =
+            new Date(timestamp)
+                .toISOString()
+                .split('T')[0];
 
         const adminData = {
             ...lockedCampaign,
-            campaignName: 'RND Direct Referral $50 Package Offer',
-            type: 'direct_offer_50pack_withdrawal',
+            campaignName:
+                'RND Direct Referral $50 Package Offer',
+            type:
+                'direct_offer_50pack_withdrawal',
             asset: 'USDT',
-            network: 'BEP-20 / BNB Smart Chain',
+            network:
+                'BEP-20 / BNB Smart Chain',
             amount: finalReward,
             status: 'pending'
         };
 
         const transactionData = {
-            type: 'direct_offer_50pack_withdrawal',
-            subtype: 'Direct Referral $50 Package Offer Withdrawal',
+            type:
+                'direct_offer_50pack_withdrawal',
+            subtype:
+                'Direct Referral $50 Package Offer Withdrawal',
             amount: finalReward,
             currency: 'USDT',
-            network: 'BEP-20 / BNB Smart Chain',
+            network:
+                'BEP-20 / BNB Smart Chain',
             status: 'pending',
             walletAddress: walletAddress,
             withdrawalId: withdrawalId,
             timestamp: timestamp,
             date: date,
-            description: `Direct Referral $50 Package Offer Withdrawal of $${finalReward} USDT (BEP-20)`,
+            description:
+                `Direct Referral $50 Package Offer Withdrawal of $${finalReward} USDT (BEP-20)`,
             txId: txId,
             txHash: null
         };
@@ -561,19 +786,153 @@ async function createAtomicWithdrawal(userId, userData, walletAddress) {
         const globalTxData = {
             ...transactionData,
             userId: userId,
-            username: userData.username || userData.referralCode || userId
+            username:
+                userData.username ||
+                userData.referralCode ||
+                userId
         };
 
-        await update(
-            ref(db),
-            {
-                [`admin/withdrawals/${withdrawalId}`]: adminData,
-                [`users/${userId}/transactions/${txId}`]: transactionData,
-                [`transactions/${txId}`]: globalTxData
-            }
-        );
+        try {
+            await update(
+                ref(db),
+                {
+                    [`admin/withdrawals/${withdrawalId}`]:
+                        adminData,
 
-        return { success: true, withdrawalId, txId };
+                    [`users/${userId}/transactions/${txId}`]:
+                        transactionData,
+
+                    [`transactions/${txId}`]:
+                        globalTxData
+                }
+            );
+        } catch (writeError) {
+
+            // ============================================================
+            // FIX A — CRITICAL SAFETY
+            // ============================================================
+
+            console.error(
+                'Withdrawal write error — verifying Firebase state:',
+                writeError
+            );
+
+            let adminExists = false;
+            let userTxExists = false;
+            let globalTxExists = false;
+
+            try {
+                const [adminSnap, userTxSnap, globalTxSnap] =
+                    await Promise.all([
+                        get(ref(db, `admin/withdrawals/${withdrawalId}`)),
+                        get(ref(db, `users/${userId}/transactions/${txId}`)),
+                        get(ref(db, `transactions/${txId}`))
+                    ]);
+
+                adminExists = adminSnap.exists();
+                userTxExists = userTxSnap.exists();
+                globalTxExists = globalTxSnap.exists();
+            } catch (verifyError) {
+                console.error(
+                    'Firebase verification failed — keeping reward in pending state:',
+                    verifyError
+                );
+
+                throw new Error(
+                    'Network error. Your withdrawal request may still be processing. ' +
+                    'Please do NOT retry immediately. Check your transaction history in a few minutes.'
+                );
+            }
+
+            const anyRecordExists =
+                adminExists || userTxExists || globalTxExists;
+
+            const allRecordsExist =
+                adminExists && userTxExists && globalTxExists;
+
+            if (allRecordsExist) {
+                console.warn(
+                    'All withdrawal records exist — treating as success despite client error.'
+                );
+
+                return {
+                    success: true,
+                    withdrawalId: withdrawalId,
+                    txId: txId
+                };
+            }
+
+            if (anyRecordExists) {
+                console.error(
+                    'PARTIAL withdrawal write detected. ' +
+                    'Keeping reward in pending state for admin review.',
+                    {
+                        adminExists,
+                        userTxExists,
+                        globalTxExists
+                    }
+                );
+
+                throw new Error(
+                    'Your withdrawal request is in an uncertain state. ' +
+                    'Please contact support. Do NOT retry.'
+                );
+            }
+
+            console.warn(
+                'No withdrawal records found — safe to rollback reward lock.'
+            );
+
+            try {
+                await runTransaction(
+                    campaignRef,
+                    current => {
+                        if (!current) {
+                            return;
+                        }
+
+                        if (
+                            current.status === 'pending' &&
+                            current.withdrawalId === withdrawalId &&
+                            current.transactionId === txId
+                        ) {
+                            return {
+                                ...current,
+                                status: 'available',
+                                walletAddress: null,
+                                withdrawalId: null,
+                                transactionId: null,
+                                requestedAt: null,
+                                updatedAt: Date.now()
+                            };
+                        }
+
+                        return current;
+                    }
+                );
+            } catch (rollbackError) {
+                console.error(
+                    'Withdrawal rollback failed:',
+                    rollbackError
+                );
+
+                throw new Error(
+                    'Withdrawal failed and rollback also failed. ' +
+                    'Please contact support.'
+                );
+            }
+
+            throw new Error(
+                writeError.message ||
+                'Withdrawal submission failed. Please try again.'
+            );
+        }
+
+        return {
+            success: true,
+            withdrawalId: withdrawalId,
+            txId: txId
+        };
 
     } finally {
         isProcessingWithdrawal = false;
@@ -603,48 +962,109 @@ function showToast(message, type = 'success') {
 }
 
 // ============================================================
-// RENDER CYCLE PROGRESS CARDS
+// FIX 21 — RENDER CYCLE PROGRESS CARDS
 // ============================================================
 function renderCycleProgress(directCount) {
     const grid = el.cycleProgressGrid;
+
+    if (!grid) {
+        return;
+    }
+
     grid.innerHTML = '';
 
-    const totalCycles = Math.max(1, Math.ceil(directCount / CAMPAIGN.cycleSize) + 1);
+    const count =
+        Math.max(
+            0,
+            Number(directCount) || 0
+        );
+
+    const totalCycles =
+        Math.max(
+            1,
+            Math.ceil(
+                count / CAMPAIGN.cycleSize
+            ) + 1
+        );
+
     let foundNext = false;
 
-    for (let i = 1; i <= totalCycles; i++) {
-        const cycleStart = (i - 1) * CAMPAIGN.cycleSize;
-        const cycleEnd = i * CAMPAIGN.cycleSize;
-        const cycleReward = CAMPAIGN.cycleReward * i;
+    for (
+        let i = 1;
+        i <= totalCycles;
+        i++
+    ) {
+        const cycleEnd =
+            i * CAMPAIGN.cycleSize;
 
-        const achieved = directCount >= cycleEnd;
-        const isNext = !achieved && !foundNext && (directCount < cycleEnd);
-        if (isNext) foundNext = true;
+        const cycleReward =
+            i * CAMPAIGN.cycleReward;
+
+        const achieved =
+            count >= cycleEnd;
+
+        const isNext =
+            !achieved &&
+            !foundNext;
+
+        if (isNext) {
+            foundNext = true;
+        }
 
         let statusClass = 'locked';
         let statusText = 'Locked';
-        if (achieved) { statusClass = 'achieved'; statusText = '✓ Complete'; }
-        else if (isNext) { statusClass = 'next'; statusText = 'Current'; }
 
-        const card = document.createElement('div');
-        card.className = `cycle-card ${statusClass}`;
+        if (achieved) {
+            statusClass = 'achieved';
+            statusText = '✓ Complete';
+        } else if (isNext) {
+            statusClass = 'next';
+            statusText = 'Current';
+        }
+
+        const card =
+            document.createElement('div');
+
+        card.className =
+            `cycle-card ${statusClass}`;
+
         card.innerHTML = `
-            <div class="cycle-label">Cycle ${i}</div>
-            <div class="cycle-refs">${cycleEnd} <small>refs</small></div>
-            <div class="cycle-reward">$${cycleReward}</div>
-            <span class="cycle-status ${statusClass}">${statusText}</span>
+            <div class="cycle-label">
+                Cycle ${i}
+            </div>
+
+            <div class="cycle-refs">
+                ${cycleEnd}
+                <small>refs</small>
+            </div>
+
+            <div class="cycle-reward">
+                $${cycleReward}
+            </div>
+
+            <span class="cycle-status ${statusClass}">
+                ${statusText}
+            </span>
         `;
+
         grid.appendChild(card);
     }
 }
 
 // ============================================================
-// UPDATE WITHDRAWAL UI — NEW RULES
+// FIX 12 + FIX B — UPDATE WITHDRAWAL UI
 // ============================================================
 function updateWithdrawalUI(reward, status) {
     const campaignStatus = getCampaignStatus();
-    const isEligible = directReferrals > 0 && reward > 0;
-    const isWithdrawn = status && ['pending', 'approved', 'paid'].includes(status.status);
+
+    const isEligible =
+        Number(directReferrals) > 0 &&
+        Number(reward) > 0;
+
+    const isWithdrawn =
+        !!status &&
+        ['pending', 'approved', 'paid']
+            .includes(String(status.status || '').toLowerCase());
 
     let displayReward = reward;
     if (campaignStatus === 'ENDED' && campaignRewardSnapshot) {
@@ -659,7 +1079,9 @@ function updateWithdrawalUI(reward, status) {
     el.withdrawalInfoBox.style.display = 'block';
 
     if (status) {
-        if (status.status === 'pending') {
+        const normalizedStatus = String(status.status || '').toLowerCase();
+
+        if (normalizedStatus === 'pending') {
             el.withdrawBtn.disabled = true;
             el.withdrawBtn.innerHTML = '<i class="bi bi-clock me-2"></i>Pending Approval';
             el.withdrawBtn.className = 'btn-withdraw btn-pending';
@@ -668,7 +1090,7 @@ function updateWithdrawalUI(reward, status) {
             el.withdrawalStatus.textContent = 'Your withdrawal request is under admin review.';
             el.withdrawalDetails.classList.remove('visible');
             el.withdrawalSubtitle.textContent = 'Withdrawal pending approval';
-        } else if (status.status === 'approved') {
+        } else if (normalizedStatus === 'approved') {
             el.withdrawBtn.disabled = true;
             el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Approved';
             el.withdrawBtn.className = 'btn-withdraw btn-approved';
@@ -677,7 +1099,7 @@ function updateWithdrawalUI(reward, status) {
             el.withdrawalStatus.textContent = 'Your withdrawal has been approved and is being processed.';
             el.withdrawalDetails.classList.remove('visible');
             el.withdrawalSubtitle.textContent = 'Withdrawal approved - processing payment';
-        } else if (status.status === 'paid') {
+        } else if (normalizedStatus === 'paid') {
             el.withdrawBtn.disabled = true;
             el.withdrawBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Paid ✓';
             el.withdrawBtn.className = 'btn-withdraw btn-paid';
@@ -690,7 +1112,7 @@ function updateWithdrawalUI(reward, status) {
             el.detailPaidDate.textContent = status.paidAt ? new Date(status.paidAt).toLocaleString() : '---';
             el.detailTxHash.textContent = status.txHash || 'Pending';
             el.withdrawalSubtitle.textContent = '✅ Payment Completed';
-        } else if (status.status === 'rejected') {
+        } else if (normalizedStatus === 'rejected') {
             el.withdrawBtn.disabled = false;
             el.withdrawBtn.innerHTML = '<i class="bi bi-arrow-up-right me-2"></i>Withdraw Reward';
             el.withdrawBtn.className = 'btn-withdraw btn-rejected';
@@ -714,8 +1136,9 @@ function updateWithdrawalUI(reward, status) {
         el.withdrawalDetails.classList.remove('visible');
         el.withdrawalSubtitle.textContent = 'Withdrawal not available yet';
     } else if (campaignStatus === 'ACTIVE') {
-        el.withdrawBtn.disabled = false;
-        el.withdrawBtn.innerHTML = '📅 Withdrawal Locked — Offer Active';
+        // FIX B — Button truly disabled during active campaign.
+        el.withdrawBtn.disabled = true;
+        el.withdrawBtn.innerHTML = '🔒 Withdrawal Locked — Offer Active';
         el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
         const time = getTimeRemaining();
         el.withdrawalInfoText.textContent = `🔒 Withdrawal is locked while the offer is active. It will open after 24 October 2026. Time remaining: ${formatTimeRemaining(time)}`;
@@ -744,29 +1167,80 @@ function updateWithdrawalUI(reward, status) {
 }
 
 // ============================================================
-// REFRESH CAMPAIGN DIRECT COUNT
+// FIX 11 — REFERRAL REFRESH FUNCTION
 // ============================================================
 async function refreshCampaignDirectCount() {
-    if (!currentUserId || getCampaignStatus() !== 'ACTIVE' || isWithdrawalFinalized) {
+    if (
+        !currentUserId ||
+        getCampaignStatus() !== 'ACTIVE' ||
+        isWithdrawalFinalized
+    ) {
         return;
     }
 
-    const latest = await getCampaignDirectReferrals(currentUserId);
+    try {
+        const latest =
+            await getCampaignDirectReferrals(
+                currentUserId
+            );
 
-    if (latest !== directReferrals) {
-        directReferrals = latest;
-        el.totalReferralsDisplay.textContent = directReferrals;
-        updateUI();
+        const safeLatest =
+            Math.max(
+                0,
+                Number(latest) || 0
+            );
+
+        if (safeLatest !== directReferrals) {
+            directReferrals = safeLatest;
+
+            el.totalReferralsDisplay.textContent =
+                String(directReferrals);
+
+            updateUI();
+        }
+    } catch (error) {
+        console.error(
+            'Campaign referral refresh failed:',
+            error
+        );
     }
 }
 
+// ============================================================
+// FIX 10 — REFERRAL REFRESH INTERVAL
+// ============================================================
 function startReferralRefresh() {
-    if (referralRefreshInterval) clearInterval(referralRefreshInterval);
-    referralRefreshInterval = setInterval(refreshCampaignDirectCount, 60000);
+    if (referralRefreshInterval) {
+        clearInterval(referralRefreshInterval);
+        referralRefreshInterval = null;
+    }
+
+    if (
+        !currentUserId ||
+        getCampaignStatus() !== 'ACTIVE' ||
+        isWithdrawalFinalized
+    ) {
+        return;
+    }
+
+    referralRefreshInterval =
+        setInterval(() => {
+            if (
+                !currentUserId ||
+                getCampaignStatus() !== 'ACTIVE' ||
+                isWithdrawalFinalized
+            ) {
+                clearInterval(referralRefreshInterval);
+                referralRefreshInterval = null;
+                return;
+            }
+
+            refreshCampaignDirectCount();
+        }, 60000);
 }
 
 // ============================================================
-// UPDATE UI — NEW RULES
+// FIX 1 + FIX 3 — UPDATE UI
 // ============================================================
 function updateUI() {
     const campaignStatus = getCampaignStatus();
@@ -789,14 +1263,12 @@ function updateUI() {
         isWithdrawalFinalized = true;
     }
 
-    // Stats
     el.statDirectRefs.textContent = displayDirectCount;
     el.statEligibleReward.textContent = '$' + displayReward;
     el.statReferralPeriod.textContent = campaignStatus === 'ENDED' ? 'Final Count' : 'Campaign Period';
 
     if (displayDirectCount > 0) {
         const cycles = Math.floor(displayDirectCount / CAMPAIGN.cycleSize);
-        const remainder = displayDirectCount % CAMPAIGN.cycleSize;
         const cycleInfo = cycles > 0 ? `${cycles} cycle${cycles > 1 ? 's' : ''} completed` : '';
         el.statRewardNote.textContent = isFinal
             ? `🏆 Final: $${displayReward} (${displayDirectCount} qualified refs)`
@@ -807,44 +1279,61 @@ function updateUI() {
         el.statRewardNote.style.color = '#64748b';
     }
 
-    // Next cycle target
-    const currentProgress = getCurrentCycleProgress(displayDirectCount);
-    const nextCycleEnd = displayDirectCount + (CAMPAIGN.cycleSize - currentProgress);
-    if (displayDirectCount >= 0) {
-        const nextMilestoneReward = (Math.floor(displayDirectCount / CAMPAIGN.cycleSize) + 1) * CAMPAIGN.cycleReward;
-        el.statNextMilestone.textContent = `${nextCycleEnd} → $${nextMilestoneReward}`;
-        const needed = nextCycleEnd - displayDirectCount;
-        el.statNextMilestoneSub.textContent = `${needed} more needed for next cycle`;
-    }
+    const completedCycles = Math.floor(displayDirectCount / CAMPAIGN.cycleSize);
+    const nextCycleEnd = (completedCycles + 1) * CAMPAIGN.cycleSize;
+    const nextMilestoneReward = (completedCycles + 1) * CAMPAIGN.cycleReward;
+    const neededForNextCycle = Math.max(0, nextCycleEnd - displayDirectCount);
+
+    el.statNextMilestone.textContent =
+        `${nextCycleEnd} → $${nextMilestoneReward}`;
+
+    el.statNextMilestoneSub.textContent =
+        `${neededForNextCycle} more needed for next cycle`;
 
     el.statMaxReward.textContent = '∞';
     el.statMaxReward.style.color = '#a78bfa';
 
-    // Progress bar (current cycle)
     const cycleProgress = getCurrentCycleProgress(displayDirectCount);
-    const progressPercent = (cycleProgress / CAMPAIGN.cycleSize) * 100;
-    el.progressCurrent.textContent = cycleProgress === 0 && displayDirectCount > 0 ? CAMPAIGN.cycleSize : cycleProgress;
-    el.progressTarget.textContent = CAMPAIGN.cycleSize;
+
+    const progressPercent =
+        Math.min(
+            100,
+            Math.max(
+                0,
+                (cycleProgress / CAMPAIGN.cycleSize) * 100
+            )
+        );
+
+    el.progressCurrent.textContent = String(cycleProgress);
+    el.progressTarget.textContent = String(CAMPAIGN.cycleSize);
     el.progressFill.style.width = progressPercent + '%';
 
-    const neededForCycle = CAMPAIGN.cycleSize - cycleProgress;
+    const neededForCycle =
+        Math.max(0, CAMPAIGN.cycleSize - cycleProgress);
+
     if (cycleProgress === CAMPAIGN.cycleSize) {
-        el.nextMilestoneText.innerHTML = '<i class="bi bi-trophy" style="color:#fbbf24;"></i> 🎉 Cycle complete! Start the next cycle by referring more $50 package users.';
+        el.needMore.textContent = '0';
+
+        el.nextMilestoneText.innerHTML =
+            '<i class="bi bi-trophy" style="color:#fbbf24;"></i> ' +
+            '🎉 Cycle complete! Start the next cycle by referring more $50 package users.';
     } else {
-        el.needMore.textContent = neededForCycle;
-        el.nextMilestoneText.innerHTML = `<i class="bi bi-bullseye" style="color:#fbbf24;"></i> Need <strong>${neededForCycle}</strong> more qualified referrals to complete this $50 cycle.`;
+        el.needMore.textContent = String(neededForCycle);
+
+        el.nextMilestoneText.innerHTML =
+            '<i class="bi bi-bullseye" style="color:#fbbf24;"></i> ' +
+            `Need <strong>${neededForCycle}</strong> more qualified referrals ` +
+            'to complete this $50 cycle.';
     }
 
     renderCycleProgress(displayDirectCount);
 
-    // Not Eligible
     if (displayDirectCount === 0) {
         el.notEligibleBox.classList.add('visible');
     } else {
         el.notEligibleBox.classList.remove('visible');
     }
 
-    // Wallet
     el.walletAmount.textContent = displayReward.toFixed(2);
     if (isFinal) {
         el.finalBadge.style.display = 'inline';
@@ -940,7 +1429,7 @@ function showDaysPopup() {
 }
 
 // ============================================================
-// HANDLE WITHDRAWAL BUTTON CLICK
+// FIX 14 — HANDLE WITHDRAWAL BUTTON CLICK
 // ============================================================
 function handleWithdrawClick() {
     const status = getCampaignStatus();
@@ -951,118 +1440,212 @@ function handleWithdrawClick() {
     }
 
     let reward = 0;
-    if (campaignRewardSnapshot) {
-        reward = Number(campaignRewardSnapshot.finalReward ?? 0);
+
+    if (
+        campaignRewardSnapshot &&
+        campaignRewardSnapshot.isFinalized === true
+    ) {
+        reward =
+            Number(
+                campaignRewardSnapshot.finalReward || 0
+            );
     } else {
-        reward = calculateReward(directReferrals);
+        reward =
+            calculateReward(directReferrals);
     }
 
-    if (reward <= 0) {
+    if (!Number.isFinite(reward) || reward <= 0) {
         showDaysPopup();
         return;
     }
 
-    if (withdrawalData && ['pending', 'approved', 'paid'].includes(withdrawalData.status)) {
-        showToast('You have already submitted a withdrawal request.', 'warning');
+    if (
+        withdrawalData &&
+        ['pending', 'approved', 'paid']
+            .includes(
+                String(
+                    withdrawalData.status || ''
+                ).toLowerCase()
+            )
+    ) {
+        showToast(
+            'You have already submitted a withdrawal request.',
+            'warning'
+        );
         return;
     }
 
-    const walletAddress = el.walletAddressInput.value.trim();
+    const walletAddress =
+        el.walletAddressInput.value.trim();
+
     if (!validateBEP20Wallet(walletAddress)) {
-        showToast('Please enter a valid BEP-20 USDT wallet address (0x...).', 'error');
+        showToast(
+            'Please enter a valid BEP-20 USDT wallet address (0x...).',
+            'error'
+        );
+
         el.walletAddressInput.classList.add('error');
+
         return;
     }
 
-    showConfirmationModal(reward, walletAddress);
+    showConfirmationModal(
+        reward,
+        walletAddress
+    );
 }
 
 // ============================================================
-// SHOW CONFIRMATION MODAL
+// FIX 16 — SHOW CONFIRMATION MODAL
 // ============================================================
-function showConfirmationModal(reward, walletAddress) {
-    el.confirmAmount.textContent = '$' + reward.toFixed(2) + ' USDT';
-    el.confirmWallet.textContent = walletAddress;
-    el.confirmationModal.classList.add('visible');
+function showConfirmationModal(
+    reward,
+    walletAddress
+) {
+    const safeReward =
+        Number(reward);
+
+    el.confirmAmount.textContent =
+        '$' +
+        (
+            Number.isFinite(safeReward)
+                ? safeReward.toFixed(2)
+                : '0.00'
+        ) +
+        ' USDT';
+
+    el.confirmWallet.textContent =
+        String(walletAddress || '');
+
+    el.confirmationModal.classList.add(
+        'visible'
+    );
 }
 
 // ============================================================
-// PROCESS WITHDRAWAL WITH FINAL SNAPSHOT ONLY
+// FIX 15 + FIX C — PROCESS WITHDRAWAL
 // ============================================================
 async function processWithdrawal() {
-    const walletAddress = el.walletAddressInput.value.trim();
 
-    if (!validateBEP20Wallet(walletAddress)) {
-        showToast('Please enter a valid BEP-20 USDT wallet address.', 'error');
+    // FIX C — Entry-level guard.
+    if (isProcessingWithdrawal) {
         return;
     }
 
-    if (getCampaignStatus() !== 'ENDED') {
-        showToast('Withdrawal is only available after the offer ends.', 'error');
-        return;
-    }
+    const originalSubmitHTML =
+        '<i class="bi bi-check-circle me-1"></i>Confirm Withdrawal';
 
-    const userSnap = await get(ref(db, 'users/' + currentUserId));
-    if (!userSnap.exists()) {
-        showToast('User data not found.', 'error');
-        return;
-    }
-
-    const latestUserData = userSnap.val();
-
-    if (!isUserActive(latestUserData)) {
-        showToast('You are not eligible because your ID is not active.', 'error');
-        return;
-    }
-
-    let snapshot = await getCampaignRewardSnapshot(currentUserId);
-
-    if (!snapshot) {
-        snapshot = await finalizeCampaignReward(currentUserId);
-    }
-
-    if (!snapshot || !snapshot.isFinalized || Number(snapshot.finalReward || 0) <= 0) {
-        showToast('No finalized eligible reward is available.', 'error');
-        return;
-    }
-
-    const reward = Number(snapshot.finalReward ?? 0);
-    if (reward <= 0) {
-        showToast('You are not eligible for this reward.', 'error');
-        return;
-    }
-
-    if (withdrawalData && ['pending', 'approved', 'paid'].includes(withdrawalData.status)) {
-        showToast('You have already submitted a withdrawal request.', 'warning');
-        return;
-    }
-
+    // FIX C — UI को तुरंत lock करो — कोई async call करने से पहले।
     el.confirmSubmit.disabled = true;
-    el.confirmSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+    el.confirmSubmit.innerHTML =
+        '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
     try {
-        const result = await createAtomicWithdrawal(currentUserId, latestUserData, walletAddress);
+        const walletAddress =
+            el.walletAddressInput.value.trim();
+
+        if (!validateBEP20Wallet(walletAddress)) {
+            showToast('Please enter a valid BEP-20 USDT wallet address.', 'error');
+            return;
+        }
+
+        if (getCampaignStatus() !== 'ENDED') {
+            showToast('Withdrawal is only available after the offer ends.', 'error');
+            return;
+        }
+
+        const userSnap = await get(ref(db, 'users/' + currentUserId));
+
+        if (!userSnap.exists()) {
+            showToast('User data not found.', 'error');
+            return;
+        }
+
+        const latestUserData = userSnap.val();
+
+        if (!isUserActive(latestUserData)) {
+            showToast('You are not eligible because your ID is not active.', 'error');
+            return;
+        }
+
+        let snapshot = await getCampaignRewardSnapshot(currentUserId);
+
+        if (!snapshot) {
+            snapshot = await finalizeCampaignReward(currentUserId);
+        }
+
+        if (
+            !snapshot ||
+            !snapshot.isFinalized ||
+            Number(snapshot.finalReward || 0) <= 0
+        ) {
+            showToast('No finalized eligible reward is available.', 'error');
+            return;
+        }
+
+        const reward = Number(snapshot.finalReward ?? 0);
+
+        if (reward <= 0) {
+            showToast('You are not eligible for this reward.', 'error');
+            return;
+        }
+
+        if (
+            withdrawalData &&
+            ['pending', 'approved', 'paid']
+                .includes(
+                    String(withdrawalData.status || '').toLowerCase()
+                )
+        ) {
+            showToast('You have already submitted a withdrawal request.', 'warning');
+            return;
+        }
+
+        const result = await createAtomicWithdrawal(
+            currentUserId,
+            latestUserData,
+            walletAddress
+        );
 
         if (result.success) {
-            showToast('✅ Your withdrawal request has been submitted successfully.', 'success');
-            withdrawalData = await checkWithdrawalStatus(currentUserId);
+            showToast(
+                '✅ Your withdrawal request has been submitted successfully.',
+                'success'
+            );
+
+            withdrawalData =
+                await checkWithdrawalStatus(currentUserId);
+
             el.walletAddressInput.value = '';
             el.confirmationModal.classList.remove('visible');
+
             updateUI();
         } else {
             showToast('❌ Failed to submit withdrawal request.', 'error');
         }
+
     } catch (error) {
         console.error('Withdrawal error:', error);
-        showToast('❌ ' + (error.message || 'Error submitting withdrawal request. Please try again.'), 'error');
-    }
 
-    el.confirmSubmit.disabled = false;
-    el.confirmSubmit.innerHTML = '<i class="bi bi-check-circle me-1"></i>Confirm Withdrawal';
+        showToast(
+            '❌ ' +
+            (error.message ||
+                'Error submitting withdrawal request. Please try again.'),
+            'error'
+        );
+
+    } finally {
+        // FIX C — हमेशा button restore करो।
+        isProcessingWithdrawal = false;
+        el.confirmSubmit.disabled = false;
+        el.confirmSubmit.innerHTML = originalSubmitHTML;
+    }
 }
 
 // ============================================================
-// LOAD USER DATA WITH ACTIVE CHECK
+// LOAD USER DATA
+// (FIX 2 (new) — isWithdrawalFinalized state corrected)
+// (FIX 18 — visibilitychange listener removed from here)
 // ============================================================
 async function loadUserData(user) {
     try {
@@ -1079,10 +1662,14 @@ async function loadUserData(user) {
         el.userName.textContent = name;
         el.userAvatar.textContent = name.charAt(0).toUpperCase();
 
-        campaignRewardSnapshot = await getCampaignRewardSnapshot(user.uid);
-        if (campaignRewardSnapshot) {
-            isWithdrawalFinalized = true;
-        }
+        // ============================================================
+        // FIX 2 (new) — correct isWithdrawalFinalized state
+        // ============================================================
+        campaignRewardSnapshot =
+            await getCampaignRewardSnapshot(user.uid);
+
+        isWithdrawalFinalized =
+            campaignRewardSnapshot?.isFinalized === true;
 
         const userIsActive = isUserActive(currentUserData);
 
@@ -1096,7 +1683,8 @@ async function loadUserData(user) {
         if (getCampaignStatus() === 'ENDED' && !campaignRewardSnapshot) {
             campaignRewardSnapshot = await finalizeCampaignReward(user.uid);
             if (campaignRewardSnapshot) {
-                isWithdrawalFinalized = true;
+                isWithdrawalFinalized =
+                    campaignRewardSnapshot.isFinalized === true;
                 directReferrals = Number(campaignRewardSnapshot.finalDirectCount ?? 0);
             }
         }
@@ -1133,12 +1721,6 @@ async function loadUserData(user) {
             }
         }
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                refreshCampaignDirectCount();
-            }
-        });
-
     } catch (error) {
         console.error('Error loading user data:', error);
         showToast('Error loading data: ' + error.message, 'error');
@@ -1147,7 +1729,7 @@ async function loadUserData(user) {
 }
 
 // ============================================================
-// COUNTDOWN
+// FIX 17 — COUNTDOWN
 // ============================================================
 function startCountdown() {
     if (countdownInterval) clearInterval(countdownInterval);
@@ -1159,13 +1741,42 @@ function startCountdown() {
         if (status === 'ENDED') {
             el.countdownWrapper.style.display = 'none';
             el.campaignEndedMessage.style.display = 'block';
-            if (countdownInterval) clearInterval(countdownInterval);
 
-            if (!isWithdrawalFinalized && currentUserId) {
-                finalizeCampaignReward(currentUserId).then(() => {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
+            if (referralRefreshInterval) {
+                clearInterval(referralRefreshInterval);
+                referralRefreshInterval = null;
+            }
+
+            if (
+                !isWithdrawalFinalized &&
+                currentUserId
+            ) {
+                finalizeCampaignReward(
+                    currentUserId
+                ).then(snapshot => {
+
+                    if (snapshot) {
+                        campaignRewardSnapshot =
+                            snapshot;
+
+                        directReferrals =
+                            Number(
+                                snapshot.finalDirectCount || 0
+                            );
+
+                        isWithdrawalFinalized =
+                            snapshot.isFinalized === true;
+                    }
+
                     updateUI();
                 });
             }
+
             updateUI();
             return;
         }
@@ -1181,7 +1792,7 @@ function startCountdown() {
 }
 
 // ============================================================
-// WALLET ADDRESS VALIDATION
+// WALLET ADDRESS VALIDATION UI
 // ============================================================
 function setupWalletValidation() {
     el.walletAddressInput.addEventListener('input', () => {
@@ -1253,9 +1864,15 @@ async function handleLogout() {
 }
 
 // ============================================================
-// SETUP LISTENERS
+// FIX 19 — SETUP LISTENERS (DUPLICATION PROTECTION)
 // ============================================================
 function setupListeners() {
+    if (listenersInitialized) {
+        return;
+    }
+
+    listenersInitialized = true;
+
     el.copyReferralBtn.addEventListener('click', copyReferralLink);
     el.logoutBtn.addEventListener('click', handleLogout);
     el.withdrawBtn.addEventListener('click', handleWithdrawClick);
@@ -1281,11 +1898,40 @@ function setupListeners() {
 }
 
 // ============================================================
-// CLEANUP
+// FIX 18 — GLOBAL VISIBILITY CHANGE LISTENER (ONCE)
+// ============================================================
+document.addEventListener(
+    'visibilitychange',
+    () => {
+        if (
+            document.visibilityState === 'visible' &&
+            currentUserId &&
+            getCampaignStatus() === 'ACTIVE' &&
+            !isWithdrawalFinalized
+        ) {
+            refreshCampaignDirectCount();
+        }
+    }
+);
+
+// ============================================================
+// FIX 3 (new) — CLEANUP
 // ============================================================
 window.addEventListener('beforeunload', () => {
-    if (countdownInterval) clearInterval(countdownInterval);
-    if (referralRefreshInterval) clearInterval(referralRefreshInterval);
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+
+    if (referralRefreshInterval) {
+        clearInterval(referralRefreshInterval);
+        referralRefreshInterval = null;
+    }
+
+    if (withdrawalListenerUnsubscribe) {
+        withdrawalListenerUnsubscribe();
+        withdrawalListenerUnsubscribe = null;
+    }
 });
 
 // ============================================================
@@ -1302,10 +1948,9 @@ onAuthStateChanged(auth, async (user) => {
     setupListeners();
 });
 
-console.log('✅ $50 Package Direct Offer Page Loaded Successfully!');
-console.log('📅 Campaign:', CAMPAIGN.campaignId, CAMPAIGN.startDate, '→', CAMPAIGN.endDate);
-console.log('💰 Reward: $10 per qualified referral ($50 package only)');
-console.log('🔄 Cycle: Every 5 referrals = $50');
+console.log('✅ $50 Package Direct Offer — FINAL PRODUCTION VERSION');
+console.log('📅 Campaign:', CAMPAIGN.campaignId);
+console.log('💰 $10 per qualified referral ($50 package only)');
+console.log('🔄 Every 5 referrals = $50 cycle (unlimited)');
 console.log('🔒 Withdrawal: Locked until Offer ENDED');
-console.log('✅ Only $50 package active users count as qualified referrals');
-console.log('✅ Unlimited cycles — 5,10,15,20... referrals = $50,$100,$150,$200...');
+console.log('✅ FIX 1–21 + FIX A + FIX B + FIX C + NEW FIX 1/2/3 applied');

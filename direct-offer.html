@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>RND Direct Referral Offer</title>
+    <title>RND Direct Referral Offer — $50 Package</title>
 
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
@@ -436,73 +436,68 @@
         }
         .progress-section .next-milestone strong { color: #fbbf24; }
 
-        /* Milestones */
-        .milestone-section-title {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #e2e8f0;
-            margin-bottom: 20px;
-        }
-        .milestone-section-title i {
-            color: #2ecc71;
-            margin-right: 10px;
-        }
-        .milestone-grid {
+        /* Cycle Progress */
+        .cycle-progress-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
             gap: 12px;
-            margin-bottom: 40px;
+            margin-top: 16px;
         }
-        .milestone-card {
+        .cycle-card {
             background: rgba(20,27,45,0.5);
             border: 1px solid rgba(46,204,113,0.06);
             border-radius: 12px;
-            padding: 16px 12px;
+            padding: 14px 12px;
             text-align: center;
             transition: all 0.3s ease;
         }
-        .milestone-card .refs {
-            font-size: 1.3rem;
+        .cycle-card .cycle-label {
+            font-size: 0.7rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .cycle-card .cycle-refs {
+            font-size: 1.4rem;
             font-weight: 700;
             color: #e2e8f0;
         }
-        .milestone-card .refs small {
+        .cycle-card .cycle-refs small {
             font-size: 0.7rem;
             color: #64748b;
             font-weight: 400;
         }
-        .milestone-card .reward {
+        .cycle-card .cycle-reward {
             font-size: 1.1rem;
             font-weight: 700;
             color: #fbbf24;
-            margin-top: 4px;
+            margin-top: 2px;
         }
-        .milestone-card .status-badge {
+        .cycle-card .cycle-status {
             display: inline-block;
             font-size: 0.6rem;
             font-weight: 600;
             padding: 2px 12px;
             border-radius: 30px;
-            margin-top: 8px;
-            letter-spacing: 0.3px;
+            margin-top: 6px;
         }
-        .milestone-card .status-badge.achieved {
+        .cycle-card .cycle-status.achieved {
             background: rgba(46,204,113,0.15);
             color: #2ecc71;
         }
-        .milestone-card .status-badge.next {
+        .cycle-card .cycle-status.next {
             background: rgba(251,191,36,0.15);
             color: #fbbf24;
         }
-        .milestone-card .status-badge.locked {
+        .cycle-card .cycle-status.locked {
             background: rgba(100,116,139,0.1);
             color: #64748b;
         }
-        .milestone-card.achieved {
+        .cycle-card.achieved {
             border-color: rgba(46,204,113,0.2);
             background: rgba(46,204,113,0.04);
         }
-        .milestone-card.next {
+        .cycle-card.next {
             border-color: rgba(251,191,36,0.2);
             background: rgba(251,191,36,0.04);
         }
@@ -563,7 +558,7 @@
             background: #fbbf24;
         }
 
-        /* ===== WITHDRAWAL SECTION - ALWAYS VISIBLE ===== */
+        /* ===== WITHDRAWAL SECTION ===== */
         .withdrawal-section {
             background: rgba(20,27,45,0.6);
             border: 1px solid rgba(46,204,113,0.06);
@@ -989,10 +984,10 @@
             .countdown-item { padding: 12px 16px; min-width: 60px; }
             .countdown-item .number { font-size: 1.6rem; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .milestone-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
-            .milestone-card { padding: 12px 8px; }
-            .milestone-card .refs { font-size: 1rem; }
-            .milestone-card .reward { font-size: 0.9rem; }
+            .cycle-progress-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+            .cycle-card { padding: 10px 6px; }
+            .cycle-card .cycle-refs { font-size: 1.1rem; }
+            .cycle-card .cycle-reward { font-size: 0.9rem; }
             .progress-section, .referral-section, .withdrawal-section { padding: 20px 16px; }
             .referral-box { flex-direction: column; align-items: stretch; }
             .referral-box code { font-size: 0.7rem; }
@@ -1008,7 +1003,7 @@
             .stat-card .number { font-size: 1.6rem; }
             .countdown-item { padding: 10px 12px; min-width: 50px; }
             .countdown-item .number { font-size: 1.3rem; }
-            .milestone-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+            .cycle-progress-grid { grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); }
             .reward-wallet-card .wallet-amount { font-size: 2rem; }
             .confirmation-overlay .modal-buttons {
                 flex-direction: column;
@@ -1104,9 +1099,10 @@
         <div class="hero-section">
             <div class="badge-campaign"><i class="bi bi-fire"></i> Limited Time Offer</div>
             <h1>RND <span>Direct Referral</span> Offer</h1>
-            <p class="subtitle">Refer More. Earn More.</p>
+            <p class="subtitle">Refer $50 Package. Earn $10 Per Qualified Referral.</p>
             <p class="date-range">
-                <i class="bi bi-calendar-event"></i> 6 September 2026 – 6 October 2026
+                <i class="bi bi-calendar-event"></i> 10 October 2026 – 24 October 2026
+                <span style="color:#64748b;margin-left:8px;">(14 Days Only)</span>
             </p>
             <div id="campaignStatusBadge"></div>
             <div id="countdownContainer">
@@ -1137,13 +1133,13 @@
         <!-- ===== REWARD WALLET ===== -->
         <div class="reward-wallet-card" id="rewardWalletCard">
             <span class="wallet-icon-big">💰</span>
-            <div class="wallet-label" id="walletLabel">Your Reward Wallet</div>
+            <div class="wallet-label" id="walletLabel">Your Offer Earnings</div>
             <div class="wallet-amount">
                 $<span id="walletAmount">0.00</span> <span class="currency">USDT</span>
                 <span class="final-badge" id="finalBadge" style="display:none;">✓ FINAL</span>
             </div>
             <div class="wallet-sub" id="walletStatusText">
-                Start referring to earn rewards!
+                Start referring $50 package users to earn $10 each!
             </div>
         </div>
 
@@ -1151,53 +1147,50 @@
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="number green" id="statDirectRefs">0</div>
-                <div class="label">Your Direct Referrals</div>
+                <div class="label">Qualified Direct Referrals</div>
                 <div class="sub" id="statReferralPeriod">Campaign Period</div>
             </div>
             <div class="stat-card">
                 <div class="number gold" id="statEligibleReward">$0</div>
-                <div class="label">Current Reward</div>
-                <div class="sub" id="statRewardNote">Earn more referrals!</div>
+                <div class="label">Total Offer Earnings</div>
+                <div class="sub" id="statRewardNote">Earn $10 per qualified referral</div>
             </div>
             <div class="stat-card">
-                <div class="number blue" id="statNextMilestone">5 → $5</div>
-                <div class="label">Next Milestone</div>
+                <div class="number blue" id="statNextMilestone">5 → $50</div>
+                <div class="label">Next Cycle Target</div>
                 <div class="sub" id="statNextMilestoneSub">0 more needed</div>
             </div>
             <div class="stat-card">
-                <div class="number purple" id="statMaxReward">$100</div>
-                <div class="label">Maximum Reward</div>
-                <div class="sub">100 Direct Referrals</div>
+                <div class="number purple" id="statMaxReward">∞</div>
+                <div class="label">Unlimited Potential</div>
+                <div class="sub">Every 5 referrals = $50</div>
             </div>
         </div>
 
         <!-- ===== PROGRESS ===== -->
         <div class="progress-section" id="progressSection">
             <div class="label-row">
-                <span class="title"><i class="bi bi-graph-up-arrow" style="color:#fbbf24;margin-right:8px;"></i>Your Progress</span>
-                <span class="value"><strong id="progressCurrent">0</strong> / <span id="progressTarget">100</span> Direct Referrals</span>
+                <span class="title"><i class="bi bi-graph-up-arrow" style="color:#fbbf24;margin-right:8px;"></i>Current Cycle Progress</span>
+                <span class="value"><strong id="progressCurrent">0</strong> / <span id="progressTarget">5</span> Qualified Referrals</span>
             </div>
             <div class="progress-bar-track">
                 <div class="fill" id="progressFill" style="width:0%;"></div>
             </div>
             <div class="next-milestone" id="nextMilestoneText">
                 <i class="bi bi-bullseye" style="color:#fbbf24;"></i>
-                Need <strong id="needMore">5</strong> more Direct referrals to reach <strong id="nextReward">$5</strong> milestone.
+                Need <strong id="needMore">5</strong> more qualified referrals to complete this $50 cycle.
             </div>
+
+            <!-- Cycle Progress Cards -->
+            <div class="cycle-progress-grid" id="cycleProgressGrid"></div>
         </div>
 
         <!-- ===== NOT ELIGIBLE ===== -->
         <div class="not-eligible-box" id="notEligibleBox">
             <i class="bi bi-person-x"></i>
             <h5>Not Eligible Yet</h5>
-            <p>You need at least <strong>5 Active Direct Referrals</strong> to qualify for this offer.</p>
+            <p>Complete at least <strong>1 Qualified Direct Referral</strong> to start earning. Each qualified referral = $10.</p>
         </div>
-
-        <!-- ===== MILESTONES ===== -->
-        <div class="milestone-section-title">
-            <i class="bi bi-trophy"></i> Reward Milestones
-        </div>
-        <div class="milestone-grid" id="milestoneGrid"></div>
 
         <!-- ===== REFERRAL ===== -->
         <div class="referral-section" id="referralSection">
@@ -1207,12 +1200,12 @@
                 <button class="copy-btn" id="copyReferralBtn"><i class="bi bi-clipboard me-1"></i>Copy Referral Link</button>
             </div>
             <div class="mt-2">
-                <span class="text-muted small"><i class="bi bi-people me-1"></i>Total Referrals: <strong style="color:#2ecc71;" id="totalReferralsDisplay">0</strong></span>
+                <span class="text-muted small"><i class="bi bi-people me-1"></i>Qualified Direct Referrals: <strong style="color:#2ecc71;" id="totalReferralsDisplay">0</strong></span>
                 <span class="text-muted small ms-3"><i class="bi bi-code me-1"></i>Your Code: <strong style="color:#2ecc71;" id="referralCodeDisplay">---</strong></span>
             </div>
         </div>
 
-        <!-- ===== WITHDRAWAL SECTION - ALWAYS VISIBLE ===== -->
+        <!-- ===== WITHDRAWAL SECTION ===== -->
         <div class="withdrawal-section" id="withdrawalSection">
             <div class="title"><i class="bi bi-credit-card"></i> 🎁 Offer Reward Withdrawal</div>
             <div class="subtitle" id="withdrawalSubtitle">Withdraw your eligible reward in USDT (BEP-20)</div>
@@ -1313,30 +1306,18 @@
         const db = getDatabase(app);
 
         // ============================================================
-        // CANONICAL CAMPAIGN CONFIGURATION
+        // NEW CAMPAIGN CONFIGURATION — 14 DAY $50 PACKAGE OFFER
         // ============================================================
         const CAMPAIGN = {
-            campaignId: 'direct_offer_2026',
-            startDate: new Date('2026-09-06T00:00:00+05:30'),
-            endDate: new Date('2026-10-06T23:59:59+05:30'),
-            minQualifying: 5,
-            maxQualifying: 100,
-            maxReward: 100,
-            milestoneStep: 5
+            campaignId: 'direct_offer_50pack_oct2026',
+            startDate: new Date('2026-10-10T00:00:00+05:30'),
+            endDate: new Date('2026-10-24T23:59:59+05:30'),
+            requiredPackageAmount: 50,      // Only $50 package qualifies
+            rewardPerReferral: 10,          // $10 per qualified referral
+            cycleSize: 5,                   // 5 referrals = $50 cycle
+            cycleReward: 50,                // $50 per cycle
+            maxQualifying: Infinity         // Unlimited cycles
         };
-
-        const MILESTONES = [
-            { refs: 5, reward: 5 }, { refs: 10, reward: 10 },
-            { refs: 15, reward: 15 }, { refs: 20, reward: 20 },
-            { refs: 25, reward: 25 }, { refs: 30, reward: 30 },
-            { refs: 35, reward: 35 }, { refs: 40, reward: 40 },
-            { refs: 45, reward: 45 }, { refs: 50, reward: 50 },
-            { refs: 55, reward: 55 }, { refs: 60, reward: 60 },
-            { refs: 65, reward: 65 }, { refs: 70, reward: 70 },
-            { refs: 75, reward: 75 }, { refs: 80, reward: 80 },
-            { refs: 85, reward: 85 }, { refs: 90, reward: 90 },
-            { refs: 95, reward: 95 }, { refs: 100, reward: 100 }
-        ];
 
         // ============================================================
         // DOM REFS
@@ -1366,9 +1347,8 @@
             progressTarget: $('progressTarget'),
             progressFill: $('progressFill'),
             needMore: $('needMore'),
-            nextReward: $('nextReward'),
             nextMilestoneText: $('nextMilestoneText'),
-            milestoneGrid: $('milestoneGrid'),
+            cycleProgressGrid: $('cycleProgressGrid'),
             referralLinkDisplay: $('referralLinkDisplay'),
             copyReferralBtn: $('copyReferralBtn'),
             totalReferralsDisplay: $('totalReferralsDisplay'),
@@ -1423,7 +1403,7 @@
         let firebaseServerOffset = 0;
 
         // ============================================================
-        // FIX 5: FIREBASE SERVER-ADJUSTED TIME
+        // FIREBASE SERVER-ADJUSTED TIME
         // ============================================================
         async function syncFirebaseServerTime() {
             try {
@@ -1440,10 +1420,7 @@
         }
 
         // ============================================================
-        // FIX 1: CANONICAL ACTIVE USER CHECK
-        // Registration alone NEVER means active.
-        // User becomes active only when at least one eligible package
-        // has status === 'active'.
+        // ACTIVE USER CHECK (same as before)
         // ============================================================
         function isUserActive(userData) {
             if (!userData || typeof userData !== 'object') {
@@ -1454,14 +1431,8 @@
 
             for (const packageId of Object.keys(packages)) {
                 const pkg = packages[packageId];
-
                 if (!pkg || typeof pkg !== 'object') continue;
-
-                // ONLY active package qualifies
-                if (
-                    String(pkg.status || '').toLowerCase() === 'active' &&
-                    Number(pkg.usdtAmount || 0) > 0
-                ) {
+                if (String(pkg.status || '').toLowerCase() === 'active' && Number(pkg.usdtAmount || 0) > 0) {
                     return true;
                 }
             }
@@ -1470,67 +1441,40 @@
         }
 
         // ============================================================
-        // FIX 2: NORMALIZE TIMESTAMP HELPER
+        // NORMALIZE TIMESTAMP
         // ============================================================
         function normalizeTimestamp(value) {
             if (value === null || value === undefined || value === '') {
                 return null;
             }
-
-            // Firebase numeric timestamp
             if (typeof value === 'number') {
                 return Number.isFinite(value) && value > 0 ? value : null;
             }
-
-            // Numeric string timestamp
             if (/^\d+$/.test(String(value))) {
                 const n = Number(value);
                 return Number.isFinite(n) && n > 0 ? n : null;
             }
-
-            // ISO/date string
             const parsed = new Date(value).getTime();
-
             return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
         }
 
         // ============================================================
-        // FIX 2: CANONICAL PACKAGE ACTIVATION TIME
+        // PACKAGE ACTIVATION TIME
         // ============================================================
         function getPackageActivationTime(pkg) {
             if (!pkg || typeof pkg !== 'object') {
                 return null;
             }
 
-            // Actual activation fields have highest priority.
-            const activationFields = [
-                pkg.activationAt,
-                pkg.activatedAt,
-                pkg.activeAt
-            ];
+            const activationFields = [pkg.activationAt, pkg.activatedAt, pkg.activeAt];
 
             for (const value of activationFields) {
                 const ts = normalizeTimestamp(value);
                 if (ts) return ts;
             }
 
-            /*
-             IMPORTANT:
-
-             Do not use USER createdAt.
-
-             Package purchaseDate/createdAt may only be used for legacy packages
-             if the production purchase system creates the package directly as ACTIVE.
-
-             If package can exist as pending before activation, the purchase code
-             must save activationAt = Date.now() exactly when status changes to active.
-            */
-
             if (String(pkg.status || '').toLowerCase() === 'active') {
-                const purchaseTime =
-                    normalizeTimestamp(pkg.purchaseDate) ||
-                    normalizeTimestamp(pkg.createdAt);
-
+                const purchaseTime = normalizeTimestamp(pkg.purchaseDate) || normalizeTimestamp(pkg.createdAt);
                 return purchaseTime;
             }
 
@@ -1538,7 +1482,7 @@
         }
 
         // ============================================================
-        // FIX 3: CAMPAIGN ELIGIBLE ACTIVE PACKAGE CHECK
+        // CAMPAIGN ELIGIBLE ACTIVE PACKAGE CHECK — $50 ONLY
         // ============================================================
         function hasCampaignActivePackage(userData) {
             if (!isUserActive(userData)) {
@@ -1549,28 +1493,19 @@
 
             for (const packageId of Object.keys(packages)) {
                 const pkg = packages[packageId];
-
                 if (!pkg || typeof pkg !== 'object') continue;
 
-                if (String(pkg.status || '').toLowerCase() !== 'active') {
-                    continue;
-                }
+                if (String(pkg.status || '').toLowerCase() !== 'active') continue;
 
-                if (Number(pkg.usdtAmount || 0) <= 0) {
-                    continue;
-                }
+                // Only $50 package qualifies for this offer
+                const pkgAmount = Number(pkg.usdtAmount || 0);
+                if (pkgAmount !== CAMPAIGN.requiredPackageAmount) continue;
 
                 const activationTime = getPackageActivationTime(pkg);
-
-                if (!activationTime) {
-                    continue;
-                }
+                if (!activationTime) continue;
 
                 // Must become active during campaign
-                if (
-                    activationTime >= CAMPAIGN.startDate.getTime() &&
-                    activationTime <= CAMPAIGN.endDate.getTime()
-                ) {
+                if (activationTime >= CAMPAIGN.startDate.getTime() && activationTime <= CAMPAIGN.endDate.getTime()) {
                     return true;
                 }
             }
@@ -1579,91 +1514,57 @@
         }
 
         // ============================================================
-        // FIX 4: CANONICAL CAMPAIGN DIRECT REFERRALS
+        // GET CAMPAIGN DIRECT REFERRALS — $50 PACKAGE ONLY
         // ============================================================
         async function getCampaignDirectReferrals(userId) {
             try {
                 if (!db || !userId) return 0;
 
                 const ownerSnap = await get(ref(db, 'users/' + userId));
-
-                if (!ownerSnap.exists()) {
-                    return 0;
-                }
+                if (!ownerSnap.exists()) return 0;
 
                 const owner = ownerSnap.val();
-
-                // Sponsor himself must be active to participate.
-                if (!isUserActive(owner)) {
-                    return 0;
-                }
+                if (!isUserActive(owner)) return 0;
 
                 const usersSnap = await get(ref(db, 'users'));
-
-                if (!usersSnap.exists()) {
-                    return 0;
-                }
+                if (!usersSnap.exists()) return 0;
 
                 const users = usersSnap.val() || {};
                 const counted = new Set();
 
                 for (const [candidateUid, candidate] of Object.entries(users)) {
-
-                    if (
-                        !candidate ||
-                        typeof candidate !== 'object' ||
-                        candidateUid === userId
-                    ) {
-                        continue;
-                    }
+                    if (!candidate || typeof candidate !== 'object' || candidateUid === userId) continue;
 
                     let isDirect = false;
 
-                    // CANONICAL UID
-                    if (
-                        candidate.sponsorUid &&
-                        String(candidate.sponsorUid) === String(userId)
-                    ) {
+                    // Canonical UID
+                    if (candidate.sponsorUid && String(candidate.sponsorUid) === String(userId)) {
                         isDirect = true;
                     }
 
                     // Legacy UID
-                    if (
-                        !isDirect &&
-                        candidate.referredByUid &&
-                        String(candidate.referredByUid) === String(userId)
-                    ) {
+                    if (!isDirect && candidate.referredByUid && String(candidate.referredByUid) === String(userId)) {
                         isDirect = true;
                     }
 
-                    /*
-                     Legacy systems may store referralCode / username
-                     instead of UID.
-                    */
+                    // Legacy code/username
                     if (!isDirect) {
-                        const legacySponsor =
-                            candidate.referredBy ||
-                            candidate.sponsor ||
-                            null;
-
-                        if (
-                            legacySponsor &&
-                            (
-                                String(legacySponsor) === String(userId) ||
-                                String(legacySponsor) === String(owner.referralCode || '') ||
-                                String(legacySponsor) === String(owner.username || '')
-                            )
-                        ) {
+                        const legacySponsor = candidate.referredBy || candidate.sponsor || null;
+                        if (legacySponsor && (
+                            String(legacySponsor) === String(userId) ||
+                            String(legacySponsor) === String(owner.referralCode || '') ||
+                            String(legacySponsor) === String(owner.username || '')
+                        )) {
                             isDirect = true;
                         }
                     }
 
                     if (!isDirect) continue;
 
-                    // Registration only MUST NOT count.
+                    // Must be active
                     if (!isUserActive(candidate)) continue;
 
-                    // Package must qualify for this campaign.
+                    // Must have $50 package active during campaign
                     if (!hasCampaignActivePackage(candidate)) continue;
 
                     counted.add(candidateUid);
@@ -1678,39 +1579,30 @@
         }
 
         // ============================================================
-        // CAMPAIGN REWARD CALCULATION
+        // NEW REWARD CALCULATION — $10 PER QUALIFIED REFERRAL
         // ============================================================
         function calculateReward(directCount) {
-            if (directCount < CAMPAIGN.minQualifying) return 0;
-            const capped = Math.min(directCount, CAMPAIGN.maxQualifying);
-            let reward = 0;
-            for (const m of MILESTONES) {
-                if (m.refs <= capped) reward = m.reward;
-            }
-            return reward;
+            if (directCount <= 0) return 0;
+            return directCount * CAMPAIGN.rewardPerReferral;
         }
 
-        function getNextMilestone(directCount) {
-            for (const m of MILESTONES) {
-                if (m.refs > directCount) return m;
-            }
-            return null;
+        function getCurrentCycleProgress(directCount) {
+            if (directCount <= 0) return 0;
+            const remainder = directCount % CAMPAIGN.cycleSize;
+            return remainder === 0 ? CAMPAIGN.cycleSize : remainder;
+        }
+
+        function getTotalCyclesCompleted(directCount) {
+            return Math.floor(directCount / CAMPAIGN.cycleSize);
         }
 
         // ============================================================
-        // FIX 5: GET CAMPAIGN STATUS WITH SERVER TIME
+        // CAMPAIGN STATUS WITH SERVER TIME
         // ============================================================
         function getCampaignStatus() {
             const now = getCampaignNow();
-
-            if (now < CAMPAIGN.startDate) {
-                return 'UPCOMING';
-            }
-
-            if (now >= CAMPAIGN.startDate && now <= CAMPAIGN.endDate) {
-                return 'ACTIVE';
-            }
-
+            if (now < CAMPAIGN.startDate) return 'UPCOMING';
+            if (now >= CAMPAIGN.startDate && now <= CAMPAIGN.endDate) return 'ACTIVE';
             return 'ENDED';
         }
 
@@ -1721,22 +1613,23 @@
             if (status === 'UPCOMING') {
                 const diff = CAMPAIGN.startDate - now;
                 if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                return { days, hours, minutes, seconds };
+                return {
+                    days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+                    hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+                    minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+                    seconds: Math.floor((diff % (1000 * 60)) / 1000)
+                };
             } else if (status === 'ACTIVE') {
                 const diff = CAMPAIGN.endDate - now;
                 if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                return { days, hours, minutes, seconds };
-            } else {
-                return { days: 0, hours: 0, minutes: 0, seconds: 0 };
+                return {
+                    days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+                    hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+                    minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+                    seconds: Math.floor((diff % (1000 * 60)) / 1000)
+                };
             }
+            return { days: 0, hours: 0, minutes: 0, seconds: 0 };
         }
 
         function formatTimeRemaining(time) {
@@ -1765,27 +1658,21 @@
         }
 
         // ============================================================
-        // FIX 6: FINALIZE CAMPAIGN REWARD WITH TRANSACTION
+        // FINALIZE CAMPAIGN REWARD WITH TRANSACTION
         // ============================================================
         async function finalizeCampaignReward(userId) {
             try {
                 if (!db || !userId) return null;
 
-                // FIX 6: Only finalize after campaign end
+                // Only finalize after campaign end
                 if (getCampaignStatus() !== 'ENDED') {
                     console.warn('Campaign cannot be finalized before end time.');
                     return null;
                 }
 
-                // Already finalized?
                 const existing = await getCampaignRewardSnapshot(userId);
+                if (existing) return existing;
 
-                if (existing) {
-                    return existing;
-                }
-
-                // IMPORTANT:
-                // Always calculate fresh from Firebase.
                 const finalDirectCount = await getCampaignDirectReferrals(userId);
                 const finalReward = calculateReward(finalDirectCount);
 
@@ -1804,14 +1691,10 @@
                     paidAt: null
                 };
 
-                // Transaction prevents two browser tabs from creating two different snapshots.
                 const result = await runTransaction(
                     ref(db, `campaign_rewards/${userId}/${CAMPAIGN.campaignId}`),
                     (currentData) => {
-                        // Someone already finalized it.
-                        if (currentData) {
-                            return currentData;
-                        }
+                        if (currentData) return currentData;
                         return snapshotData;
                     }
                 );
@@ -1868,7 +1751,7 @@
         }
 
         // ============================================================
-        // FIX 7: ATOMIC WITHDRAWAL CREATION WITH TRANSACTION LOCK
+        // ATOMIC WITHDRAWAL CREATION
         // ============================================================
         async function createAtomicWithdrawal(userId, userData, walletAddress) {
             if (isProcessingWithdrawal) {
@@ -1895,31 +1778,14 @@
                 const txId = generateTxId();
                 const timestamp = Date.now();
 
-                /*
-                 FIRST:
-                 claim/lock the one campaign reward record atomically.
-                */
                 const lockResult = await runTransaction(
                     campaignRef,
                     current => {
-
-                        if (!current) {
-                            return; // abort
-                        }
-
-                        if (!current.isFinalized) {
-                            return;
-                        }
-
+                        if (!current) return;
+                        if (!current.isFinalized) return;
                         const reward = Number(current.finalReward || 0);
-
-                        if (reward <= 0) {
-                            return;
-                        }
-
-                        if (['pending', 'approved', 'paid'].includes(current.status)) {
-                            return;
-                        }
+                        if (reward <= 0) return;
+                        if (['pending', 'approved', 'paid'].includes(current.status)) return;
 
                         return {
                             ...current,
@@ -1938,13 +1804,11 @@
                 }
 
                 const lockedCampaign = lockResult.snapshot.val();
-
                 if (!lockedCampaign || lockedCampaign.withdrawalId !== withdrawalId) {
                     throw new Error('Withdrawal request could not be locked');
                 }
 
                 const finalReward = Number(lockedCampaign.finalReward || 0);
-
                 if (finalReward <= 0) {
                     throw new Error('No eligible reward');
                 }
@@ -1953,8 +1817,8 @@
 
                 const adminData = {
                     ...lockedCampaign,
-                    campaignName: 'RND Direct Referral Special Offer',
-                    type: 'direct_offer_withdrawal',
+                    campaignName: 'RND Direct Referral $50 Package Offer',
+                    type: 'direct_offer_50pack_withdrawal',
                     asset: 'USDT',
                     network: 'BEP-20 / BNB Smart Chain',
                     amount: finalReward,
@@ -1962,8 +1826,8 @@
                 };
 
                 const transactionData = {
-                    type: 'direct_offer_withdrawal',
-                    subtype: 'Direct Referral Offer Withdrawal',
+                    type: 'direct_offer_50pack_withdrawal',
+                    subtype: 'Direct Referral $50 Package Offer Withdrawal',
                     amount: finalReward,
                     currency: 'USDT',
                     network: 'BEP-20 / BNB Smart Chain',
@@ -1972,7 +1836,7 @@
                     withdrawalId: withdrawalId,
                     timestamp: timestamp,
                     date: date,
-                    description: `Direct Referral Offer Withdrawal of $${finalReward} USDT (BEP-20)`,
+                    description: `Direct Referral $50 Package Offer Withdrawal of $${finalReward} USDT (BEP-20)`,
                     txId: txId,
                     txHash: null
                 };
@@ -1983,11 +1847,6 @@
                     username: userData.username || userData.referralCode || userId
                 };
 
-                /*
-                 Campaign record is ALREADY locked.
-
-                 Now write related records.
-                */
                 await update(
                     ref(db),
                     {
@@ -1997,11 +1856,7 @@
                     }
                 );
 
-                return {
-                    success: true,
-                    withdrawalId,
-                    txId
-                };
+                return { success: true, withdrawalId, txId };
 
             } finally {
                 isProcessingWithdrawal = false;
@@ -2031,43 +1886,49 @@
         }
 
         // ============================================================
-        // RENDER MILESTONES
+        // RENDER CYCLE PROGRESS CARDS
         // ============================================================
-        function renderMilestones(directCount) {
-            const grid = el.milestoneGrid;
+        function renderCycleProgress(directCount) {
+            const grid = el.cycleProgressGrid;
             grid.innerHTML = '';
+
+            const totalCycles = Math.max(1, Math.ceil(directCount / CAMPAIGN.cycleSize) + 1);
             let foundNext = false;
 
-            for (const m of MILESTONES) {
-                const achieved = directCount >= m.refs;
-                const isNext = !achieved && !foundNext && (directCount < CAMPAIGN.maxQualifying);
+            for (let i = 1; i <= totalCycles; i++) {
+                const cycleStart = (i - 1) * CAMPAIGN.cycleSize;
+                const cycleEnd = i * CAMPAIGN.cycleSize;
+                const cycleReward = CAMPAIGN.cycleReward * i;
+
+                const achieved = directCount >= cycleEnd;
+                const isNext = !achieved && !foundNext && (directCount < cycleEnd);
                 if (isNext) foundNext = true;
 
                 let statusClass = 'locked';
                 let statusText = 'Locked';
-                if (achieved) { statusClass = 'achieved'; statusText = '✓ Achieved'; }
-                else if (isNext) { statusClass = 'next'; statusText = 'Next Target'; }
+                if (achieved) { statusClass = 'achieved'; statusText = '✓ Complete'; }
+                else if (isNext) { statusClass = 'next'; statusText = 'Current'; }
 
                 const card = document.createElement('div');
-                card.className = `milestone-card ${statusClass}`;
+                card.className = `cycle-card ${statusClass}`;
                 card.innerHTML = `
-                    <div class="refs">${m.refs} <small>Direct</small></div>
-                    <div class="reward">$${m.reward}</div>
-                    <span class="status-badge ${statusClass}">${statusText}</span>
+                    <div class="cycle-label">Cycle ${i}</div>
+                    <div class="cycle-refs">${cycleEnd} <small>refs</small></div>
+                    <div class="cycle-reward">$${cycleReward}</div>
+                    <span class="cycle-status ${statusClass}">${statusText}</span>
                 `;
                 grid.appendChild(card);
             }
         }
 
         // ============================================================
-        // UPDATE WITHDRAWAL UI
+        // UPDATE WITHDRAWAL UI — NEW RULES
         // ============================================================
         function updateWithdrawalUI(reward, status) {
             const campaignStatus = getCampaignStatus();
-            const isEligible = directReferrals >= CAMPAIGN.minQualifying && reward > 0;
+            const isEligible = directReferrals > 0 && reward > 0;
             const isWithdrawn = status && ['pending', 'approved', 'paid'].includes(status.status);
 
-            // Determine the authoritative reward amount
             let displayReward = reward;
             if (campaignStatus === 'ENDED' && campaignRewardSnapshot) {
                 displayReward = Number(campaignRewardSnapshot.finalReward ?? 0);
@@ -2075,7 +1936,6 @@
 
             el.withdrawAmount.textContent = '$' + displayReward.toFixed(2) + ' USDT';
 
-            // Show wallet form only when eligible and no active withdrawal
             const showWalletForm = campaignStatus === 'ENDED' && isEligible && !isWithdrawn;
             el.walletFormGroup.style.display = showWalletForm ? 'block' : 'none';
 
@@ -2132,16 +1992,16 @@
                 el.withdrawBtn.innerHTML = '⏳ Withdrawal Opens After Offer Ends';
                 el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
                 const time = getTimeRemaining();
-                el.withdrawalInfoText.textContent = `📅 Campaign starts on 6 September 2026. Withdrawal will be available after the offer ends on 6 October 2026. Time until start: ${formatTimeRemaining(time)}`;
+                el.withdrawalInfoText.textContent = `📅 Campaign starts on 10 October 2026. Withdrawal will be available after the offer ends on 24 October 2026. Time until start: ${formatTimeRemaining(time)}`;
                 el.withdrawalStatus.classList.remove('visible');
                 el.withdrawalDetails.classList.remove('visible');
                 el.withdrawalSubtitle.textContent = 'Withdrawal not available yet';
             } else if (campaignStatus === 'ACTIVE') {
                 el.withdrawBtn.disabled = false;
-                el.withdrawBtn.innerHTML = '📅 Check Withdrawal Date';
+                el.withdrawBtn.innerHTML = '📅 Withdrawal Locked — Offer Active';
                 el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
                 const time = getTimeRemaining();
-                el.withdrawalInfoText.textContent = `🎯 Offer is active! Withdrawal opens after the offer ends on 6 October 2026. Time remaining: ${formatTimeRemaining(time)}`;
+                el.withdrawalInfoText.textContent = `🔒 Withdrawal is locked while the offer is active. It will open after 24 October 2026. Time remaining: ${formatTimeRemaining(time)}`;
                 el.withdrawalStatus.classList.remove('visible');
                 el.withdrawalDetails.classList.remove('visible');
                 el.withdrawalSubtitle.textContent = 'Withdrawal locked - offer active';
@@ -2158,7 +2018,7 @@
                     el.withdrawBtn.disabled = true;
                     el.withdrawBtn.innerHTML = '⛔ Not Eligible';
                     el.withdrawBtn.className = 'btn-withdraw withdrawal-locked';
-                    el.withdrawalInfoText.textContent = `You need ${CAMPAIGN.minQualifying - directReferrals} more active referrals to qualify.`;
+                    el.withdrawalInfoText.textContent = 'Complete at least 1 qualified referral to be eligible for withdrawal.';
                     el.withdrawalStatus.classList.remove('visible');
                     el.withdrawalDetails.classList.remove('visible');
                     el.withdrawalSubtitle.textContent = 'Not eligible for withdrawal';
@@ -2167,7 +2027,7 @@
         }
 
         // ============================================================
-        // FIX 9: REFRESH CAMPAIGN DIRECT COUNT
+        // REFRESH CAMPAIGN DIRECT COUNT
         // ============================================================
         async function refreshCampaignDirectCount() {
             if (!currentUserId || getCampaignStatus() !== 'ACTIVE' || isWithdrawalFinalized) {
@@ -2184,27 +2044,23 @@
         }
 
         function startReferralRefresh() {
-            if (referralRefreshInterval) {
-                clearInterval(referralRefreshInterval);
-            }
-
+            if (referralRefreshInterval) clearInterval(referralRefreshInterval);
             referralRefreshInterval = setInterval(refreshCampaignDirectCount, 60000);
         }
 
         // ============================================================
-        // FIX 10: UPDATE UI WITH PROPER ZERO HANDLING
+        // UPDATE UI — NEW RULES
         // ============================================================
         function updateUI() {
             const campaignStatus = getCampaignStatus();
             const statusBadge = {
-                'UPCOMING': { class: 'upcoming', text: '⏳ Upcoming - Starts 6 Sep 2026' },
-                'ACTIVE': { class: 'active', text: '🔥 ACTIVE - Refer & Earn!' },
+                'UPCOMING': { class: 'upcoming', text: '⏳ Upcoming - Starts 10 Oct 2026' },
+                'ACTIVE': { class: 'active', text: '🔥 ACTIVE - Refer & Earn $10 per Referral!' },
                 'ENDED': { class: 'ended', text: '🏁 Offer Ended - Withdrawal Available' }
             }[campaignStatus] || { class: 'upcoming', text: '⏳ Upcoming' };
 
             el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge ${statusBadge.class}">${statusBadge.text}</span>`;
 
-            // Determine authoritative values with proper zero handling
             let displayReward = calculateReward(directReferrals);
             let displayDirectCount = directReferrals;
             let isFinal = false;
@@ -2221,43 +2077,51 @@
             el.statEligibleReward.textContent = '$' + displayReward;
             el.statReferralPeriod.textContent = campaignStatus === 'ENDED' ? 'Final Count' : 'Campaign Period';
 
-            if (displayDirectCount >= CAMPAIGN.minQualifying) {
-                el.statRewardNote.textContent = isFinal ? '🏆 Final reward: $' + displayReward : '🎯 Current reward: $' + displayReward;
+            if (displayDirectCount > 0) {
+                const cycles = Math.floor(displayDirectCount / CAMPAIGN.cycleSize);
+                const remainder = displayDirectCount % CAMPAIGN.cycleSize;
+                const cycleInfo = cycles > 0 ? `${cycles} cycle${cycles > 1 ? 's' : ''} completed` : '';
+                el.statRewardNote.textContent = isFinal
+                    ? `🏆 Final: $${displayReward} (${displayDirectCount} qualified refs)`
+                    : `💰 $${displayReward} earned (${displayDirectCount} refs)${cycleInfo ? ' • ' + cycleInfo : ''}`;
                 el.statRewardNote.style.color = '#fbbf24';
             } else {
-                el.statRewardNote.textContent = 'Need ' + (CAMPAIGN.minQualifying - displayDirectCount) + ' more active referrals to qualify';
+                el.statRewardNote.textContent = 'Earn $10 per qualified $50 package referral';
                 el.statRewardNote.style.color = '#64748b';
             }
 
-            const next = getNextMilestone(displayDirectCount);
-            if (next) {
-                el.statNextMilestone.textContent = `${next.refs} → $${next.reward}`;
-                el.statNextMilestoneSub.textContent = `${next.refs - displayDirectCount} more needed`;
-            } else if (displayDirectCount >= CAMPAIGN.maxQualifying) {
-                el.statNextMilestone.textContent = '🎯 Max Reached!';
-                el.statNextMilestoneSub.textContent = 'You\'ve hit the maximum!';
+            // Next cycle target
+            const currentProgress = getCurrentCycleProgress(displayDirectCount);
+            const nextCycleEnd = displayDirectCount + (CAMPAIGN.cycleSize - currentProgress);
+            if (displayDirectCount >= 0) {
+                const nextMilestoneReward = (Math.floor(displayDirectCount / CAMPAIGN.cycleSize) + 1) * CAMPAIGN.cycleReward;
+                el.statNextMilestone.textContent = `${nextCycleEnd} → $${nextMilestoneReward}`;
+                const needed = nextCycleEnd - displayDirectCount;
+                el.statNextMilestoneSub.textContent = `${needed} more needed for next cycle`;
             }
 
-            // Progress
-            const progress = Math.min((displayDirectCount / CAMPAIGN.maxQualifying) * 100, 100);
-            el.progressCurrent.textContent = Math.min(displayDirectCount, CAMPAIGN.maxQualifying);
-            el.progressTarget.textContent = CAMPAIGN.maxQualifying;
-            el.progressFill.style.width = progress + '%';
+            el.statMaxReward.textContent = '∞';
+            el.statMaxReward.style.color = '#a78bfa';
 
-            if (next) {
-                el.needMore.textContent = next.refs - displayDirectCount;
-                el.nextReward.textContent = '$' + next.reward;
-                el.nextMilestoneText.style.display = 'block';
-            } else if (displayDirectCount >= CAMPAIGN.maxQualifying) {
-                el.nextMilestoneText.innerHTML = '<i class="bi bi-trophy" style="color:#fbbf24;"></i> 🎉 You\'ve reached the maximum reward of <strong>$' + CAMPAIGN.maxReward + '</strong>!';
+            // Progress bar (current cycle)
+            const cycleProgress = getCurrentCycleProgress(displayDirectCount);
+            const progressPercent = (cycleProgress / CAMPAIGN.cycleSize) * 100;
+            el.progressCurrent.textContent = cycleProgress === 0 && displayDirectCount > 0 ? CAMPAIGN.cycleSize : cycleProgress;
+            el.progressTarget.textContent = CAMPAIGN.cycleSize;
+            el.progressFill.style.width = progressPercent + '%';
+
+            const neededForCycle = CAMPAIGN.cycleSize - cycleProgress;
+            if (cycleProgress === CAMPAIGN.cycleSize) {
+                el.nextMilestoneText.innerHTML = '<i class="bi bi-trophy" style="color:#fbbf24;"></i> 🎉 Cycle complete! Start the next cycle by referring more $50 package users.';
             } else {
-                el.nextMilestoneText.style.display = 'none';
+                el.needMore.textContent = neededForCycle;
+                el.nextMilestoneText.innerHTML = `<i class="bi bi-bullseye" style="color:#fbbf24;"></i> Need <strong>${neededForCycle}</strong> more qualified referrals to complete this $50 cycle.`;
             }
 
-            renderMilestones(displayDirectCount);
+            renderCycleProgress(displayDirectCount);
 
             // Not Eligible
-            if (displayDirectCount < CAMPAIGN.minQualifying) {
+            if (displayDirectCount === 0) {
                 el.notEligibleBox.classList.add('visible');
             } else {
                 el.notEligibleBox.classList.remove('visible');
@@ -2267,27 +2131,24 @@
             el.walletAmount.textContent = displayReward.toFixed(2);
             if (isFinal) {
                 el.finalBadge.style.display = 'inline';
-                el.walletLabel.textContent = 'Final Reward';
+                el.walletLabel.textContent = 'Final Offer Earnings';
                 if (displayReward > 0) {
-                    el.walletStatusText.textContent = '🏆 Final reward locked! $' + displayReward + ' USDT';
+                    el.walletStatusText.textContent = `🏆 Final earnings locked! $${displayReward} USDT from ${displayDirectCount} qualified referrals.`;
                 } else {
                     el.walletStatusText.textContent = 'No reward earned this campaign.';
                 }
             } else {
                 el.finalBadge.style.display = 'none';
-                el.walletLabel.textContent = 'Estimated Reward';
+                el.walletLabel.textContent = 'Estimated Offer Earnings';
                 if (displayReward === 0) {
-                    if (displayDirectCount === 0) {
-                        el.walletStatusText.textContent = '💡 Start referring active users to earn rewards!';
-                    } else {
-                        el.walletStatusText.textContent = `📊 Need ${CAMPAIGN.minQualifying - displayDirectCount} more active referrals to qualify`;
-                    }
+                    el.walletStatusText.textContent = '💡 Refer users who activate the $50 package to earn $10 each!';
                 } else {
-                    const nextM = getNextMilestone(displayDirectCount);
-                    if (nextM) {
-                        el.walletStatusText.textContent = `🎯 $${displayReward} USDT estimated! Need ${nextM.refs - displayDirectCount} more for $${nextM.reward}`;
+                    const cycles = Math.floor(displayDirectCount / CAMPAIGN.cycleSize);
+                    const remainder = displayDirectCount % CAMPAIGN.cycleSize;
+                    if (remainder === 0 && cycles > 0) {
+                        el.walletStatusText.textContent = `💰 $${displayReward} USDT earned! ${cycles} full cycle${cycles > 1 ? 's' : ''} completed.`;
                     } else {
-                        el.walletStatusText.textContent = `💰 $${displayReward} USDT estimated! Keep referring active users!`;
+                        el.walletStatusText.textContent = `💰 $${displayReward} USDT estimated! ${CAMPAIGN.cycleSize - remainder} more to complete this cycle.`;
                     }
                 }
             }
@@ -2307,9 +2168,11 @@
                 el.popupIcon.textContent = '📅';
                 el.popupTitle.textContent = 'Offer Not Started Yet';
                 el.popupText.innerHTML = `
-                    The Direct Referral Offer has not started yet.
+                    The $50 Package Direct Referral Offer has not started yet.
                     <br><br>
-                    <strong>Starts:</strong> 6 September 2026
+                    <strong>Starts:</strong> 10 October 2026
+                    <br>
+                    <strong>Ends:</strong> 24 October 2026
                     <br>
                     <strong>Your Estimated Reward:</strong> $${reward.toFixed(2)} USDT
                     <br><br>
@@ -2320,11 +2183,11 @@
                 el.popupIcon.textContent = '🔒';
                 el.popupTitle.textContent = 'Withdrawal Locked — Offer Active';
                 el.popupText.innerHTML = `
-                    🎁 Your reward is currently locked.
+                    🔒 Your reward is currently locked while the offer is active.
                     <br><br>
                     <strong>Your Estimated Reward:</strong> $${reward.toFixed(2)} USDT
                     <br>
-                    <strong>Offer Ends:</strong> 6 October 2026 at 23:59:59 IST
+                    <strong>Offer Ends:</strong> 24 October 2026 at 23:59:59 IST
                     <br>
                     <strong>Withdrawal Opens:</strong> After the campaign end time
                     <br><br>
@@ -2347,11 +2210,11 @@
                     el.popupIcon.textContent = '⛔';
                     el.popupTitle.textContent = 'Not Eligible';
                     el.popupText.innerHTML = `
-                        You are not eligible for withdrawal.
+                        You are not eligible for withdrawal because you have 0 qualified referrals.
                         <br><br>
-                        <strong>Minimum required:</strong> ${CAMPAIGN.minQualifying} Active Direct Referrals
+                        <strong>Minimum required:</strong> 1 Qualified Direct Referral ($50 package)
                         <br>
-                        <strong>Your active referrals:</strong> ${directReferrals}
+                        <strong>Your qualified referrals:</strong> ${directReferrals}
                     `;
                 }
             }
@@ -2370,7 +2233,6 @@
                 return;
             }
 
-            // Use final snapshot reward if available
             let reward = 0;
             if (campaignRewardSnapshot) {
                 reward = Number(campaignRewardSnapshot.finalReward ?? 0);
@@ -2408,7 +2270,7 @@
         }
 
         // ============================================================
-        // FIX 8: PROCESS WITHDRAWAL WITH FINAL SNAPSHOT ONLY
+        // PROCESS WITHDRAWAL WITH FINAL SNAPSHOT ONLY
         // ============================================================
         async function processWithdrawal() {
             const walletAddress = el.walletAddressInput.value.trim();
@@ -2423,7 +2285,6 @@
                 return;
             }
 
-            // Check user is still active
             const userSnap = await get(ref(db, 'users/' + currentUserId));
             if (!userSnap.exists()) {
                 showToast('User data not found.', 'error');
@@ -2437,7 +2298,6 @@
                 return;
             }
 
-            // FIX 8: Withdrawal must use final snapshot
             let snapshot = await getCampaignRewardSnapshot(currentUserId);
 
             if (!snapshot) {
@@ -2450,7 +2310,6 @@
             }
 
             const reward = Number(snapshot.finalReward ?? 0);
-
             if (reward <= 0) {
                 showToast('You are not eligible for this reward.', 'error');
                 return;
@@ -2503,18 +2362,13 @@
                 el.userName.textContent = name;
                 el.userAvatar.textContent = name.charAt(0).toUpperCase();
 
-                // ============================================================
-                // CAMPAIGN DATA
-                // ============================================================
                 campaignRewardSnapshot = await getCampaignRewardSnapshot(user.uid);
-
                 if (campaignRewardSnapshot) {
                     isWithdrawalFinalized = true;
                 }
 
                 const userIsActive = isUserActive(currentUserData);
 
-                // INACTIVE USER = ZERO OFFER COUNT
                 if (!userIsActive) {
                     directReferrals = 0;
                     console.log('ℹ️ User inactive - offer count forced to 0');
@@ -2522,21 +2376,17 @@
                     directReferrals = await getCampaignDirectReferrals(user.uid);
                 }
 
-                // FINALIZE ONLY AFTER CAMPAIGN END
                 if (getCampaignStatus() === 'ENDED' && !campaignRewardSnapshot) {
                     campaignRewardSnapshot = await finalizeCampaignReward(user.uid);
-
                     if (campaignRewardSnapshot) {
                         isWithdrawalFinalized = true;
                         directReferrals = Number(campaignRewardSnapshot.finalDirectCount ?? 0);
                     }
                 }
 
-                // Setup withdrawal listener
                 setupWithdrawalListener(user.uid);
                 withdrawalData = await checkWithdrawalStatus(user.uid);
 
-                // Referral link
                 const referralCode = currentUserData.referralCode || user.uid.substring(0, 8).toUpperCase();
                 const link = `https://staking.randigital.in/register.html?ref=${referralCode}`;
                 el.referralLinkDisplay.textContent = link;
@@ -2550,24 +2400,22 @@
 
                 const status = getCampaignStatus();
                 if (status === 'UPCOMING') {
-                    showToast('📢 Direct Referral Offer starts on 6 September 2026!', 'warning');
+                    showToast('📢 $50 Package Direct Referral Offer starts on 10 October 2026!', 'warning');
                 } else if (status === 'ACTIVE') {
                     if (userIsActive) {
-                        showToast('🎯 Offer is ACTIVE! Refer active users to earn more!', 'success');
-                        // FIX 9: Start referral refresh
+                        showToast('🎯 Offer is ACTIVE! Refer $50 package users and earn $10 each!', 'success');
                         startReferralRefresh();
                     } else {
-                        showToast('ℹ️ Activate your ID by purchasing an eligible package to participate in this offer.', 'info');
+                        showToast('ℹ️ Activate your ID with a $50 package to participate in this offer.', 'info');
                     }
                 } else if (status === 'ENDED') {
-                    if (directReferrals >= CAMPAIGN.minQualifying) {
+                    if (directReferrals > 0) {
                         showToast('🏆 Offer ended! You are eligible for reward withdrawal.', 'success');
                     } else {
-                        showToast('⏰ Offer ended. You need at least 5 Active Direct Referrals to qualify.', 'warning');
+                        showToast('⏰ Offer ended. You need at least 1 qualified referral ($50 package) to qualify.', 'warning');
                     }
                 }
 
-                // FIX 9: Visibility change listener
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') {
                         refreshCampaignDirectCount();
@@ -2732,24 +2580,18 @@
                 return;
             }
 
-            // FIX 5: Sync server time first
             await syncFirebaseServerTime();
-
             await loadUserData(user);
             setupListeners();
         });
 
-        console.log('✅ Direct Offer Page Loaded Successfully!');
-        console.log('📅 Campaign:', CAMPAIGN);
-        console.log('📊 Milestones:', MILESTONES.length);
-        console.log('✅ User Activation Logic: Canonical - Package Based');
-        console.log('✅ Only ACTIVE users count as referrals');
-        console.log('✅ sponsorUid used as canonical referral source');
-        console.log('✅ Countdown: UPCOMING=startDate, ACTIVE=endDate');
-        console.log('✅ Campaign finalization uses transaction for safety');
-        console.log('✅ Withdrawal requires final snapshot only');
-        console.log('✅ Firebase server time sync implemented');
-        console.log('✅ Zero values handled correctly');
+        console.log('✅ $50 Package Direct Offer Page Loaded Successfully!');
+        console.log('📅 Campaign:', CAMPAIGN.campaignId, CAMPAIGN.startDate, '→', CAMPAIGN.endDate);
+        console.log('💰 Reward: $10 per qualified referral ($50 package only)');
+        console.log('🔄 Cycle: Every 5 referrals = $50');
+        console.log('🔒 Withdrawal: Locked until Offer ENDED');
+        console.log('✅ Only $50 package active users count as qualified referrals');
+        console.log('✅ Unlimited cycles — 5,10,15,20... referrals = $50,$100,$150,$200...');
     </script>
 </body>
 </html>

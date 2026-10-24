@@ -1,10 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER — STANDALONE SCRIPT
-// ============================================================
-// - मुख्य स्क्रिप्ट से पूरी तरह अलग (No changes needed in main script)
-// - Firestore/DB से डेटा फेच करके खुद कैलकुलेशन करेगा
-// - ऑफर खत्म होने तक लाइव नहीं होगा, ऑफर खत्म होने पर ही Finalize होगा
-// - 29 Oct से 10 Nov 2026
+// DIWALI BUMPER OFFER — STANDALONE SCRIPT (Corrected as per A-H)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -12,7 +7,7 @@ import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getDatabase, ref, get, update, runTransaction } from "firebase/database";
 
 // ============================================================
-// 🔥 LIVE FIREBASE CONFIG (Production)
+// 🔥 LIVE FIREBASE CONFIG
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -30,19 +25,23 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 DYNAMIC CAMPAIGN CONFIG
+// 🎯 CONFIGURATION (Requirement A & E)
 // ============================================================
 const CAMPAIGN = {
   id: "diwali_2026",
   name: "Diwali Bumper Offer",
-  startDate: new Date("2026-10-29T00:00:00+05:30"), // 29 Oct
-  endDate:   new Date("2026-11-10T23:59:59+05:30"), // 10 Nov
-  rewards: { 50: 10, 100: 20, 200: 45, 500: 60, 1000: 250 }
+  startDate: new Date("2026-10-29T00:00:00+05:30"), // 29 Oct IST
+  endDate:   new Date("2026-11-10T23:59:59+05:30"), // 10 Nov IST
+  // Requirement A: Exact fixed values
+  rewards: { 
+    50: 10, 
+    100: 25, 
+    200: 50, 
+    500: 90, 
+    1000: 250 
+  }
 };
 
-// ============================================================
-// DOM REFS & STATE
-// ============================================================
 const $ = id => document.getElementById(id);
 const el = {
   loadingOverlay: $("loadingOverlay"), toastContainer: $("toastContainer"),
@@ -81,7 +80,6 @@ const el = {
 let currentUserId = null;
 let currentUserData = null;
 let calculatedRewards = { balance: 0, paidAmount: 0, counts: {}, breakdown: {} };
-let isCalculated = false;
 let countdownInterval = null;
 let isProcessingWithdrawal = false;
 
@@ -132,6 +130,20 @@ function showToast(message, type = "success") {
   setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translateX(100%)"; setTimeout(() => toast.remove(), 300); }, 5000);
 }
 
+// Render dynamic table
+function renderRewardsTable() {
+  const tbody = $("rewardsTableBody");
+  if (!tbody) return;
+  const r = CAMPAIGN.rewards;
+  tbody.innerHTML = `
+    <tr><td>$50</td><td class="gold-text">$${r[50]}</td></tr>
+    <tr><td>$100</td><td class="gold-text">$${r[100]}</td></tr>
+    <tr><td>$200</td><td class="gold-text">$${r[200]}</td></tr>
+    <tr><td>$500</td><td class="gold-text">$${r[500]}</td></tr>
+    <tr class="highlight-row"><td>$1,000 <span class="star">★</span></td><td class="gold-text big">$${r[1000]}</td></tr>
+  `;
+}
+
 // ============================================================
 // 🧮 CALCULATOR
 // ============================================================
@@ -151,86 +163,134 @@ function initCalculator() {
 }
 
 // ============================================================
-// 📊 CALCULATE REWARDS FROM EXISTING TRANSACTIONS
+// 📊 REQUIREMENT B, C, D: CALCULATE & SECURE REWARDS (Self-Purchase)
 // ============================================================
 async function calculateUserRewards(uid) {
   try {
-    // 1. Fetch User Data (to get referralCode)
+    // 1. Fetch User Data
     const userSnap = await get(ref(db, `users/${uid}`));
     if (!userSnap.exists()) return;
     currentUserData = userSnap.val();
-    const myRefCode = currentUserData.referralCode || uid.substring(0, 8);
-
-    // Show name
+    
     const name = currentUserData.name || currentUserData.username || "User";
     if (el.userName) el.userName.textContent = name;
     if (el.userAvatar) el.userAvatar.textContent = name.charAt(0).toUpperCase();
-    if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = myRefCode;
-    if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${myRefCode}`;
+    
+    const refCode = currentUserData.referralCode || uid.substring(0, 8);
+    if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
+    if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // 2. Fetch ALL users to find who was referred by me
-    const usersSnap = await get(ref(db, "users"));
-    const allUsers = usersSnap.val() || {};
-    const referredUsers = new Set();
-
-    for (const [uId, uData] of Object.entries(allUsers)) {
-      if (uId === uid) continue;
-      // Check referral link
-      if (uData.referredBy === myRefCode || uData.referredByUid === uid || uData.sponsorUid === uid) {
-        referredUsers.add(uId);
-      }
+    // 2. Fetch ONLY self-transactions (Requirement B.1 & B.3)
+    let rawTx = [];
+    if (currentUserData.transactions) {
+      rawTx = Object.entries(currentUserData.transactions).map(([id, t]) => ({ id, ...t }));
     }
 
-    // 3. Fetch ALL transactions and filter
-    const txSnap = await get(ref(db, "transactions"));
-    const allTx = txSnap.val() || {};
+    // Fallback: Global transactions me bhi check karein agar user node me na mile
+    if (rawTx.length === 0) {
+      const txSnap = await get(ref(db, "transactions"));
+      const allTx = txSnap.val() || {};
+      rawTx = Object.entries(allTx)
+        .filter(([id, t]) => t.userId === uid)
+        .map(([id, t]) => ({ id, ...t }));
+    }
+
+    // 3. Count only eligible purchases (Requirement C & E)
     const counts = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
     const breakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
+    
+    // Secure local memory to prevent double counting in this session
+    const validTxIds = [];
 
-    for (const [txId, tx] of Object.entries(allTx)) {
-      // Skip if not a package purchase
-      if (tx.type !== "package_purchase" && tx.type !== "purchase") continue;
-      if (tx.status !== "confirmed" && tx.status !== "completed") continue;
+    for (const tx of rawTx) {
+      // Check status: Only confirmed/completed
+      const txStatus = String(tx.status || "").toLowerCase();
+      if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") continue;
 
-      // Check if purchased by someone I referred
-      if (!referredUsers.has(tx.userId)) continue;
+      // Check package amount
+      const amt = Number(tx.amount || tx.packageAmount || 0);
+      if (!CAMPAIGN.rewards[amt]) continue;
 
-      // Check if within campaign dates
+      // Check date (29 Oct - 10 Nov) - Requirement E
       const txTime = tx.timestamp || tx.createdAt || 0;
       if (txTime < CAMPAIGN.startDate.getTime() || txTime > CAMPAIGN.endDate.getTime()) continue;
 
-      const amt = Number(tx.amount || tx.packageAmount || 0);
-      if (CAMPAIGN.rewards[amt]) {
-        counts[amt]++;
-        breakdown[amt] += CAMPAIGN.rewards[amt];
-      }
+      // Agar sab sahi hai, toh count karein
+      counts[amt]++;
+      breakdown[amt] += CAMPAIGN.rewards[amt];
+      validTxIds.push(tx.id || tx.txId);
     }
 
-    // 4. Calculate Total
     let totalBal = 0;
     Object.values(breakdown).forEach(v => totalBal += v);
 
-    calculatedRewards = {
-      balance: totalBal,
-      counts: counts,
-      breakdown: breakdown,
-      // Fetch paid info separately
-      paidAmount: 0,
-      status: "available"
-    };
-
-    // 5. Fetch Withdrawal Status from Admin Panel
+    // 4. Fetch Admin Data (Paid/Withdrawal status) - Requirement F
     const rewardSnap = await get(ref(db, `diwali_rewards/${CAMPAIGN.id}/${uid}`));
+    let adminPaidAmount = 0;
+    let adminStatus = "available";
+    let adminWallet = "";
+    let adminTxHash = "";
+    let adminPaidAt = null;
+
     if (rewardSnap.exists()) {
       const data = rewardSnap.val();
-      calculatedRewards.paidAmount = data.paidAmount || 0;
-      calculatedRewards.status = data.status || "available";
-      calculatedRewards.walletAddress = data.walletAddress || "";
-      calculatedRewards.txHash = data.txHash || "";
-      calculatedRewards.paidAt = data.paidAt || null;
+      adminPaidAmount = data.paidAmount || 0;
+      adminStatus = data.status || "available";
+      adminWallet = data.walletAddress || "";
+      adminTxHash = data.txHash || "";
+      adminPaidAt = data.paidAt || null;
     }
 
-    isCalculated = true;
+    // 5. Requirement D: Duplicate Protection
+    // Hum Firebase me save karenge ki kaunse TX pe bonus mil chuka hai
+    // Isse page refresh karne par double reward nahi milega.
+    const securityRef = ref(db, `diwali_rewards/${CAMPAIGN.id}/${uid}/claimed_tx`);
+    const securitySnap = await get(securityRef);
+    const alreadyClaimed = securitySnap.val() || {};
+    
+    let securedBalance = 0;
+    let securedCounts = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
+    let securedBreakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
+    const updates = {};
+
+    for (const tx of rawTx) {
+      const txStatus = String(tx.status || "").toLowerCase();
+      if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") continue;
+      const amt = Number(tx.amount || tx.packageAmount || 0);
+      if (!CAMPAIGN.rewards[amt]) continue;
+      const txTime = tx.timestamp || tx.createdAt || 0;
+      if (txTime < CAMPAIGN.startDate.getTime() || txTime > CAMPAIGN.endDate.getTime()) continue;
+
+      const txId = tx.id || tx.txId;
+      const rewardAmt = CAMPAIGN.rewards[amt];
+
+      // Agar pehle se claim nahi hua hai, toh naya claim add karein
+      if (!alreadyClaimed[txId]) {
+        updates[txId] = { amount: amt, reward: rewardAmt, claimedAt: Date.now() };
+      }
+
+      // Chahe pehle claim hua ho ya abhi, total balance me zaroor jodein
+      securedCounts[amt]++;
+      securedBreakdown[amt] += rewardAmt;
+      securedBalance += rewardAmt;
+    }
+
+    // Save new claims to Firebase
+    if (Object.keys(updates).length > 0) {
+      await update(securityRef, updates);
+    }
+
+    calculatedRewards = {
+      balance: securedBalance,
+      counts: securedCounts,
+      breakdown: securedBreakdown,
+      paidAmount: adminPaidAmount,
+      status: adminStatus,
+      walletAddress: adminWallet,
+      txHash: adminTxHash,
+      paidAt: adminPaidAt
+    };
+
     updateUI();
 
   } catch (err) {
@@ -254,7 +314,6 @@ function updateUI() {
     el.campaignDuration.textContent = `${days} Days Only`;
   }
 
-  // Badge
   const badges = {
     UPCOMING: { cls: "upcoming", txt: `⏳ Upcoming — Starts ${startStr}` },
     ACTIVE:   { cls: "active",   txt: `🔥 ACTIVE — Earn Up To $250 per ID!` },
@@ -263,7 +322,6 @@ function updateUI() {
   const b = badges[status] || badges.UPCOMING;
   if (el.campaignStatusBadge) el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge ${b.cls}">${b.txt}</span>`;
 
-  // Wallet UI
   const balance    = Number(calculatedRewards.balance || 0);
   const paidAmount = Number(calculatedRewards.paidAmount || 0);
   const counts     = calculatedRewards.counts || {};
@@ -289,10 +347,10 @@ function updateUI() {
   });
 
   if (el.walletStatusText) {
-    if (status === "UPCOMING") el.walletStatusText.textContent = `Campaign starts ${startStr}. Get ready to refer!`;
+    if (status === "UPCOMING") el.walletStatusText.textContent = `Campaign starts ${startStr}. Get ready to buy!`;
     else if (status === "ENDED") el.walletStatusText.textContent = balance > 0 ? `🏆 Final earnings locked! $${fmt(balance)} total.` : "Campaign ended — no rewards earned.";
-    else if (balance === 0) el.walletStatusText.textContent = "Refer eligible IDs to grow your Diwali reward balance!";
-    else el.walletStatusText.textContent = `💰 $${fmt(balance)} earned so far. Keep referring!`;
+    else if (balance === 0) el.walletStatusText.textContent = "Buy eligible packages to grow your Diwali reward balance!";
+    else el.walletStatusText.textContent = `💰 $${fmt(balance)} earned so far. Keep buying!`;
   }
   if (el.finalBadge) el.finalBadge.style.display = status === "ENDED" && balance > 0 ? "inline-block" : "none";
 
@@ -452,21 +510,14 @@ async function submitWithdrawal() {
     const txId = generateId("tx");
     const timestamp = Date.now();
 
-    // Atomic lock to prevent double withdrawal
     const lockResult = await runTransaction(rewardsRoot, (current) => {
       if (!current) {
-        return { 
-          status: "pending", walletAddress: addr, withdrawalId, transactionId: txId,
-          requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp 
-        };
+        return { status: "pending", walletAddress: addr, withdrawalId, transactionId: txId, requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp };
       }
       const cStatus = String(current.status || "").toLowerCase();
       if (["pending", "approved", "paid"].includes(cStatus)) return; // abort
 
-      return {
-        ...current, status: "pending", walletAddress: addr, withdrawalId, transactionId: txId,
-        requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp
-      };
+      return { ...current, status: "pending", walletAddress: addr, withdrawalId, transactionId: txId, requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp };
     });
 
     if (!lockResult.committed) { showToast("Withdrawal already submitted.", "warning"); return; }
@@ -487,7 +538,6 @@ async function submitWithdrawal() {
     };
     const globalTx = { ...userTx, userId: currentUserId };
 
-    // Write directly to admin panel and user history
     await update(ref(db), {
       [`admin/withdrawals/${withdrawalId}`]: adminData,
       [`users/${currentUserId}/transactions/${txId}`]: userTx,
@@ -498,7 +548,6 @@ async function submitWithdrawal() {
     if (el.confirmationModal) el.confirmationModal.classList.remove("visible");
     if (el.walletAddressInput) el.walletAddressInput.value = "";
     
-    // Refresh UI
     calculatedRewards.status = "pending";
     updateUI();
   } catch (err) {
@@ -537,15 +586,13 @@ function setupListeners() {
   el.logoutBtn?.addEventListener("click", handleLogout);
   el.withdrawBtn?.addEventListener("click", handleWithdrawClick);
   el.walletAddressInput?.addEventListener("input", validateWallet);
-  
   el.popupCloseBtn?.addEventListener("click", () => el.daysPopup?.classList.remove("visible"));
   el.daysPopup?.addEventListener("click", (e) => { if (e.target === el.daysPopup) el.daysPopup.classList.remove("visible"); });
-  
   el.confirmCancel?.addEventListener("click", () => el.confirmationModal?.classList.remove("visible"));
   el.confirmationModal?.addEventListener("click", (e) => { if (e.target === el.confirmationModal) el.confirmationModal.classList.remove("visible"); });
   el.confirmSubmit?.addEventListener("click", submitWithdrawal);
-
   initCalculator();
+  renderRewardsTable();
 }
 
 const AUTH_TIMEOUT_MS = 10000;
@@ -565,16 +612,10 @@ onAuthStateChanged(auth, async (user) => {
   currentUserId = user.uid;
   
   startCountdown();
-  updateUI(); // Show basic UI before data loads
+  updateUI(); 
+  setupListeners();
+  
   await calculateUserRewards(user.uid);
   
   if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");
-  setupListeners();
-  
-  const status = getCampaignStatus();
-  if (status === "ACTIVE") showToast(`🎯 Offer is ACTIVE!`, "success");
-});
-
-window.addEventListener("beforeunload", () => {
-  if (countdownInterval) clearInterval(countdownInterval);
 });

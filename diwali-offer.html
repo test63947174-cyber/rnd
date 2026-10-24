@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🪔 Diwali Bumper Offer 2026 — RND Stake</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="diwali-offer.css"/>
+</head>
+<body class="diwali-body">
+
+<!-- LOADING -->
+<div id="loadingOverlay"><div class="loader-spinner"></div></div>
+
+<!-- TOAST -->
+<div id="toastContainer"></div>
+
+<!-- DAYS REMAINING POPUP -->
+<div class="days-remaining-popup" id="daysPopup">
+  <div class="popup-content">
+    <span class="popup-icon" id="popupIcon">🪔</span>
+    <div class="popup-title" id="popupTitle">Withdrawal Not Available Yet</div>
+    <div class="popup-text" id="popupText">
+      Your Diwali Offer Balance is <strong>$<span id="popupRewardAmount">0</span></strong> USDT.
+      <br><br>Withdrawals unlock after the campaign ends.
+      <br><br>
+      <span style="color:#94a3b8;font-size:0.9rem;">Time remaining:</span>
+      <div class="popup-days" id="popupDaysRemaining">0</div>
+      <span style="color:#64748b;font-size:0.85rem;">until withdrawal opens</span>
+    </div>
+    <button class="popup-close-btn" id="popupCloseBtn">Got it!</button>
+  </div>
+</div>
+
+<!-- CONFIRMATION MODAL -->
+<div class="confirmation-overlay" id="confirmationModal">
+  <div class="modal-content">
+    <span class="modal-icon">⚠️</span>
+    <div class="modal-title">Confirm Withdrawal</div>
+    <div class="modal-details" id="confirmDetails">
+      <div class="row"><span class="label">Network</span><span class="value">BEP-20 / BNB Smart Chain</span></div>
+      <div class="row"><span class="label">Amount</span><span class="value warning" id="confirmAmount">$0.00 USDT</span></div>
+      <div class="row"><span class="label">Wallet Address</span><span class="value" id="confirmWallet">0x...</span></div>
+    </div>
+    <div class="modal-warning">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      Verify your wallet address. BEP-20 transactions are irreversible.
+    </div>
+    <div class="modal-buttons">
+      <button class="btn-cancel" id="confirmCancel">Cancel</button>
+      <button class="btn-confirm" id="confirmSubmit"><i class="bi bi-check-circle me-1"></i>Confirm Withdrawal</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAVBAR -->
+<nav class="navbar-custom">
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <a href="dashboard.html" class="brand">
+        RND<span>Stake</span>
+        <small>Diwali Bumper Offer</small>
+      </a>
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <a href="dashboard.html" class="nav-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+        <a href="diwali-offer.html" class="nav-link active"><i class="bi bi-fire"></i>Diwali Offer</a>
+        <div class="user-badge" id="userBadge">
+          <div class="avatar" id="userAvatar">U</div>
+          <span class="name" id="userName">Loading...</span>
+          <button class="logout-btn" id="logoutBtn" title="Logout"><i class="bi bi-box-arrow-right"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main-content diwali-main">
+
+  <!-- HERO -->
+  <section class="diwali-hero">
+    <div class="rangoli-layer"></div>
+    <div class="diya diya-1">🪔</div>
+    <div class="diya diya-2">🪔</div>
+    <div class="diya diya-3">🪔</div>
+    <div class="diya diya-4">🪔</div>
+    <div class="sparkle s1"></div><div class="sparkle s2"></div>
+    <div class="sparkle s3"></div><div class="sparkle s4"></div>
+
+    <div class="hero-inner">
+      <span class="festive-badge"><i class="bi bi-stars"></i> Grand Indian Festival</span>
+      <h1 class="diwali-title" id="campaignTitle">🪔 DIWALI BUMPER OFFER 2026 🎆</h1>
+      <p class="diwali-subtitle">CELEBRATE DIWALI • EARN BIG</p>
+      <p class="diwali-dates">
+        <i class="bi bi-calendar-event"></i>
+        <span id="campaignDates">2 November 2026 – 12 November 2026</span>
+        <span class="duration-pill" id="campaignDuration">10 Days Only</span>
+      </p>
+
+      <div id="campaignStatusBadge" class="mt-3"></div>
+
+      <div id="countdownContainer">
+        <div class="countdown-wrapper" id="countdownWrapper">
+          <div class="countdown-item"><div class="number" id="countdownDays">00</div><div class="label">Days</div></div>
+          <div class="countdown-item"><div class="number" id="countdownHours">00</div><div class="label">Hours</div></div>
+          <div class="countdown-item"><div class="number" id="countdownMinutes">00</div><div class="label">Minutes</div></div>
+          <div class="countdown-item"><div class="number" id="countdownSeconds">00</div><div class="label">Seconds</div></div>
+        </div>
+        <div id="campaignEndedMessage" style="display:none;">
+          <span class="campaign-ended-text"><i class="bi bi-clock-history"></i> The Diwali Bumper Offer has ended.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OFFER BALANCE -->
+  <section class="reward-wallet-card" id="rewardWalletCard">
+    <span class="wallet-icon-big">🪙</span>
+    <div class="wallet-label" id="walletLabel">Your Diwali Offer Balance</div>
+    <div class="wallet-amount">
+      $<span id="walletAmount">0.00</span> <span class="currency">USDT</span>
+      <span class="final-badge" id="finalBadge" style="display:none;">✓ FINAL</span>
+    </div>
+    <div class="wallet-sub" id="walletStatusText">Refer eligible IDs to grow your Diwali reward balance!</div>
+  </section>
+
+  <!-- STATS -->
+  <section class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+      <div class="number green" id="statEligibleIds">0</div>
+      <div class="label">Eligible Direct Referral IDs</div>
+      <div class="sub">Counted per ID purchase</div>
+    </div>
+    <div class="stat-card">
+      <div class="number gold" id="statEligibleReward">$0</div>
+      <div class="label">Total Diwali Rewards</div>
+      <div class="sub" id="statRewardNote">Sum of all eligible IDs</div>
+    </div>
+    <div class="stat-card">
+      <div class="number blue" id="statWithdrawable">$0</div>
+      <div class="label">Withdrawable (after end)</div>
+      <div class="sub" id="statWithdrawNote">Locked until 12 Nov 2026</div>
+    </div>
+    <div class="stat-card">
+      <div class="number purple" id="statPaid">$0</div>
+      <div class="label">Already Paid</div>
+      <div class="sub">Verified USDT transfers</div>
+    </div>
+  </section>
+
+  <!-- REWARDS TABLE -->
+  <section class="diwali-section">
+    <h2 class="section-title"><i class="bi bi-table"></i> Reward Structure</h2>
+    <div class="rewards-table-wrap">
+      <table class="rewards-table">
+        <thead>
+          <tr>
+            <th>Direct Referral ID Amount</th>
+            <th>Reward Per Qualified ID</th>
+          </tr>
+        </thead>
+        <tbody id="rewardsTableBody">
+          <tr><td>$50</td><td class="gold-text">$10</td></tr>
+          <tr><td>$100</td><td class="gold-text">$20</td></tr>
+          <tr><td>$200</td><td class="gold-text">$45</td></tr>
+          <tr><td>$500</td><td class="gold-text">$60</td></tr>
+          <tr class="highlight-row"><td>$1,000 <span class="star">★</span></td><td class="gold-text big">$250</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">
+      <i class="bi bi-info-circle"></i>
+      Every eligible ID is rewarded separately. No single-ID limit.
+    </p>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="diwali-section">
+    <h2 class="section-title"><i class="bi bi-lightbulb"></i> How It Works</h2>
+    <div class="how-grid">
+      <div class="how-step">
+        <div class="step-num">1</div>
+        <h5>Share Your Link</h5>
+        <p>Invite friends using your unique referral link below.</p>
+      </div>
+      <div class="how-step">
+        <div class="step-num">2</div>
+        <h5>They Buy an ID</h5>
+        <p>Any eligible ID — $50, $100, $200, $500 or $1,000 — counts separately.</p>
+      </div>
+      <div class="how-step">
+        <div class="step-num">3</div>
+        <h5>Auto Reward Credited</h5>
+        <p>Reward is added instantly to your Diwali Offer Balance.</p>
+      </div>
+      <div class="how-step">
+        <div class="step-num">4</div>
+        <h5>Withdraw After 12 Nov</h5>
+        <p>Withdraw the full accumulated balance once the campaign ends.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALCULATOR -->
+  <section class="diwali-section">
+    <h2 class="section-title"><i class="bi bi-calculator"></i> Earnings Calculator</h2>
+    <div class="calc-grid">
+      <div class="calc-row">
+        <label>$50 IDs</label>
+        <input type="number" min="0" value="0" class="calc-input" id="calc50"/>
+        <span class="calc-out">$<span id="calcOut50">0</span></span>
+      </div>
+      <div class="calc-row">
+        <label>$100 IDs</label>
+        <input type="number" min="0" value="0" class="calc-input" id="calc100"/>
+        <span class="calc-out">$<span id="calcOut100">0</span></span>
+      </div>
+      <div class="calc-row">
+        <label>$200 IDs</label>
+        <input type="number" min="0" value="0" class="calc-input" id="calc200"/>
+        <span class="calc-out">$<span id="calcOut200">0</span></span>
+      </div>
+      <div class="calc-row">
+        <label>$500 IDs</label>
+        <input type="number" min="0" value="0" class="calc-input" id="calc500"/>
+        <span class="calc-out">$<span id="calcOut500">0</span></span>
+      </div>
+      <div class="calc-row">
+        <label>$1,000 IDs</label>
+        <input type="number" min="0" value="0" class="calc-input" id="calc1000"/>
+        <span class="calc-out">$<span id="calcOut1000">0</span></span>
+      </div>
+      <div class="calc-total">
+        <span>Total Potential Reward</span>
+        <strong>$<span id="calcTotal">0</span></strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- BREAKDOWN -->
+  <section class="diwali-section">
+    <h2 class="section-title"><i class="bi bi-receipt"></i> My Earnings Breakdown</h2>
+    <div class="breakdown-grid" id="breakdownGrid">
+      <div class="breakdown-card"><div class="bd-label">$50 IDs</div><div class="bd-count" id="bdCount50">0</div><div class="bd-reward">$<span id="bdReward50">0</span></div></div>
+      <div class="breakdown-card"><div class="bd-label">$100 IDs</div><div class="bd-count" id="bdCount100">0</div><div class="bd-reward">$<span id="bdReward100">0</span></div></div>
+      <div class="breakdown-card"><div class="bd-label">$200 IDs</div><div class="bd-count" id="bdCount200">0</div><div class="bd-reward">$<span id="bdReward200">0</span></div></div>
+      <div class="breakdown-card"><div class="bd-label">$500 IDs</div><div class="bd-count" id="bdCount500">0</div><div class="bd-reward">$<span id="bdReward500">0</span></div></div>
+      <div class="breakdown-card highlight"><div class="bd-label">$1,000 IDs</div><div class="bd-count" id="bdCount1000">0</div><div class="bd-reward">$<span id="bdReward1000">0</span></div></div>
+    </div>
+  </section>
+
+  <!-- REFERRAL -->
+  <section class="diwali-section referral-section" id="referralSection">
+    <h2 class="section-title"><i class="bi bi-link-45deg"></i> Your Referral Link</h2>
+    <div class="referral-box">
+      <code id="referralLinkDisplay">Loading...</code>
+      <button class="copy-btn" id="copyReferralBtn"><i class="bi bi-clipboard me-1"></i>Copy</button>
+    </div>
+    <div style="margin-top:12px;">
+      <span style="color:#94a3b8;font-size:0.85rem;"><i class="bi bi-code me-1"></i>Code: <strong style="color:#4ade80;" id="referralCodeDisplay">---</strong></span>
+    </div>
+  </section>
+
+  <!-- WITHDRAWAL -->
+  <section class="diwali-section withdrawal-section" id="withdrawalSection">
+    <h2 class="section-title"><i class="bi bi-credit-card"></i> 🎁 Diwali Reward Withdrawal</h2>
+    <div class="subtitle" id="withdrawalSubtitle">Withdrawals unlock after the campaign ends.</div>
+
+    <div class="reward-amount-display">
+      <span class="label">Your Diwali Offer Balance</span>
+      <span class="amount" id="withdrawAmount">$0.00 USDT</span>
+    </div>
+
+    <div id="withdrawalInfoBox" class="withdrawal-info-box">
+      <span id="withdrawalInfoText"></span>
+    </div>
+
+    <div class="withdrawal-details" id="withdrawalDetails">
+      <div class="detail-row"><span class="key">Amount</span><span class="value" id="detailAmount">$0.00 USDT</span></div>
+      <div class="detail-row"><span class="key">Network</span><span class="value">BEP-20 / BNB Smart Chain</span></div>
+      <div class="detail-row"><span class="key">Wallet</span><span class="value" id="detailWallet">---</span></div>
+      <div class="detail-row"><span class="key">Paid Date</span><span class="value" id="detailPaidDate">---</span></div>
+      <div class="detail-row"><span class="key">TX Hash</span><span class="value tx-hash" id="detailTxHash">---</span></div>
+    </div>
+
+    <div class="form-group" id="walletFormGroup">
+      <label>
+        <i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address
+        <span class="network-badge ms-2">BNB Smart Chain (BEP-20)</span>
+      </label>
+      <input type="text" class="form-control-custom" id="walletAddressInput" placeholder="Enter your BEP-20 USDT wallet address (0x...)"/>
+      <div class="wallet-validation-msg" id="walletValidationMsg"></div>
+      <div class="warning-text">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Sending to an unsupported network/address may result in loss of funds.
+      </div>
+    </div>
+
+    <button class="btn-withdraw" id="withdrawBtn" disabled><i class="bi bi-arrow-up-right me-2"></i>Withdraw Diwali Reward</button>
+    <div class="withdrawal-status" id="withdrawalStatus"></div>
+  </section>
+
+  <!-- RULES -->
+  <section class="diwali-section notice-section">
+    <h2 class="section-title"><i class="bi bi-shield-check"></i> Offer Terms</h2>
+    <ul class="offer-rules">
+      <li>Rewards are calculated <strong>per eligible ID</strong> across all five categories.</li>
+      <li>Rewards are credited automatically upon verified ID purchase confirmation.</li>
+      <li>Duplicate transactions for the same purchase are blocked server-side.</li>
+      <li>Diwali rewards are tracked separately from regular referral commissions.</li>
+      <li>Withdrawals unlock <strong>after the campaign ends</strong> and are subject to transaction verification.</li>
+      <li>New Diwali reward accruals stop automatically at campaign end.</li>
+      <li>All campaign dates use Indian Standard Time (IST).</li>
+    </ul>
+  </section>
+
+</div>
+
+<!-- IMPORT MAP -->
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+    "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+  }
+}
+</script>
+
+<script type="module" src="diwali-offer.js"></script>
+</body>
+</html>

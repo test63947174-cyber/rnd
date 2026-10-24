@@ -12,13 +12,10 @@
 </head>
 <body class="diwali-body">
 
-<!-- LOADING -->
 <div id="loadingOverlay"><div class="loader-spinner"></div></div>
-
-<!-- TOAST -->
 <div id="toastContainer"></div>
 
-<!-- DAYS REMAINING POPUP -->
+<!-- POPUP -->
 <div class="days-remaining-popup" id="daysPopup">
   <div class="popup-content">
     <span class="popup-icon" id="popupIcon">🪔</span>
@@ -35,7 +32,7 @@
   </div>
 </div>
 
-<!-- CONFIRMATION MODAL -->
+<!-- MODAL -->
 <div class="confirmation-overlay" id="confirmationModal">
   <div class="modal-content">
     <span class="modal-icon">⚠️</span>
@@ -56,7 +53,6 @@
   </div>
 </div>
 
-<!-- NAVBAR -->
 <nav class="navbar-custom">
   <div class="container">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -77,10 +73,7 @@
   </div>
 </nav>
 
-<!-- MAIN -->
 <div class="main-content diwali-main">
-
-  <!-- HERO -->
   <section class="diwali-hero">
     <div class="rangoli-layer"></div>
     <div class="diya diya-1">🪔</div>
@@ -99,7 +92,6 @@
         <span id="campaignDates">29 October – 10 November 2026</span>
         <span class="duration-pill" id="campaignDuration">12 Days Only</span>
       </p>
-
       <div id="campaignStatusBadge" class="mt-3"></div>
 
       <div id="countdownContainer">
@@ -116,7 +108,6 @@
     </div>
   </section>
 
-  <!-- OFFER BALANCE -->
   <section class="reward-wallet-card" id="rewardWalletCard">
     <span class="wallet-icon-big">🪙</span>
     <div class="wallet-label" id="walletLabel">Your Diwali Offer Balance</div>
@@ -124,14 +115,13 @@
       $<span id="walletAmount">0.00</span> <span class="currency">USDT</span>
       <span class="final-badge" id="finalBadge" style="display:none;">✓ FINAL</span>
     </div>
-    <div class="wallet-sub" id="walletStatusText">Refer eligible IDs to grow your Diwali reward balance!</div>
+    <div class="wallet-sub" id="walletStatusText">Purchase eligible IDs to grow your Diwali reward balance!</div>
   </section>
 
-  <!-- STATS -->
   <section class="stats-grid" id="statsGrid">
     <div class="stat-card">
       <div class="number green" id="statEligibleIds">0</div>
-      <div class="label">Eligible Direct Referral IDs</div>
+      <div class="label">Eligible Direct Purchases</div>
       <div class="sub">Counted per ID purchase</div>
     </div>
     <div class="stat-card">
@@ -151,23 +141,18 @@
     </div>
   </section>
 
-  <!-- REWARDS TABLE -->
   <section class="diwali-section">
     <h2 class="section-title"><i class="bi bi-table"></i> Reward Structure</h2>
     <div class="rewards-table-wrap">
       <table class="rewards-table">
         <thead>
           <tr>
-            <th>Direct Referral ID Amount</th>
+            <th>Package ID Amount</th>
             <th>Reward Per Qualified ID</th>
           </tr>
         </thead>
         <tbody id="rewardsTableBody">
-          <tr><td>$50</td><td class="gold-text">$10</td></tr>
-          <tr><td>$100</td><td class="gold-text">$20</td></tr>
-          <tr><td>$200</td><td class="gold-text">$45</td></tr>
-          <tr><td>$500</td><td class="gold-text">$60</td></tr>
-          <tr class="highlight-row"><td>$1,000 <span class="star">★</span></td><td class="gold-text big">$250</td></tr>
+          <!-- Rendered by JS -->
         </tbody>
       </table>
     </div>
@@ -177,24 +162,23 @@
     </p>
   </section>
 
-  <!-- HOW IT WORKS -->
   <section class="diwali-section">
     <h2 class="section-title"><i class="bi bi-lightbulb"></i> How It Works</h2>
     <div class="how-grid">
       <div class="how-step">
         <div class="step-num">1</div>
-        <h5>Share Your Link</h5>
-        <p>Invite friends using your unique referral link below.</p>
+        <h5>Buy a Package</h5>
+        <p>Purchase any eligible package from your dashboard.</p>
       </div>
       <div class="how-step">
         <div class="step-num">2</div>
-        <h5>They Buy an ID</h5>
-        <p>Any eligible ID — $50, $100, $200, $500 or $1,000 — counts separately.</p>
+        <h5>Get Instant Bonus</h5>
+        <p>Reward is added instantly to your Diwali Offer Balance.</p>
       </div>
       <div class="how-step">
         <div class="step-num">3</div>
-        <h5>Auto Reward Credited</h5>
-        <p>Reward is added instantly to your Diwali Offer Balance.</p>
+        <h5>Buy Multiple Times</h5>
+        <p>Every eligible purchase earns its own separate reward.</p>
       </div>
       <div class="how-step">
         <div class="step-num">4</div>
@@ -204,7 +188,6 @@
     </div>
   </section>
 
-  <!-- CALCULATOR -->
   <section class="diwali-section">
     <h2 class="section-title"><i class="bi bi-calculator"></i> Earnings Calculator</h2>
     <div class="calc-grid">
@@ -240,7 +223,6 @@
     </div>
   </section>
 
-  <!-- BREAKDOWN -->
   <section class="diwali-section">
     <h2 class="section-title"><i class="bi bi-receipt"></i> My Earnings Breakdown</h2>
     <div class="breakdown-grid" id="breakdownGrid">
@@ -252,19 +234,6 @@
     </div>
   </section>
 
-  <!-- REFERRAL -->
-  <section class="diwali-section referral-section" id="referralSection">
-    <h2 class="section-title"><i class="bi bi-link-45deg"></i> Your Referral Link</h2>
-    <div class="referral-box">
-      <code id="referralLinkDisplay">Loading...</code>
-      <button class="copy-btn" id="copyReferralBtn"><i class="bi bi-clipboard me-1"></i>Copy</button>
-    </div>
-    <div style="margin-top:12px;">
-      <span style="color:#94a3b8;font-size:0.85rem;"><i class="bi bi-code me-1"></i>Code: <strong style="color:#4ade80;" id="referralCodeDisplay">---</strong></span>
-    </div>
-  </section>
-
-  <!-- WITHDRAWAL -->
   <section class="diwali-section withdrawal-section" id="withdrawalSection">
     <h2 class="section-title"><i class="bi bi-credit-card"></i> 🎁 Diwali Reward Withdrawal</h2>
     <div class="subtitle" id="withdrawalSubtitle">Withdrawals unlock after the campaign ends on 10 Nov 2026.</div>
@@ -303,7 +272,6 @@
     <div class="withdrawal-status" id="withdrawalStatus"></div>
   </section>
 
-  <!-- RULES -->
   <section class="diwali-section notice-section">
     <h2 class="section-title"><i class="bi bi-shield-check"></i> Offer Terms</h2>
     <ul class="offer-rules">
@@ -316,10 +284,8 @@
       <li>All campaign dates use Indian Standard Time (IST).</li>
     </ul>
   </section>
-
 </div>
 
-<!-- IMPORT MAP -->
 <script type="importmap">
 {
   "imports": {

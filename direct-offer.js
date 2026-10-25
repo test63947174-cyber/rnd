@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER — STANDALONE SCRIPT (Corrected as per Feedback)
+// DIWALI BUMPER OFFER — STANDALONE SCRIPT (New Root Category)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -120,36 +120,16 @@ function isWithinDiwaliCampaign(tx) {
   return txTime >= CAMPAIGN.startDate.getTime() && txTime <= CAMPAIGN.endDate.getTime();
 }
 
-// ============================================================
-// ✅ UPDATED FUNCTION (As per your exact instructions)
-// ============================================================
+// ✅ Exact function as you requested
 function isEligiblePackagePurchase(tx) {
-  if (!tx || typeof tx !== "object") {
-    return false;
-  }
-
-  // Buy Package file stores package purchases as type: "package"
+  if (!tx || typeof tx !== "object") return false;
   const txType = String(tx.type || "").trim().toLowerCase();
   const packageId = String(tx.packageId || "").trim();
+  const amount = Number(tx.amount ?? tx.packageAmount);
 
-  const amount = Number(
-    tx.amount ?? tx.packageAmount
-  );
-
-  // Accept only actual package purchase records.
-  if (txType !== "package") {
-    return false;
-  }
-
-  // A package purchase must have a package ID.
-  if (!packageId) {
-    return false;
-  }
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return false;
-  }
-
+  if (txType !== "package") return false;
+  if (!packageId) return false;
+  if (!Number.isFinite(amount) || amount <= 0) return false;
   return true;
 }
 
@@ -226,17 +206,14 @@ async function calculateUserRewards(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // Read from BOTH sources and merge by unique TX ID
     let mergedTx = {};
     
-    // Source 1: User node
     if (currentUserData.transactions) {
       Object.entries(currentUserData.transactions).forEach(([id, t]) => {
         mergedTx[id] = { id, ...t };
       });
     }
     
-    // Source 2: Global transactions node (only for this user)
     const txSnap = await get(ref(db, "transactions"));
     const allTx = txSnap.val() || {};
     Object.entries(allTx).forEach(([id, t]) => {
@@ -251,8 +228,8 @@ async function calculateUserRewards(uid) {
     const breakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
     let totalBal = 0;
 
-    // Fetch claims from Firebase for duplicate prevention
-    const securityRef = ref(db, `diwali_rewards/${CAMPAIGN.id}/${uid}/claimed_tx`);
+    // 🔥 Use new direct_diwali_offer root path for claims
+    const securityRef = ref(db, `direct_diwali_offer/${CAMPAIGN.id}/user_claims/${uid}`);
     const securitySnap = await get(securityRef);
     const alreadyClaimed = securitySnap.val() || {};
     const newClaims = {};
@@ -260,14 +237,10 @@ async function calculateUserRewards(uid) {
     for (const tx of rawTx) {
       const txStatus = String(tx.status || "").toLowerCase();
       if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") continue;
-
-      // Strict Package Check (Updated)
       if (!isEligiblePackagePurchase(tx)) continue;
 
       const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
       if (!CAMPAIGN.rewards[amt]) continue;
-
-      // Safe Time Check
       if (!isWithinDiwaliCampaign(tx)) continue;
 
       const txId = tx.id || tx.txId;
@@ -282,13 +255,13 @@ async function calculateUserRewards(uid) {
       totalBal += rewardAmt;
     }
 
-    // Save claims to Firebase (prevents double-credit on refresh)
+    // Save claims to Firebase
     if (Object.keys(newClaims).length > 0) {
       await update(securityRef, newClaims);
     }
 
-    // Fetch Admin Data
-    const rewardSnap = await get(ref(db, `diwali_rewards/${CAMPAIGN.id}/${uid}`));
+    // 🔥 Use new direct_diwali_offer root path for admin data
+    const rewardSnap = await get(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${uid}`));
     let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
 
     if (rewardSnap.exists()) {
@@ -459,7 +432,7 @@ function startCountdown() {
 }
 
 // ============================================================
-// 🏦 WITHDRAWAL
+// 🏦 WITHDRAWAL (New separated paths)
 // ============================================================
 function validateWallet() {
   const val = el.walletAddressInput?.value.trim() || "";
@@ -526,7 +499,8 @@ async function submitWithdrawal() {
     const avail = Math.max(0, bal - paid);
     if (avail <= 0) { showToast("Nothing to withdraw.", "warning"); return; }
 
-    const rewardsRoot = ref(db, `diwali_rewards/${CAMPAIGN.id}/${currentUserId}`);
+    // 🔥 New separated path for reward status lock
+    const rewardsRoot = ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${currentUserId}`);
     const withdrawalId = generateId("dw");
     const txId = generateId("tx");
     const timestamp = Date.now();
@@ -559,10 +533,11 @@ async function submitWithdrawal() {
     };
     const globalTx = { ...userTx, userId: currentUserId };
 
+    // 🔥 NEW SEPARATED PATHS: All Diwali data will go here, keeping older categories untouched.
     await update(ref(db), {
-      [`admin/withdrawals/${withdrawalId}`]: adminData,
-      [`users/${currentUserId}/transactions/${txId}`]: userTx,
-      [`transactions/${txId}`]: globalTx
+      [`direct_diwali_offer/${CAMPAIGN.id}/withdrawals/${withdrawalId}`]: adminData,
+      [`users/${currentUserId}/diwali_transactions/${txId}`]: userTx,
+      [`direct_diwali_offer/${CAMPAIGN.id}/transactions/${txId}`]: globalTx
     });
 
     showToast("✅ Withdrawal request submitted. Awaiting admin approval.", "success");

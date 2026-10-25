@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER — STANDALONE SCRIPT (New Root Category)
+// DIWALI BUMPER OFFER — STANDALONE SCRIPT (Test Mode Enabled)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -25,13 +25,14 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION
+// 🎯 CONFIGURATION (LIVE TESTING - Dates Extended)
 // ============================================================
 const CAMPAIGN = {
   id: "diwali_2026",
   name: "Diwali Bumper Offer",
-  startDate: new Date("2026-10-29T00:00:00+05:30"), 
-  endDate:   new Date("2026-11-10T23:59:59.999+05:30"),
+  // 🔥 TESTING DATES: Today se shuru hokar 30 din tak
+  startDate: new Date("2026-10-25T00:00:00+05:30"), 
+  endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
   rewards: { 
     50: 10, 
     100: 25, 
@@ -120,7 +121,6 @@ function isWithinDiwaliCampaign(tx) {
   return txTime >= CAMPAIGN.startDate.getTime() && txTime <= CAMPAIGN.endDate.getTime();
 }
 
-// ✅ Exact function as you requested
 function isEligiblePackagePurchase(tx) {
   if (!tx || typeof tx !== "object") return false;
   const txType = String(tx.type || "").trim().toLowerCase();
@@ -228,7 +228,6 @@ async function calculateUserRewards(uid) {
     const breakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
     let totalBal = 0;
 
-    // 🔥 Use new direct_diwali_offer root path for claims
     const securityRef = ref(db, `direct_diwali_offer/${CAMPAIGN.id}/user_claims/${uid}`);
     const securitySnap = await get(securityRef);
     const alreadyClaimed = securitySnap.val() || {};
@@ -255,12 +254,10 @@ async function calculateUserRewards(uid) {
       totalBal += rewardAmt;
     }
 
-    // Save claims to Firebase
     if (Object.keys(newClaims).length > 0) {
       await update(securityRef, newClaims);
     }
 
-    // 🔥 Use new direct_diwali_offer root path for admin data
     const rewardSnap = await get(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${uid}`));
     let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
 
@@ -432,7 +429,7 @@ function startCountdown() {
 }
 
 // ============================================================
-// 🏦 WITHDRAWAL (New separated paths)
+// 🏦 WITHDRAWAL
 // ============================================================
 function validateWallet() {
   const val = el.walletAddressInput?.value.trim() || "";
@@ -499,7 +496,6 @@ async function submitWithdrawal() {
     const avail = Math.max(0, bal - paid);
     if (avail <= 0) { showToast("Nothing to withdraw.", "warning"); return; }
 
-    // 🔥 New separated path for reward status lock
     const rewardsRoot = ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${currentUserId}`);
     const withdrawalId = generateId("dw");
     const txId = generateId("tx");
@@ -510,7 +506,7 @@ async function submitWithdrawal() {
         return { status: "pending", walletAddress: addr, withdrawalId, transactionId: txId, requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp };
       }
       const cStatus = String(current.status || "").toLowerCase();
-      if (["pending", "approved", "paid"].includes(cStatus)) return; // abort
+      if (["pending", "approved", "paid"].includes(cStatus)) return;
 
       return { ...current, status: "pending", walletAddress: addr, withdrawalId, transactionId: txId, requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp };
     });
@@ -533,7 +529,6 @@ async function submitWithdrawal() {
     };
     const globalTx = { ...userTx, userId: currentUserId };
 
-    // 🔥 NEW SEPARATED PATHS: All Diwali data will go here, keeping older categories untouched.
     await update(ref(db), {
       [`direct_diwali_offer/${CAMPAIGN.id}/withdrawals/${withdrawalId}`]: adminData,
       [`users/${currentUserId}/diwali_transactions/${txId}`]: userTx,

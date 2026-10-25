@@ -1,13 +1,13 @@
 // ============================================================
-// DIWALI BUMPER OFFER — STANDALONE SCRIPT (Test Mode Enabled)
+// DIWALI BUMPER OFFER 2026 — COMPLETE FINAL SCRIPT
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase, ref, get, update, runTransaction } from "firebase/database";
+import { getDatabase, ref, get, update, onValue, runTransaction } from "firebase/database";
 
 // ============================================================
-// 🔥 LIVE FIREBASE CONFIG
+// 🔥 LIVE FIREBASE CONFIG (No Changes)
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -25,19 +25,18 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION (LIVE TESTING - Dates Extended)
+// 🎯 CONFIGURATION (Exact Rewards)
 // ============================================================
 const CAMPAIGN = {
   id: "diwali_2026",
   name: "Diwali Bumper Offer",
-  // 🔥 TESTING DATES: Today se shuru hokar 30 din tak
   startDate: new Date("2026-10-25T00:00:00+05:30"), 
   endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
   rewards: { 
     50: 10, 
     100: 25, 
-    200: 50, 
-    500: 90, 
+    200: 60, 
+    500: 120, 
     1000: 250 
   }
 };
@@ -85,6 +84,9 @@ let currentUserData = null;
 let calculatedRewards = { balance: 0, paidAmount: 0, counts: {}, breakdown: {} };
 let countdownInterval = null;
 let isProcessingWithdrawal = false;
+let isCalculating = false; 
+let unsubTransactions = null;
+let unsubRewards = null;
 
 // ============================================================
 // UTILS & TIME HELPERS
@@ -110,7 +112,7 @@ function normalizeTimestamp(value) {
   } else return null;
 
   if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
-  if (timestamp < 100000000000) timestamp *= 1000; // Seconds to ms
+  if (timestamp < 100000000000) timestamp *= 1000;
   return timestamp;
 }
 
@@ -121,15 +123,28 @@ function isWithinDiwaliCampaign(tx) {
   return txTime >= CAMPAIGN.startDate.getTime() && txTime <= CAMPAIGN.endDate.getTime();
 }
 
+// ============================================================
+// REWARD LOGIC
+// ============================================================
 function isEligiblePackagePurchase(tx) {
   if (!tx || typeof tx !== "object") return false;
-  const txType = String(tx.type || "").trim().toLowerCase();
-  const packageId = String(tx.packageId || "").trim();
-  const amount = Number(tx.amount ?? tx.packageAmount);
+  
+  // 1. Status check
+  const txStatus = String(tx.status || "").toLowerCase();
+  if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") return false;
 
-  if (txType !== "package") return false;
-  if (!packageId) return false;
-  if (!Number.isFinite(amount) || amount <= 0) return false;
+  // 2. Type check (exclude withdrawals/transfers/refunds)
+  const txType = String(tx.type || "").toLowerCase();
+  if (txType.includes("withdraw") || txType.includes("transfer") || txType.includes("debit") || txType.includes("refund")) return false;
+
+  // 3. Exact package amount check
+  const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
+  if (!CAMPAIGN.rewards[amt]) return false; 
+
+  // 4. Must have a buyer
+  const txUserId = tx.userId || tx.uid;
+  if (!txUserId) return false;
+
   return true;
 }
 
@@ -190,9 +205,12 @@ function initCalculator() {
 }
 
 // ============================================================
-// 📊 CALCULATE & SECURE REWARDS
+// 📊 CALCULATE & SECURE REWARDS (Optimized)
 // ============================================================
 async function calculateUserRewards(uid) {
+  if (isCalculating) return;
+  isCalculating = true;
+
   try {
     const userSnap = await get(ref(db, `users/${uid}`));
     if (!userSnap.exists()) return;
@@ -206,47 +224,49 @@ async function calculateUserRewards(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    let mergedTx = {};
-    
-    if (currentUserData.transactions) {
-      Object.entries(currentUserData.transactions).forEach(([id, t]) => {
-        mergedTx[id] = { id, ...t };
-      });
-    }
-    
-    const txSnap = await get(ref(db, "transactions"));
-    const allTx = txSnap.val() || {};
-    Object.entries(allTx).forEach(([id, t]) => {
-      if (t.userId === uid || t.uid === uid) {
-        mergedTx[id] = { id, ...t };
+    // Fetch referred users
+    const usersSnap = await get(ref(db, "users"));
+    const allUsers = usersSnap.val() || {};
+    const referredUsers = new Set();
+
+    for (const [uId, uData] of Object.entries(allUsers)) {
+      if (uId === uid) continue;
+      const referredBy = uData.referredBy || uData.referredByUid || uData.sponsorUid || uData.referrerUid || uData.referrer;
+      if (String(referredBy) === String(refCode) || String(referredBy) === String(uid)) {
+        referredUsers.add(uId); 
       }
-    });
+    }
 
-    const rawTx = Object.values(mergedTx);
+    // Fetch transactions and existing claims
+    const [txSnap, claimsSnap] = await Promise.all([
+      get(ref(db, "transactions")),
+      get(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/user_claims/${uid}`))
+    ]);
 
+    const allTx = txSnap.val() || {};
+    const existingClaims = claimsSnap.val() || {};
+    
     const counts = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
     const breakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
     let totalBal = 0;
+    const newClaimsUpdates = {};
 
-    const securityRef = ref(db, `direct_diwali_offer/${CAMPAIGN.id}/user_claims/${uid}`);
-    const securitySnap = await get(securityRef);
-    const alreadyClaimed = securitySnap.val() || {};
-    const newClaims = {};
-
-    for (const tx of rawTx) {
-      const txStatus = String(tx.status || "").toLowerCase();
-      if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") continue;
+    for (const [txId, tx] of Object.entries(allTx)) {
+      const txUserId = tx.userId || tx.uid;
+      
+      // Check if buyer is a direct referral
+      if (!referredUsers.has(txUserId)) continue;
+      
+      // Check package validity
       if (!isEligiblePackagePurchase(tx)) continue;
-
-      const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
-      if (!CAMPAIGN.rewards[amt]) continue;
       if (!isWithinDiwaliCampaign(tx)) continue;
 
-      const txId = tx.id || tx.txId;
+      const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
       const rewardAmt = CAMPAIGN.rewards[amt];
 
-      if (!alreadyClaimed[txId]) {
-        newClaims[txId] = { amount: amt, reward: rewardAmt, claimedAt: Date.now() };
+      // If not claimed yet, prep for saving
+      if (!existingClaims[txId]) {
+        newClaimsUpdates[txId] = { amount: amt, reward: rewardAmt, claimedAt: Date.now() };
       }
 
       counts[amt]++;
@@ -254,10 +274,12 @@ async function calculateUserRewards(uid) {
       totalBal += rewardAmt;
     }
 
-    if (Object.keys(newClaims).length > 0) {
-      await update(securityRef, newClaims);
+    // Save new claims in one batch
+    if (Object.keys(newClaimsUpdates).length > 0) {
+      await update(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/user_claims/${uid}`), newClaimsUpdates);
     }
 
+    // Fetch admin paid status
     const rewardSnap = await get(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${uid}`));
     let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
 
@@ -281,11 +303,47 @@ async function calculateUserRewards(uid) {
     };
 
     updateUI();
-
   } catch (err) {
     console.error("Calculation error:", err);
     showToast("Failed to load reward data. Please refresh.", "error");
+  } finally {
+    isCalculating = false;
   }
+}
+
+// ============================================================
+// LIVE LISTENERS (Debounced)
+// ============================================================
+function setupLiveListeners(uid) {
+  let txTimeout = null;
+  unsubTransactions = onValue(ref(db, "transactions"), () => {
+    if (txTimeout) clearTimeout(txTimeout);
+    txTimeout = setTimeout(() => calculateUserRewards(uid), 800);
+  });
+
+  unsubRewards = onValue(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${uid}`), (snap) => {
+    if (snap.exists()) {
+      const data = snap.val();
+      calculatedRewards.paidAmount = data.paidAmount || 0;
+      calculatedRewards.status = data.status || "available";
+      calculatedRewards.walletAddress = data.walletAddress || "";
+      calculatedRewards.txHash = data.txHash || "";
+      calculatedRewards.paidAt = data.paidAt || null;
+      updateUI();
+    } else {
+      calculatedRewards.paidAmount = 0;
+      calculatedRewards.status = "available";
+      calculatedRewards.walletAddress = "";
+      calculatedRewards.txHash = "";
+      calculatedRewards.paidAt = null;
+      updateUI();
+    }
+  });
+}
+
+function clearLiveListeners() {
+  if (unsubTransactions) { unsubTransactions(); unsubTransactions = null; }
+  if (unsubRewards) { unsubRewards(); unsubRewards = null; }
 }
 
 // ============================================================
@@ -337,10 +395,10 @@ function updateUI() {
   });
 
   if (el.walletStatusText) {
-    if (status === "UPCOMING") el.walletStatusText.textContent = `Campaign starts ${startStr}. Get ready to buy!`;
+    if (status === "UPCOMING") el.walletStatusText.textContent = `Campaign starts ${startStr}. Get ready to refer!`;
     else if (status === "ENDED") el.walletStatusText.textContent = balance > 0 ? `🏆 Final earnings locked! $${fmt(balance)} total.` : "Campaign ended — no rewards earned.";
-    else if (balance === 0) el.walletStatusText.textContent = "Buy eligible packages to grow your Diwali reward balance!";
-    else el.walletStatusText.textContent = `💰 $${fmt(balance)} earned so far. Keep buying!`;
+    else if (balance === 0) el.walletStatusText.textContent = "Refer eligible packages to grow your Diwali reward balance!";
+    else el.walletStatusText.textContent = `💰 $${fmt(balance)} earned so far. Keep referring!`;
   }
   if (el.finalBadge) el.finalBadge.style.display = status === "ENDED" && balance > 0 ? "inline-block" : "none";
 
@@ -349,7 +407,7 @@ function updateUI() {
 
 function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
   const withdrawalStatus = String(calculatedRewards.status || "").toLowerCase();
-  const isWithdrawn = ["pending", "approved", "paid"].includes(withdrawalStatus);
+  const canWithdraw = withdrawable > 0;
 
   if (el.withdrawAmount) el.withdrawAmount.textContent = `$${fmt(withdrawable)} USDT`;
   
@@ -365,13 +423,22 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
     }
   }
 
-  if (isWithdrawn) {
+  if (["pending", "approved", "paid"].includes(withdrawalStatus)) {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = true;
       if (withdrawalStatus === "pending") el.withdrawBtn.innerHTML = `<i class="bi bi-clock me-2"></i>Pending Approval`;
       else if (withdrawalStatus === "approved") el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle me-2"></i>Approved`;
-      else if (withdrawalStatus === "paid") el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
+      else if (withdrawalStatus === "paid") {
+         if (canWithdraw) {
+             el.withdrawBtn.disabled = false;
+             el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw New Rewards`;
+             el.withdrawBtn.className = "btn-withdraw";
+         } else {
+             el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
+         }
+      }
     }
+    
     if (el.withdrawalStatus) {
       el.withdrawalStatus.classList.add("visible");
       el.withdrawalStatus.className = `withdrawal-status visible ${withdrawalStatus}`;
@@ -380,6 +447,7 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
         withdrawalStatus === "approved" ? "✅ Your withdrawal has been approved and is being processed." :
         "✅ Payment has been sent to your wallet.";
     }
+    
     if (withdrawalStatus === "paid" && el.withdrawalDetails) {
       el.withdrawalDetails.classList.add("visible");
       if (el.detailAmount) el.detailAmount.textContent = `$${fmt(calculatedRewards.paidAmount || balance)} USDT`;
@@ -387,14 +455,17 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
       if (el.detailPaidDate) el.detailPaidDate.textContent = calculatedRewards.paidAt ? new Date(calculatedRewards.paidAt).toLocaleString() : "---";
       if (el.detailTxHash) el.detailTxHash.textContent = calculatedRewards.txHash || "---";
     }
-    if (el.walletFormGroup) el.walletFormGroup.style.display = "none";
-    return;
+    
+    if (el.walletFormGroup) el.walletFormGroup.style.display = canWithdraw ? "block" : "none";
+    if (canWithdraw) return; 
+    else return;
   }
 
   if (status === "ENDED" && withdrawable > 0) {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = false;
       el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw Diwali Reward`;
+      el.withdrawBtn.className = "btn-withdraw";
     }
     if (el.walletFormGroup) el.walletFormGroup.style.display = "block";
     if (el.withdrawalStatus) el.withdrawalStatus.classList.remove("visible");
@@ -403,6 +474,7 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = true;
       el.withdrawBtn.innerHTML = status === "ENDED" ? `Nothing to Withdraw` : `🔒 Withdrawal Locked — Offer Active`;
+      el.withdrawBtn.className = "btn-withdraw withdrawal-locked";
     }
     if (el.walletFormGroup) el.walletFormGroup.style.display = "none";
   }
@@ -429,7 +501,7 @@ function startCountdown() {
 }
 
 // ============================================================
-// 🏦 WITHDRAWAL
+// 🏦 WITHDRAWAL (Atomic & Secure)
 // ============================================================
 function validateWallet() {
   const val = el.walletAddressInput?.value.trim() || "";
@@ -505,13 +577,29 @@ async function submitWithdrawal() {
       if (!current) {
         return { status: "pending", walletAddress: addr, withdrawalId, transactionId: txId, requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp };
       }
+      
       const cStatus = String(current.status || "").toLowerCase();
-      if (["pending", "approved", "paid"].includes(cStatus)) return;
+      if (cStatus === "pending" || cStatus === "approved") return; 
+      
+      const cPaid = Number(current.paidAmount || 0);
+      const cBal = Number(calculatedRewards.balance || 0);
+      const cAvail = Math.max(0, cBal - cPaid);
+      
+      if (cAvail <= 0) return;
 
-      return { ...current, status: "pending", walletAddress: addr, withdrawalId, transactionId: txId, requestedAmount: avail, requestedAt: timestamp, updatedAt: timestamp };
+      return { 
+        ...current, 
+        status: "pending", 
+        walletAddress: addr, 
+        withdrawalId, 
+        transactionId: txId, 
+        requestedAmount: cAvail, 
+        requestedAt: timestamp, 
+        updatedAt: timestamp 
+      };
     });
 
-    if (!lockResult.committed) { showToast("Withdrawal already submitted.", "warning"); return; }
+    if (!lockResult.committed) { showToast("Withdrawal already submitted or nothing available.", "warning"); return; }
 
     const date = new Date(timestamp).toISOString().split("T")[0];
 
@@ -519,7 +607,7 @@ async function submitWithdrawal() {
       campaignName: CAMPAIGN.name, campaignId: CAMPAIGN.id, type: "diwali_offer_withdrawal",
       asset: "USDT", network: "BEP-20 / BNB Smart Chain", amount: avail, status: "pending",
       userId: currentUserId, username: currentUserData?.username || currentUserData?.name || currentUserId,
-      walletAddress: addr, requestedAt: timestamp
+      walletAddress: addr, requestedAt: timestamp, withdrawalId
     };
     const userTx = {
       type: "diwali_offer_withdrawal", subtype: `${CAMPAIGN.name} Withdrawal`,
@@ -568,8 +656,11 @@ async function copyReferralLink() {
 }
 
 async function handleLogout() { 
-  try { await signOut(auth); window.location.href = "login.html"; } 
-  catch (e) { showToast("Logout error", "error"); } 
+  try { 
+    clearLiveListeners(); 
+    await signOut(auth); 
+    window.location.href = "login.html"; 
+  } catch (e) { showToast("Logout error", "error"); } 
 }
 
 function setupListeners() {
@@ -603,10 +694,15 @@ onAuthStateChanged(auth, async (user) => {
   currentUserId = user.uid;
   
   startCountdown();
-  updateUI(); 
   setupListeners();
   
   await calculateUserRewards(user.uid);
+  setupLiveListeners(user.uid); 
   
   if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");
+});
+
+window.addEventListener("beforeunload", () => {
+  clearLiveListeners();
+  if (countdownInterval) clearInterval(countdownInterval);
 });

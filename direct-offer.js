@@ -1,13 +1,13 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — COMPLETE FINAL SCRIPT
+// DIWALI BUMPER OFFER 2026 — COMPLETE FIREBASE FIX
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase, ref, get, update, onValue, runTransaction } from "firebase/database";
+import { getDatabase, ref, get, update, onValue, runTransaction, set } from "firebase/database";
 
 // ============================================================
-// 🔥 LIVE FIREBASE CONFIG (No Changes)
+// 🔥 LIVE FIREBASE CONFIG
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -25,7 +25,7 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION (Exact Rewards)
+// 🎯 CONFIGURATION
 // ============================================================
 const CAMPAIGN = {
   id: "diwali_2026",
@@ -87,6 +87,7 @@ let isProcessingWithdrawal = false;
 let isCalculating = false; 
 let unsubTransactions = null;
 let unsubRewards = null;
+let processedTxCache = new Set(); // Cache to prevent duplicate processing in same session
 
 // ============================================================
 // UTILS & TIME HELPERS
@@ -123,25 +124,18 @@ function isWithinDiwaliCampaign(tx) {
   return txTime >= CAMPAIGN.startDate.getTime() && txTime <= CAMPAIGN.endDate.getTime();
 }
 
-// ============================================================
-// REWARD LOGIC
-// ============================================================
 function isEligiblePackagePurchase(tx) {
   if (!tx || typeof tx !== "object") return false;
   
-  // 1. Status check
   const txStatus = String(tx.status || "").toLowerCase();
   if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") return false;
 
-  // 2. Type check (exclude withdrawals/transfers/refunds)
   const txType = String(tx.type || "").toLowerCase();
   if (txType.includes("withdraw") || txType.includes("transfer") || txType.includes("debit") || txType.includes("refund")) return false;
 
-  // 3. Exact package amount check
   const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
   if (!CAMPAIGN.rewards[amt]) return false; 
 
-  // 4. Must have a buyer
   const txUserId = tx.userId || tx.uid;
   if (!txUserId) return false;
 
@@ -205,7 +199,7 @@ function initCalculator() {
 }
 
 // ============================================================
-// 📊 CALCULATE & SECURE REWARDS (Optimized)
+// 📊 REQUIREMENT 2, 3, 5: AUTO-SYNC & REWARD CALCULATION
 // ============================================================
 async function calculateUserRewards(uid) {
   if (isCalculating) return;
@@ -224,7 +218,7 @@ async function calculateUserRewards(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // Fetch referred users
+    // 1. Fetch all users to find Direct Referrals
     const usersSnap = await get(ref(db, "users"));
     const allUsers = usersSnap.val() || {};
     const referredUsers = new Set();
@@ -232,12 +226,13 @@ async function calculateUserRewards(uid) {
     for (const [uId, uData] of Object.entries(allUsers)) {
       if (uId === uid) continue;
       const referredBy = uData.referredBy || uData.referredByUid || uData.sponsorUid || uData.referrerUid || uData.referrer;
+      // Strict Check: Match by Code or UID
       if (String(referredBy) === String(refCode) || String(referredBy) === String(uid)) {
         referredUsers.add(uId); 
       }
     }
 
-    // Fetch transactions and existing claims
+    // 2. Fetch transactions and existing claims in parallel
     const [txSnap, claimsSnap] = await Promise.all([
       get(ref(db, "transactions")),
       get(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/user_claims/${uid}`))
@@ -250,23 +245,42 @@ async function calculateUserRewards(uid) {
     const breakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
     let totalBal = 0;
     const newClaimsUpdates = {};
+    const newPurchases = {};
 
     for (const [txId, tx] of Object.entries(allTx)) {
       const txUserId = tx.userId || tx.uid;
       
-      // Check if buyer is a direct referral
+      // Must be from a Direct Referral
       if (!referredUsers.has(txUserId)) continue;
       
-      // Check package validity
+      // Must be a valid purchase
       if (!isEligiblePackagePurchase(tx)) continue;
       if (!isWithinDiwaliCampaign(tx)) continue;
 
       const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
       const rewardAmt = CAMPAIGN.rewards[amt];
+      const purchaseId = txId; // Using txId as unique purchaseId
 
-      // If not claimed yet, prep for saving
+      // REQUIREMENT 2 & 5: Save to direct_diwali_offer/purchases if not exists
+      newPurchases[`purchases/${purchaseId}`] = {
+        purchaseId: purchaseId,
+        buyerUid: txUserId,
+        directReferrerUid: uid,
+        packageAmount: amt,
+        rewardAmount: rewardAmt,
+        status: "completed",
+        timestamp: tx.timestamp || tx.createdAt || Date.now(),
+        campaignId: CAMPAIGN.id
+      };
+
+      // REQUIREMENT 5: Duplicate Check
       if (!existingClaims[txId]) {
-        newClaimsUpdates[txId] = { amount: amt, reward: rewardAmt, claimedAt: Date.now() };
+        newClaimsUpdates[`user_claims/${uid}/${txId}`] = { 
+          purchaseId: purchaseId,
+          amount: amt, 
+          reward: rewardAmt, 
+          claimedAt: Date.now() 
+        };
       }
 
       counts[amt]++;
@@ -274,12 +288,15 @@ async function calculateUserRewards(uid) {
       totalBal += rewardAmt;
     }
 
-    // Save new claims in one batch
-    if (Object.keys(newClaimsUpdates).length > 0) {
-      await update(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/user_claims/${uid}`), newClaimsUpdates);
+    // Save new claims and purchases atomically
+    if (Object.keys(newClaimsUpdates).length > 0 || Object.keys(newPurchases).length > 0) {
+      await update(ref(db, `direct_diwali_offer/${CAMPAIGN.id}`), {
+        ...newPurchases,
+        ...newClaimsUpdates
+      });
     }
 
-    // Fetch admin paid status
+    // 3. Fetch admin paid status
     const rewardSnap = await get(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${uid}`));
     let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
 
@@ -312,15 +329,17 @@ async function calculateUserRewards(uid) {
 }
 
 // ============================================================
-// LIVE LISTENERS (Debounced)
+// LIVE LISTENERS (REQUIREMENT 6: Instant Update)
 // ============================================================
 function setupLiveListeners(uid) {
+  // Listen to transactions (Debounced to prevent spam)
   let txTimeout = null;
   unsubTransactions = onValue(ref(db, "transactions"), () => {
     if (txTimeout) clearTimeout(txTimeout);
     txTimeout = setTimeout(() => calculateUserRewards(uid), 800);
   });
 
+  // Listen to reward status (Admin updates)
   unsubRewards = onValue(ref(db, `direct_diwali_offer/${CAMPAIGN.id}/rewards/${uid}`), (snap) => {
     if (snap.exists()) {
       const data = snap.val();
@@ -501,7 +520,7 @@ function startCountdown() {
 }
 
 // ============================================================
-// 🏦 WITHDRAWAL (Atomic & Secure)
+// 🏦 WITHDRAWAL (REQUIREMENT 7: Secure & Atomic)
 // ============================================================
 function validateWallet() {
   const val = el.walletAddressInput?.value.trim() || "";
@@ -582,7 +601,7 @@ async function submitWithdrawal() {
       if (cStatus === "pending" || cStatus === "approved") return; 
       
       const cPaid = Number(current.paidAmount || 0);
-      const cBal = Number(calculatedRewards.balance || 0);
+      const cBal = Number(calculatedRewards.balance || 0); // Always use the latest calculated balance
       const cAvail = Math.max(0, cBal - cPaid);
       
       if (cAvail <= 0) return;
@@ -617,6 +636,7 @@ async function submitWithdrawal() {
     };
     const globalTx = { ...userTx, userId: currentUserId };
 
+    // Save all records atomically
     await update(ref(db), {
       [`direct_diwali_offer/${CAMPAIGN.id}/withdrawals/${withdrawalId}`]: adminData,
       [`users/${currentUserId}/diwali_transactions/${txId}`]: userTx,

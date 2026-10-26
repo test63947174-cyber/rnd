@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL AUTO-SYNC SCRIPT
+// DIWALI BUMPER OFFER 2026 — FINAL SCRIPT (With Live Auto-Sync)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -28,7 +28,7 @@ const db   = getDatabase(app);
 // 🎯 CONFIGURATION
 // ============================================================
 const CAMPAIGN = {
-  id: "direct_diwali_offer_2026", // 🔥 अलग नोड का नाम
+  id: "direct_diwali_offer_2026", // अलग नोड का नाम
   name: "Diwali Bumper Offer 2026",
   startDate: new Date("2026-10-25T00:00:00+05:30"), 
   endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
@@ -123,14 +123,14 @@ function isWithinDiwaliCampaign(tx) {
 }
 
 // ============================================================
-// 🔥 AUTO-SYNC FUNCTION (यही असली जादू है)
+// 🔥 AUTO-SYNC FUNCTION (यह अब आपके 'packages' को पढ़ेगा)
 // ============================================================
 async function syncDiwaliData(uid) {
   if (isSyncing) return;
   isSyncing = true;
 
   try {
-    // 1. यूजर डेटा लाओ
+    // 1. Fetch current user
     const userSnap = await get(ref(db, `users/${uid}`));
     if (!userSnap.exists()) return;
     currentUserData = userSnap.val();
@@ -143,7 +143,7 @@ async function syncDiwaliData(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // 2. सभी यूजर्स को फेच करो (डायरेक्ट रेफरल ढूंढने के लिए)
+    // 2. Fetch all users (to find who referred you)
     const usersSnap = await get(ref(db, "users"));
     const allUsers = usersSnap.val() || {};
     const referredUsers = new Set();
@@ -151,18 +151,14 @@ async function syncDiwaliData(uid) {
     for (const [uId, uData] of Object.entries(allUsers)) {
       if (uId === uid) continue;
       const referredBy = uData.referredBy || uData.referredByUid || uData.sponsorUid || uData.referrerUid || uData.referrer;
+      // Strict Check: Match by Code or UID
       if (String(referredBy) === String(refCode) || String(referredBy) === String(uid)) {
         referredUsers.add(uId); 
       }
     }
 
-    // 3. ग्लोबल ट्रांजैक्शन और दिवाली का पुराना डेटा फेच करो
-    const [txSnap, diwaliSnap] = await Promise.all([
-      get(ref(db, "transactions")),
-      get(ref(db, CAMPAIGN.id))
-    ]);
-
-    const allTx = txSnap.val() || {};
+    // 3. Fetch existing Diwali data
+    const diwaliSnap = await get(ref(db, CAMPAIGN.id));
     const diwaliData = diwaliSnap.val() || {};
     const existingPurchases = diwaliData.purchases || {};
     
@@ -171,64 +167,66 @@ async function syncDiwaliData(uid) {
     let totalBal = 0;
     const updates = {};
 
-    // 4. हर ट्रांजैक्शन को चेक करो
-    for (const [txId, tx] of Object.entries(allTx)) {
-      const txUserId = tx.userId || tx.uid;
+    // 4. 🚨 यहाँ हम 'packages' चेक करेंगे (क्योंकि Buy Package पेज 'packages' में सेव करता है)
+    for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       
-      // क्या यह खरीदार आपका डायरेक्ट रेफरल है?
-      if (!referredUsers.has(txUserId)) continue;
+      // क्या यह यूजर आपका डायरेक्ट रेफरल है?
+      if (!referredUsers.has(refUserUid)) continue;
       
-      // क्या यह सही पैकेज है? (सिर्फ 50, 100, 200, 500, 1000)
-      const txStatus = String(tx.status || "").toLowerCase();
-      if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") continue;
+      const packages = refUserData.packages || {};
       
-      const txType = String(tx.type || "").toLowerCase();
-      if (txType.includes("withdraw") || txType.includes("transfer") || txType.includes("debit") || txType.includes("refund")) continue;
-
-      const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
-      if (!CAMPAIGN.rewards[amt]) continue; 
-
-      // क्या यह दिवाली की तारीख में हुआ है?
-      const txTime = tx.timestamp || tx.createdAt || 0;
-      if (txTime < CAMPAIGN.startDate.getTime() || txTime > CAMPAIGN.endDate.getTime()) continue;
-
-      const rewardAmt = CAMPAIGN.rewards[amt];
-      const purchaseId = txId; 
-
-      // 🔥 यहाँ डेटा को नए नोड में सेव करने का प्लान बन रहा है
-      if (!existingPurchases[purchaseId]) {
-        updates[`purchases/${purchaseId}`] = {
-          purchaseId: purchaseId,
-          buyerUid: txUserId,
-          directReferrerUid: uid,
-          packageAmount: amt,
-          rewardAmount: rewardAmt,
-          status: "completed",
-          timestamp: txTime,
-          campaignId: CAMPAIGN.id
-        };
+      // उस यूजर के हर पैकेज को चेक करें
+      for (const [pkgId, pkg] of Object.entries(packages)) {
         
-        updates[`user_claims/${uid}/${purchaseId}`] = {
-          purchaseId: purchaseId,
-          amount: amt,
-          reward: rewardAmt,
-          claimedAt: Date.now()
-        };
-      }
+        // स्टेटस चेक करें
+        if (pkg.status !== "active" && pkg.status !== "completed") continue;
 
-      // UI के लिए टोटल कैलकुलेट करो
-      counts[amt]++;
-      breakdown[amt] += rewardAmt;
-      totalBal += rewardAmt;
+        // अमाउंट चेक करें (सिर्फ 50, 100, 200, 500, 1000)
+        const amt = Number(pkg.usdtAmount || 0);
+        if (!CAMPAIGN.rewards[amt]) continue; 
+
+        // तारीख चेक करें
+        const txTime = pkg.purchaseDate || pkg.timestamp || 0;
+        if (txTime < CAMPAIGN.startDate.getTime() || txTime > CAMPAIGN.endDate.getTime()) continue;
+
+        const rewardAmt = CAMPAIGN.rewards[amt];
+        const purchaseId = pkgId; // Using package ID as purchase ID
+
+        // 🔥 अगर यह पैकेज पहले से दिवाली डेटाबेस में नहीं है, तो उसे सेव करें
+        if (!existingPurchases[purchaseId]) {
+          updates[`purchases/${purchaseId}`] = {
+            purchaseId: purchaseId,
+            buyerUid: refUserUid,
+            directReferrerUid: uid,
+            packageAmount: amt,
+            rewardAmount: rewardAmt,
+            status: "completed",
+            timestamp: txTime,
+            campaignId: CAMPAIGN.id
+          };
+          
+          updates[`user_claims/${uid}/${purchaseId}`] = {
+            purchaseId: purchaseId,
+            amount: amt,
+            reward: rewardAmt,
+            claimedAt: Date.now()
+          };
+        }
+
+        // UI के लिए टोटल कैलकुलेट करें
+        counts[amt]++;
+        breakdown[amt] += rewardAmt;
+        totalBal += rewardAmt;
+      }
     }
 
-    // 5. अगर नया डेटा मिला है, तो उसे दिवाली वाले नोड में सेव करो
+    // 5. नया डेटा हो तो Firebase में सेव करें
     if (Object.keys(updates).length > 0) {
       await update(ref(db, CAMPAIGN.id), updates);
-      console.log("🔥 New Diwali data synced!");
+      console.log("🔥 New Diwali data synced from packages!");
     }
 
-    // 6. एडमिन का पेड स्टेटस चेक करो
+    // 6. एडमिन का पेड स्टेटस चेक करें
     const rewardSnap = await get(ref(db, `${CAMPAIGN.id}/rewards/${uid}`));
     let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
 
@@ -275,7 +273,7 @@ function stopAutoSync() {
 }
 
 // ============================================================
-// 🎨 UI RENDER (पहले जैसा ही है)
+// 🎨 UI RENDER
 // ============================================================
 function updateUI() {
   const status = getCampaignStatus();

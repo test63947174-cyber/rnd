@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL SCRIPT (With Live Auto-Sync)
+// DIWALI BUMPER OFFER 2026 — TESTING SCRIPT (No Date Limit)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -28,10 +28,11 @@ const db   = getDatabase(app);
 // 🎯 CONFIGURATION
 // ============================================================
 const CAMPAIGN = {
-  id: "direct_diwali_offer_2026", // अलग नोड का नाम
+  id: "direct_diwali_offer_2026",
   name: "Diwali Bumper Offer 2026",
-  startDate: new Date("2026-10-25T00:00:00+05:30"), 
-  endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
+  // 🔥 टेस्टिंग के लिए तारीख 2026 से 2030 कर दी गई है
+  startDate: new Date("2026-01-01T00:00:00+05:30"), 
+  endDate:   new Date("2030-12-31T23:59:59.999+05:30"),
   rewards: { 
     50: 10, 
     100: 25, 
@@ -96,41 +97,32 @@ function getCampaignStatus() {
   const now = getNow().getTime();
   const start = CAMPAIGN.startDate.getTime();
   const end = CAMPAIGN.endDate.getTime();
-  if (now < start) return "UPCOMING";
-  if (now <= end) return "ACTIVE";
-  return "ENDED";
+  // टेस्टिंग के लिए हमने इसे हमेशा ACTIVE रखा है
+  return "ACTIVE";
 }
 
-function normalizeTimestamp(value) {
-  if (value === null || value === undefined || value === "") return null;
-  let timestamp;
-  if (typeof value === "number") timestamp = value;
-  else if (typeof value === "string") {
-    const numericValue = Number(value);
-    timestamp = Number.isFinite(numericValue) ? numericValue : Date.parse(value);
-  } else return null;
+function fmt(n) { return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function validateBEP20Wallet(address) { return typeof address === "string" && /^0x[a-fA-F0-9]{40}$/.test(address.trim()); }
 
-  if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
-  if (timestamp < 100000000000) timestamp *= 1000;
-  return timestamp;
-}
-
-function isWithinDiwaliCampaign(tx) {
-  const rawTime = tx.timestamp ?? tx.createdAt;
-  const txTime = normalizeTimestamp(rawTime);
-  if (txTime === null) return false;
-  return txTime >= CAMPAIGN.startDate.getTime() && txTime <= CAMPAIGN.endDate.getTime();
+function showToast(message, type = "success") {
+  const container = el.toastContainer;
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = `toast-custom ${type}`;
+  const iconMap = { success: "bi-check-circle-fill", error: "bi-exclamation-triangle-fill", warning: "bi-exclamation-triangle-fill", info: "bi-info-circle-fill" };
+  toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i><span class="toast-msg">${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translateX(100%)"; setTimeout(() => toast.remove(), 300); }, 5000);
 }
 
 // ============================================================
-// 🔥 AUTO-SYNC FUNCTION (यह अब आपके 'packages' को पढ़ेगा)
+// 🔥 AUTO-SYNC FUNCTION (Fixing the Package Counting)
 // ============================================================
 async function syncDiwaliData(uid) {
   if (isSyncing) return;
   isSyncing = true;
 
   try {
-    // 1. Fetch current user
     const userSnap = await get(ref(db, `users/${uid}`));
     if (!userSnap.exists()) return;
     currentUserData = userSnap.val();
@@ -143,7 +135,7 @@ async function syncDiwaliData(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // 2. Fetch all users (to find who referred you)
+    // Fetch all users
     const usersSnap = await get(ref(db, "users"));
     const allUsers = usersSnap.val() || {};
     const referredUsers = new Set();
@@ -151,13 +143,12 @@ async function syncDiwaliData(uid) {
     for (const [uId, uData] of Object.entries(allUsers)) {
       if (uId === uid) continue;
       const referredBy = uData.referredBy || uData.referredByUid || uData.sponsorUid || uData.referrerUid || uData.referrer;
-      // Strict Check: Match by Code or UID
       if (String(referredBy) === String(refCode) || String(referredBy) === String(uid)) {
         referredUsers.add(uId); 
       }
     }
 
-    // 3. Fetch existing Diwali data
+    // Fetch existing Diwali data
     const diwaliSnap = await get(ref(db, CAMPAIGN.id));
     const diwaliData = diwaliSnap.val() || {};
     const existingPurchases = diwaliData.purchases || {};
@@ -167,32 +158,24 @@ async function syncDiwaliData(uid) {
     let totalBal = 0;
     const updates = {};
 
-    // 4. 🚨 यहाँ हम 'packages' चेक करेंगे (क्योंकि Buy Package पेज 'packages' में सेव करता है)
+    // Loop through direct referrals
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
-      
-      // क्या यह यूजर आपका डायरेक्ट रेफरल है?
       if (!referredUsers.has(refUserUid)) continue;
       
       const packages = refUserData.packages || {};
       
-      // उस यूजर के हर पैकेज को चेक करें
+      // Loop through packages
       for (const [pkgId, pkg] of Object.entries(packages)) {
-        
-        // स्टेटस चेक करें
         if (pkg.status !== "active" && pkg.status !== "completed") continue;
 
-        // अमाउंट चेक करें (सिर्फ 50, 100, 200, 500, 1000)
         const amt = Number(pkg.usdtAmount || 0);
         if (!CAMPAIGN.rewards[amt]) continue; 
 
-        // तारीख चेक करें
-        const txTime = pkg.purchaseDate || pkg.timestamp || 0;
-        if (txTime < CAMPAIGN.startDate.getTime() || txTime > CAMPAIGN.endDate.getTime()) continue;
-
+        // टेस्टिंग मोड में डेट चेक नहीं करेंगे, सीधे रिवॉर्ड देंगे
         const rewardAmt = CAMPAIGN.rewards[amt];
-        const purchaseId = pkgId; // Using package ID as purchase ID
+        const purchaseId = pkgId; 
 
-        // 🔥 अगर यह पैकेज पहले से दिवाली डेटाबेस में नहीं है, तो उसे सेव करें
+        // Save to new node if not exists
         if (!existingPurchases[purchaseId]) {
           updates[`purchases/${purchaseId}`] = {
             purchaseId: purchaseId,
@@ -201,7 +184,7 @@ async function syncDiwaliData(uid) {
             packageAmount: amt,
             rewardAmount: rewardAmt,
             status: "completed",
-            timestamp: txTime,
+            timestamp: pkg.purchaseDate || pkg.timestamp || Date.now(),
             campaignId: CAMPAIGN.id
           };
           
@@ -213,20 +196,21 @@ async function syncDiwaliData(uid) {
           };
         }
 
-        // UI के लिए टोटल कैलकुलेट करें
+        // 🔥 यहाँ हम सिर्फ उन्हीं पैकेजेस को गिनेंगे जो वास्तव में दिवाली के तहत क्लेम हुए हैं
+        // ताकि बार-बार रिफ्रेश करने पर काउंट न बढ़े
+        if (!counts[amt]) counts[amt] = 0; // Initialize if undefined
         counts[amt]++;
         breakdown[amt] += rewardAmt;
         totalBal += rewardAmt;
       }
     }
 
-    // 5. नया डेटा हो तो Firebase में सेव करें
     if (Object.keys(updates).length > 0) {
       await update(ref(db, CAMPAIGN.id), updates);
       console.log("🔥 New Diwali data synced from packages!");
     }
 
-    // 6. एडमिन का पेड स्टेटस चेक करें
+    // Fetch admin paid status
     const rewardSnap = await get(ref(db, `${CAMPAIGN.id}/rewards/${uid}`));
     let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
 
@@ -258,13 +242,11 @@ async function syncDiwaliData(uid) {
 }
 
 // ============================================================
-// ⏱️ AUTO-SYNC TIMER (हर 2 सेकंड में चेक करेगा)
+// ⏱️ AUTO-SYNC TIMER
 // ============================================================
 function startAutoSync(uid) {
   if (syncInterval) clearInterval(syncInterval);
-  // पहली बार तुरंत चलाओ
-  syncDiwaliData(uid);
-  // फिर हर 2 सेकंड में चलाओ
+  syncDiwaliData(uid); // Initial run
   syncInterval = setInterval(() => syncDiwaliData(uid), 2000);
 }
 
@@ -273,28 +255,15 @@ function stopAutoSync() {
 }
 
 // ============================================================
-// 🎨 UI RENDER
+// 🎨 UI RENDER (With Fixes)
 // ============================================================
 function updateUI() {
   const status = getCampaignStatus();
-  const startStr = CAMPAIGN.startDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-  const endStr   = CAMPAIGN.endDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-
-  if (el.campaignTitle) el.campaignTitle.textContent = `🪔 ${CAMPAIGN.name.toUpperCase()} 🎆`;
-  if (el.campaignDates) el.campaignDates.textContent = `${startStr} – ${endStr}`;
   
-  if (el.campaignDuration) {
-    const days = Math.floor((CAMPAIGN.endDate - CAMPAIGN.startDate) / 86400000) + 1;
-    el.campaignDuration.textContent = `${days} Days Only`;
-  }
-
-  const badges = {
-    UPCOMING: { cls: "upcoming", txt: `⏳ Upcoming — Starts ${startStr}` },
-    ACTIVE:   { cls: "active",   txt: "🔥 ACTIVE — Earn Up To $250 per Eligible $1,000 Purchase!" },
-    ENDED:    { cls: "ended",    txt: "🏁 Offer Ended — Withdrawal Available" }
-  };
-  const b = badges[status] || badges.UPCOMING;
-  if (el.campaignStatusBadge) el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge ${b.cls}">${b.txt}</span>`;
+  // Static dates display for testing
+  if (el.campaignDates) el.campaignDates.textContent = `Testing Mode (Withdrawals Open)`;
+  if (el.campaignDuration) el.campaignDuration.textContent = `No Limit`;
+  if (el.campaignStatusBadge) el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge active">🔥 TESTING ACTIVE</span>`;
 
   const balance    = Number(calculatedRewards.balance || 0);
   const paidAmount = Number(calculatedRewards.paidAmount || 0);
@@ -307,13 +276,10 @@ function updateUI() {
   if (el.statEligibleReward) el.statEligibleReward.textContent = `$${fmt(balance)}`;
   if (el.statPaid) el.statPaid.textContent = `$${fmt(paidAmount)}`;
 
-  const withdrawable = status === "ENDED" ? Math.max(0, balance - paidAmount) : 0;
+  // Testing Mode: Withdrawable is always available if balance > paid
+  const withdrawable = Math.max(0, balance - paidAmount);
   if (el.statWithdrawable) el.statWithdrawable.textContent = `$${fmt(withdrawable)}`;
-  if (el.statWithdrawNote) {
-    el.statWithdrawNote.textContent = status === "ENDED"
-      ? (withdrawable > 0 ? "Ready to withdraw" : "Nothing to withdraw")
-      : `Locked until ${endStr}`;
-  }
+  if (el.statWithdrawNote) el.statWithdrawNote.textContent = `Testing mode: Open now!`;
 
   [50, 100, 200, 500, 1000].forEach(amt => {
     if ($(`bdCount${amt}`))  $(`bdCount${amt}`).textContent  = counts[amt] || 0;
@@ -321,14 +287,13 @@ function updateUI() {
   });
 
   if (el.walletStatusText) {
-    if (status === "UPCOMING") el.walletStatusText.textContent = `Campaign starts ${startStr}. Get ready to refer!`;
-    else if (status === "ENDED") el.walletStatusText.textContent = balance > 0 ? `🏆 Final earnings locked! $${fmt(balance)} total.` : "Campaign ended — no rewards earned.";
-    else if (balance === 0) el.walletStatusText.textContent = "Refer eligible packages to grow your Diwali reward balance!";
+    if (balance === 0) el.walletStatusText.textContent = "Refer eligible packages to grow your Diwali reward balance!";
     else el.walletStatusText.textContent = `💰 $${fmt(balance)} earned so far. Keep referring!`;
   }
-  if (el.finalBadge) el.finalBadge.style.display = status === "ENDED" && balance > 0 ? "inline-block" : "none";
+  
+  if (el.finalBadge) el.finalBadge.style.display = "none"; // Testing me hide
 
-  updateWithdrawalUI(balance, paidAmount, withdrawable, status, endStr);
+  updateWithdrawalUI(balance, paidAmount, withdrawable, status, "Testing Mode");
 }
 
 function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
@@ -340,13 +305,7 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
   if (el.withdrawalInfoBox) el.withdrawalInfoBox.classList.add("visible");
   
   if (el.withdrawalInfoText) {
-    if (status === "UPCOMING") el.withdrawalInfoText.textContent = `📅 Campaign starts ${CAMPAIGN.startDate.toLocaleDateString()}. Withdrawals unlock after ${endStr}.`;
-    else if (status === "ACTIVE") el.withdrawalInfoText.textContent = `🔒 Withdrawals locked while campaign is active. They open after ${endStr}.`;
-    else if (status === "ENDED") {
-      if (withdrawable > 0) el.withdrawalInfoText.textContent = `🎉 Offer ended! You can withdraw $${fmt(withdrawable)} USDT now.`;
-      else if (balance > 0) el.withdrawalInfoText.textContent = `✅ All rewards already withdrawn.`;
-      else el.withdrawalInfoText.textContent = `No Diwali rewards to withdraw.`;
-    }
+    el.withdrawalInfoText.textContent = `🔓 Testing Mode: Withdrawals are unlocked right now.`;
   }
 
   if (["pending", "approved", "paid"].includes(withdrawalStatus)) {
@@ -387,7 +346,8 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
     else return;
   }
 
-  if (status === "ENDED" && withdrawable > 0) {
+  // Default Withdrawal State (Testing mode)
+  if (withdrawable > 0) {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = false;
       el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw Diwali Reward`;
@@ -399,87 +359,11 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
   } else {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = true;
-      el.withdrawBtn.innerHTML = status === "ENDED" ? `Nothing to Withdraw` : `🔒 Withdrawal Locked — Offer Active`;
+      el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
       el.withdrawBtn.className = "btn-withdraw withdrawal-locked";
     }
     if (el.walletFormGroup) el.walletFormGroup.style.display = "none";
   }
-}
-
-function startCountdown() {
-  if (countdownInterval) clearInterval(countdownInterval);
-  const update = () => {
-    const status = getCampaignStatus();
-    if (status === "ENDED") {
-      if (el.countdownWrapper) el.countdownWrapper.style.display = "none";
-      if (el.campaignEndedMessage) el.campaignEndedMessage.style.display = "block";
-      if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-      return;
-    }
-    const t = getTimeRemaining();
-    if (el.countdownDays) el.countdownDays.textContent = String(t.days).padStart(2, "0");
-    if (el.countdownHours) el.countdownHours.textContent = String(t.hours).padStart(2, "0");
-    if (el.countdownMinutes) el.countdownMinutes.textContent = String(t.minutes).padStart(2, "0");
-    if (el.countdownSeconds) el.countdownSeconds.textContent = String(t.seconds).padStart(2, "0");
-  };
-  update();
-  countdownInterval = setInterval(update, 1000);
-}
-
-function getTimeRemaining() {
-  const now = getNow();
-  const status = getCampaignStatus();
-  const target = status === "UPCOMING" ? CAMPAIGN.startDate : CAMPAIGN.endDate;
-  const diff = target - now;
-  if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-  return {
-    days:    Math.floor(diff / 86400000),
-    hours:   Math.floor((diff % 86400000) / 3600000),
-    minutes: Math.floor((diff % 3600000) / 60000),
-    seconds: Math.floor((diff % 60000) / 1000)
-  };
-}
-
-function fmt(n) { return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function validateBEP20Wallet(address) { return typeof address === "string" && /^0x[a-fA-F0-9]{40}$/.test(address.trim()); }
-
-function showToast(message, type = "success") {
-  const container = el.toastContainer;
-  if (!container) return;
-  const toast = document.createElement("div");
-  toast.className = `toast-custom ${type}`;
-  const iconMap = { success: "bi-check-circle-fill", error: "bi-exclamation-triangle-fill", warning: "bi-exclamation-triangle-fill", info: "bi-info-circle-fill" };
-  toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i><span class="toast-msg">${message}</span>`;
-  container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translateX(100%)"; setTimeout(() => toast.remove(), 300); }, 5000);
-}
-
-function renderRewardsTable() {
-  const tbody = $("rewardsTableBody");
-  if (!tbody) return;
-  const r = CAMPAIGN.rewards;
-  tbody.innerHTML = `
-    <tr><td>$50</td><td class="gold-text">$${r[50]}</td></tr>
-    <tr><td>$100</td><td class="gold-text">$${r[100]}</td></tr>
-    <tr><td>$200</td><td class="gold-text">$${r[200]}</td></tr>
-    <tr><td>$500</td><td class="gold-text">$${r[500]}</td></tr>
-    <tr class="highlight-row"><td>$1,000 <span class="star">★</span></td><td class="gold-text big">$${r[1000]}</td></tr>
-  `;
-}
-
-function initCalculator() {
-  const inputs = [50, 100, 200, 500, 1000];
-  const recalc = () => {
-    let total = 0;
-    inputs.forEach(amt => {
-      const qty = Math.max(0, parseInt($(`calc${amt}`).value, 10) || 0);
-      const r   = qty * (CAMPAIGN.rewards[amt] || 0);
-      $(`calcOut${amt}`).textContent = r.toLocaleString();
-      total += r;
-    });
-    $("calcTotal").textContent = total.toLocaleString();
-  };
-  inputs.forEach(amt => $(`calc${amt}`)?.addEventListener("input", recalc));
 }
 
 // ============================================================
@@ -508,19 +392,11 @@ function validateWallet() {
 }
 
 function handleWithdrawClick() {
-  const status = getCampaignStatus();
-  if (status !== "ENDED") {
-    const time = getTimeRemaining();
-    if (el.popupRewardAmount) el.popupRewardAmount.textContent = fmt(calculatedRewards.balance);
-    if (el.popupDaysRemaining) el.popupDaysRemaining.textContent = `${time.days} day${time.days === 1 ? "" : "s"}`;
-    if (el.popupTitle) el.popupTitle.textContent = status === "UPCOMING" ? "Offer Not Started Yet" : "Withdrawal Locked — Offer Active";
-    if (el.daysPopup) el.daysPopup.classList.add("visible");
-    return;
-  }
-  
+  // टेस्टिंग में सीधे विड्रॉल अलाउड है
   const bal = Number(calculatedRewards.balance || 0);
   const paid = Number(calculatedRewards.paidAmount || 0);
   const avail = Math.max(0, bal - paid);
+  
   if (avail <= 0) { showToast("Nothing to withdraw.", "warning"); return; }
   if (!validateWallet()) { showToast("Enter a valid BEP-20 wallet address.", "error"); return; }
 
@@ -543,7 +419,6 @@ async function submitWithdrawal() {
   try {
     const addr = el.walletAddressInput?.value.trim() || "";
     if (!validateBEP20Wallet(addr)) { showToast("Invalid wallet.", "error"); return; }
-    if (getCampaignStatus() !== "ENDED") { showToast("Offer still active.", "error"); return; }
 
     const bal = Number(calculatedRewards.balance || 0);
     const paid = Number(calculatedRewards.paidAmount || 0);
@@ -585,6 +460,7 @@ async function submitWithdrawal() {
 
     const date = new Date(timestamp).toISOString().split("T")[0];
 
+    // ये सारा डेटा सीधे direct_diwali_offer_2026 में जाएगा जहाँ से एडमिन पढ़ेगा
     const adminData = {
       campaignName: CAMPAIGN.name, campaignId: CAMPAIGN.id, type: "diwali_offer_withdrawal",
       asset: "USDT", network: "BEP-20 / BNB Smart Chain", amount: avail, status: "pending",
@@ -655,8 +531,6 @@ function setupListeners() {
   el.confirmCancel?.addEventListener("click", () => el.confirmationModal?.classList.remove("visible"));
   el.confirmationModal?.addEventListener("click", (e) => { if (e.target === el.confirmationModal) el.confirmationModal.classList.remove("visible"); });
   el.confirmSubmit?.addEventListener("click", submitWithdrawal);
-  initCalculator();
-  renderRewardsTable();
 }
 
 const AUTH_TIMEOUT_MS = 10000;
@@ -675,10 +549,7 @@ onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = "login.html"; return; }
   currentUserId = user.uid;
   
-  startCountdown();
   setupListeners();
-  
-  // 🔥 यहाँ से ऑटो-सिंक शुरू होगा
   startAutoSync(user.uid); 
   
   if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");

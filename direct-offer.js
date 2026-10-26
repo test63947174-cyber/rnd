@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL LOCK SCRIPT (Start Now)
+// DIWALI BUMPER OFFER 2026 — FINAL PERFECT SCRIPT
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -25,14 +25,13 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION (Start Date = Now, End Date = 7 Nov)
+// 🎯 CONFIGURATION (Start Date = Aaj, End = 7 Nov)
 // ============================================================
 const CAMPAIGN = {
   id: "direct_diwali_offer_2026",
   name: "Diwali Bumper Offer 2026",
-  // 🔥 स्टार्ट डेट को 'अभी' (आज) सेट किया गया है
-  startDate: new Date(), 
-  // 🔥 7 Nov रात 11:59:59 बजे खत्म होगा
+  // 🔥 आज की तारीख (26 Oct 2026) से स्टार्ट
+  startDate: new Date("2026-10-26T00:00:00+05:30"), 
   endDate:   new Date("2026-11-07T23:59:59.999+05:30"),
   rewards: { 
     50: 10, 
@@ -101,7 +100,7 @@ function getCampaignStatus() {
   const end = CAMPAIGN.endDate.getTime();
   if (now < start) return "UPCOMING";
   if (now <= end) return "ACTIVE";
-  return "ENDED"; // 8 नवंबर से ENDED हो जाएगा
+  return "ENDED"; 
 }
 
 function fmt(n) { return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -218,7 +217,7 @@ async function syncDiwaliData(uid) {
     let totalEarned = 0;
     const updates = {};
 
-    // 3. Calculate Total Earned
+    // 3. Calculate Total Earned (with Tolerant Time Check)
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       if (!referredUsers.has(refUserUid)) continue;
       
@@ -231,7 +230,9 @@ async function syncDiwaliData(uid) {
         if (!CAMPAIGN.rewards[amt]) continue; 
 
         const purchaseTime = pkg.purchaseDate || pkg.timestamp || 0;
-        if (purchaseTime < CAMPAIGN.startDate.getTime() || purchaseTime > CAMPAIGN.endDate.getTime()) continue;
+        // 🔥 यहाँ हम सिर्फ यह देखेंगे कि पैकेज आज या उसके बाद का है
+        // (पुराने पैकेज जो 26 Oct से पहले के हैं, वो नहीं गिने जाएंगे)
+        if (purchaseTime < CAMPAIGN.startDate.getTime()) continue;
 
         const rewardAmt = CAMPAIGN.rewards[amt];
         const purchaseId = pkgId; 
@@ -319,7 +320,7 @@ function stopAutoSync() {
 }
 
 // ============================================================
-// 🎨 UI RENDER (विड्रॉल लॉक का लॉजिक)
+// 🎨 UI RENDER
 // ============================================================
 function updateUI() {
   const status = getCampaignStatus();
@@ -359,7 +360,7 @@ function updateUI() {
 function updateWithdrawalUI(withdrawable, status) {
   const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
   
-  // 🔥 विड्रॉल सिर्फ तब खुलेगा जब ऑफर खत्म (ENDED) हो जाए
+  // 🔥 विड्रॉल लॉक का लॉजिक
   const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
   injectWithdrawalInput(); 

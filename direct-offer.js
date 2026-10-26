@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — COMPLETE AUTO-SYNC SCRIPT
+// DIWALI BUMPER OFFER 2026 — FINAL AUTO-SYNC SCRIPT
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -28,7 +28,7 @@ const db   = getDatabase(app);
 // 🎯 CONFIGURATION
 // ============================================================
 const CAMPAIGN = {
-  id: "direct_diwali_offer_2026", // 🔥 Naya Node Name
+  id: "direct_diwali_offer_2026", // 🔥 अलग नोड का नाम
   name: "Diwali Bumper Offer 2026",
   startDate: new Date("2026-10-25T00:00:00+05:30"), 
   endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
@@ -84,9 +84,8 @@ let currentUserData = null;
 let calculatedRewards = { balance: 0, paidAmount: 0, counts: {}, breakdown: {} };
 let countdownInterval = null;
 let isProcessingWithdrawal = false;
-let isCalculating = false; 
-let unsubTransactions = null;
-let unsubRewards = null;
+let isSyncing = false; 
+let syncInterval = null;
 
 // ============================================================
 // UTILS & TIME HELPERS
@@ -123,88 +122,15 @@ function isWithinDiwaliCampaign(tx) {
   return txTime >= CAMPAIGN.startDate.getTime() && txTime <= CAMPAIGN.endDate.getTime();
 }
 
-function isEligiblePackagePurchase(tx) {
-  if (!tx || typeof tx !== "object") return false;
-  
-  const txStatus = String(tx.status || "").toLowerCase();
-  if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") return false;
-
-  const txType = String(tx.type || "").toLowerCase();
-  if (txType.includes("withdraw") || txType.includes("transfer") || txType.includes("debit") || txType.includes("refund")) return false;
-
-  const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
-  if (!CAMPAIGN.rewards[amt]) return false; 
-
-  const txUserId = tx.userId || tx.uid;
-  if (!txUserId) return false;
-
-  return true;
-}
-
-function getTimeRemaining() {
-  const now = getNow();
-  const status = getCampaignStatus();
-  const target = status === "UPCOMING" ? CAMPAIGN.startDate : CAMPAIGN.endDate;
-  const diff = target - now;
-  if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-  return {
-    days:    Math.floor(diff / 86400000),
-    hours:   Math.floor((diff % 86400000) / 3600000),
-    minutes: Math.floor((diff % 3600000) / 60000),
-    seconds: Math.floor((diff % 60000) / 1000)
-  };
-}
-
-function fmt(n) { return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function validateBEP20Wallet(address) { return typeof address === "string" && /^0x[a-fA-F0-9]{40}$/.test(address.trim()); }
-
-function showToast(message, type = "success") {
-  const container = el.toastContainer;
-  if (!container) return;
-  const toast = document.createElement("div");
-  toast.className = `toast-custom ${type}`;
-  const iconMap = { success: "bi-check-circle-fill", error: "bi-exclamation-triangle-fill", warning: "bi-exclamation-triangle-fill", info: "bi-info-circle-fill" };
-  toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i><span class="toast-msg">${message}</span>`;
-  container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translateX(100%)"; setTimeout(() => toast.remove(), 300); }, 5000);
-}
-
-function renderRewardsTable() {
-  const tbody = $("rewardsTableBody");
-  if (!tbody) return;
-  const r = CAMPAIGN.rewards;
-  tbody.innerHTML = `
-    <tr><td>$50</td><td class="gold-text">$${r[50]}</td></tr>
-    <tr><td>$100</td><td class="gold-text">$${r[100]}</td></tr>
-    <tr><td>$200</td><td class="gold-text">$${r[200]}</td></tr>
-    <tr><td>$500</td><td class="gold-text">$${r[500]}</td></tr>
-    <tr class="highlight-row"><td>$1,000 <span class="star">★</span></td><td class="gold-text big">$${r[1000]}</td></tr>
-  `;
-}
-
-function initCalculator() {
-  const inputs = [50, 100, 200, 500, 1000];
-  const recalc = () => {
-    let total = 0;
-    inputs.forEach(amt => {
-      const qty = Math.max(0, parseInt($(`calc${amt}`).value, 10) || 0);
-      const r   = qty * (CAMPAIGN.rewards[amt] || 0);
-      $(`calcOut${amt}`).textContent = r.toLocaleString();
-      total += r;
-    });
-    $("calcTotal").textContent = total.toLocaleString();
-  };
-  inputs.forEach(amt => $(`calc${amt}`)?.addEventListener("input", recalc));
-}
-
 // ============================================================
-// 📊 AUTO-SYNC & CALCULATE REWARDS
+// 🔥 AUTO-SYNC FUNCTION (यही असली जादू है)
 // ============================================================
-async function calculateUserRewards(uid) {
-  if (isCalculating) return;
-  isCalculating = true;
+async function syncDiwaliData(uid) {
+  if (isSyncing) return;
+  isSyncing = true;
 
   try {
+    // 1. यूजर डेटा लाओ
     const userSnap = await get(ref(db, `users/${uid}`));
     if (!userSnap.exists()) return;
     currentUserData = userSnap.val();
@@ -217,7 +143,7 @@ async function calculateUserRewards(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // 1. Fetch all users to find Direct Referrals
+    // 2. सभी यूजर्स को फेच करो (डायरेक्ट रेफरल ढूंढने के लिए)
     const usersSnap = await get(ref(db, "users"));
     const allUsers = usersSnap.val() || {};
     const referredUsers = new Set();
@@ -230,10 +156,10 @@ async function calculateUserRewards(uid) {
       }
     }
 
-    // 2. Fetch global transactions and direct_diwali_offer data
+    // 3. ग्लोबल ट्रांजैक्शन और दिवाली का पुराना डेटा फेच करो
     const [txSnap, diwaliSnap] = await Promise.all([
       get(ref(db, "transactions")),
-      get(ref(db, CAMPAIGN.id)) // Fetching the new separate node
+      get(ref(db, CAMPAIGN.id))
     ]);
 
     const allTx = txSnap.val() || {};
@@ -245,22 +171,31 @@ async function calculateUserRewards(uid) {
     let totalBal = 0;
     const updates = {};
 
-    // 3. Loop through all transactions
+    // 4. हर ट्रांजैक्शन को चेक करो
     for (const [txId, tx] of Object.entries(allTx)) {
       const txUserId = tx.userId || tx.uid;
       
-      // Check if buyer is a direct referral
+      // क्या यह खरीदार आपका डायरेक्ट रेफरल है?
       if (!referredUsers.has(txUserId)) continue;
       
-      // Check if purchase is valid
-      if (!isEligiblePackagePurchase(tx)) continue;
-      if (!isWithinDiwaliCampaign(tx)) continue;
+      // क्या यह सही पैकेज है? (सिर्फ 50, 100, 200, 500, 1000)
+      const txStatus = String(tx.status || "").toLowerCase();
+      if (txStatus !== "confirmed" && txStatus !== "completed" && txStatus !== "success") continue;
+      
+      const txType = String(tx.type || "").toLowerCase();
+      if (txType.includes("withdraw") || txType.includes("transfer") || txType.includes("debit") || txType.includes("refund")) continue;
 
       const amt = Number(tx.amount ?? tx.packageAmount ?? 0);
-      const rewardAmt = CAMPAIGN.rewards[amt];
-      const purchaseId = txId; // Using txId as purchaseId
+      if (!CAMPAIGN.rewards[amt]) continue; 
 
-      // 🔥 AUTO-SYNC: Save to new separate node if not exists
+      // क्या यह दिवाली की तारीख में हुआ है?
+      const txTime = tx.timestamp || tx.createdAt || 0;
+      if (txTime < CAMPAIGN.startDate.getTime() || txTime > CAMPAIGN.endDate.getTime()) continue;
+
+      const rewardAmt = CAMPAIGN.rewards[amt];
+      const purchaseId = txId; 
+
+      // 🔥 यहाँ डेटा को नए नोड में सेव करने का प्लान बन रहा है
       if (!existingPurchases[purchaseId]) {
         updates[`purchases/${purchaseId}`] = {
           purchaseId: purchaseId,
@@ -269,11 +204,10 @@ async function calculateUserRewards(uid) {
           packageAmount: amt,
           rewardAmount: rewardAmt,
           status: "completed",
-          timestamp: tx.timestamp || tx.createdAt || Date.now(),
+          timestamp: txTime,
           campaignId: CAMPAIGN.id
         };
         
-        // Also save the claim for this referrer
         updates[`user_claims/${uid}/${purchaseId}`] = {
           purchaseId: purchaseId,
           amount: amt,
@@ -282,18 +216,19 @@ async function calculateUserRewards(uid) {
         };
       }
 
-      // Calculate totals for UI
+      // UI के लिए टोटल कैलकुलेट करो
       counts[amt]++;
       breakdown[amt] += rewardAmt;
       totalBal += rewardAmt;
     }
 
-    // Save any new purchases/claims atomically
+    // 5. अगर नया डेटा मिला है, तो उसे दिवाली वाले नोड में सेव करो
     if (Object.keys(updates).length > 0) {
       await update(ref(db, CAMPAIGN.id), updates);
+      console.log("🔥 New Diwali data synced!");
     }
 
-    // 4. Fetch admin paid status
+    // 6. एडमिन का पेड स्टेटस चेक करो
     const rewardSnap = await get(ref(db, `${CAMPAIGN.id}/rewards/${uid}`));
     let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
 
@@ -318,52 +253,29 @@ async function calculateUserRewards(uid) {
 
     updateUI();
   } catch (err) {
-    console.error("Calculation error:", err);
-    showToast("Failed to load reward data. Please refresh.", "error");
+    console.error("Sync error:", err);
   } finally {
-    isCalculating = false;
+    isSyncing = false;
   }
 }
 
 // ============================================================
-// LIVE LISTENERS (Instant Update)
+// ⏱️ AUTO-SYNC TIMER (हर 2 सेकंड में चेक करेगा)
 // ============================================================
-function setupLiveListeners(uid) {
-  // Listen to transactions (Debounced)
-  let txTimeout = null;
-  unsubTransactions = onValue(ref(db, "transactions"), () => {
-    if (txTimeout) clearTimeout(txTimeout);
-    txTimeout = setTimeout(() => calculateUserRewards(uid), 800);
-  });
-
-  // Listen to this user's reward node for admin updates
-  unsubRewards = onValue(ref(db, `${CAMPAIGN.id}/rewards/${uid}`), (snap) => {
-    if (snap.exists()) {
-      const data = snap.val();
-      calculatedRewards.paidAmount = data.paidAmount || 0;
-      calculatedRewards.status = data.status || "available";
-      calculatedRewards.walletAddress = data.walletAddress || "";
-      calculatedRewards.txHash = data.txHash || "";
-      calculatedRewards.paidAt = data.paidAt || null;
-      updateUI();
-    } else {
-      calculatedRewards.paidAmount = 0;
-      calculatedRewards.status = "available";
-      calculatedRewards.walletAddress = "";
-      calculatedRewards.txHash = "";
-      calculatedRewards.paidAt = null;
-      updateUI();
-    }
-  });
+function startAutoSync(uid) {
+  if (syncInterval) clearInterval(syncInterval);
+  // पहली बार तुरंत चलाओ
+  syncDiwaliData(uid);
+  // फिर हर 2 सेकंड में चलाओ
+  syncInterval = setInterval(() => syncDiwaliData(uid), 2000);
 }
 
-function clearLiveListeners() {
-  if (unsubTransactions) { unsubTransactions(); unsubTransactions = null; }
-  if (unsubRewards) { unsubRewards(); unsubRewards = null; }
+function stopAutoSync() {
+  if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
 }
 
 // ============================================================
-// 🎨 UI RENDER
+// 🎨 UI RENDER (पहले जैसा ही है)
 // ============================================================
 function updateUI() {
   const status = getCampaignStatus();
@@ -514,6 +426,62 @@ function startCountdown() {
   };
   update();
   countdownInterval = setInterval(update, 1000);
+}
+
+function getTimeRemaining() {
+  const now = getNow();
+  const status = getCampaignStatus();
+  const target = status === "UPCOMING" ? CAMPAIGN.startDate : CAMPAIGN.endDate;
+  const diff = target - now;
+  if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
+  return {
+    days:    Math.floor(diff / 86400000),
+    hours:   Math.floor((diff % 86400000) / 3600000),
+    minutes: Math.floor((diff % 3600000) / 60000),
+    seconds: Math.floor((diff % 60000) / 1000)
+  };
+}
+
+function fmt(n) { return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function validateBEP20Wallet(address) { return typeof address === "string" && /^0x[a-fA-F0-9]{40}$/.test(address.trim()); }
+
+function showToast(message, type = "success") {
+  const container = el.toastContainer;
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = `toast-custom ${type}`;
+  const iconMap = { success: "bi-check-circle-fill", error: "bi-exclamation-triangle-fill", warning: "bi-exclamation-triangle-fill", info: "bi-info-circle-fill" };
+  toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i><span class="toast-msg">${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translateX(100%)"; setTimeout(() => toast.remove(), 300); }, 5000);
+}
+
+function renderRewardsTable() {
+  const tbody = $("rewardsTableBody");
+  if (!tbody) return;
+  const r = CAMPAIGN.rewards;
+  tbody.innerHTML = `
+    <tr><td>$50</td><td class="gold-text">$${r[50]}</td></tr>
+    <tr><td>$100</td><td class="gold-text">$${r[100]}</td></tr>
+    <tr><td>$200</td><td class="gold-text">$${r[200]}</td></tr>
+    <tr><td>$500</td><td class="gold-text">$${r[500]}</td></tr>
+    <tr class="highlight-row"><td>$1,000 <span class="star">★</span></td><td class="gold-text big">$${r[1000]}</td></tr>
+  `;
+}
+
+function initCalculator() {
+  const inputs = [50, 100, 200, 500, 1000];
+  const recalc = () => {
+    let total = 0;
+    inputs.forEach(amt => {
+      const qty = Math.max(0, parseInt($(`calc${amt}`).value, 10) || 0);
+      const r   = qty * (CAMPAIGN.rewards[amt] || 0);
+      $(`calcOut${amt}`).textContent = r.toLocaleString();
+      total += r;
+    });
+    $("calcTotal").textContent = total.toLocaleString();
+  };
+  inputs.forEach(amt => $(`calc${amt}`)?.addEventListener("input", recalc));
 }
 
 // ============================================================
@@ -673,7 +641,7 @@ async function copyReferralLink() {
 
 async function handleLogout() { 
   try { 
-    clearLiveListeners(); 
+    stopAutoSync(); 
     await signOut(auth); 
     window.location.href = "login.html"; 
   } catch (e) { showToast("Logout error", "error"); } 
@@ -712,13 +680,13 @@ onAuthStateChanged(auth, async (user) => {
   startCountdown();
   setupListeners();
   
-  await calculateUserRewards(user.uid);
-  setupLiveListeners(user.uid); 
+  // 🔥 यहाँ से ऑटो-सिंक शुरू होगा
+  startAutoSync(user.uid); 
   
   if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");
 });
 
 window.addEventListener("beforeunload", () => {
-  clearLiveListeners();
+  stopAutoSync();
   if (countdownInterval) clearInterval(countdownInterval);
 });

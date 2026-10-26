@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL PERFECT SCRIPT (Live Timer)
+// DIWALI BUMPER OFFER 2026 — PERFECT FIX (Live Node & Balance)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -25,10 +25,10 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION (26 Oct - 7 Nov)
+// 🎯 CONFIGURATION (Correct Node Name)
 // ============================================================
 const CAMPAIGN = {
-  id: "direct_diwali_offer_2026",
+  id: "direct_diwali_offer_2026", // 🔥 यहाँ नाम सही कर दिया गया है
   name: "Diwali Bumper Offer 2026",
   startDate: new Date("2026-10-26T00:00:00+05:30"), 
   endDate:   new Date("2026-11-07T23:59:59.999+05:30"),
@@ -117,7 +117,7 @@ function showToast(message, type = "success") {
 }
 
 // ============================================================
-// ⏱️ COUNTDOWN TIMER LOGIC
+// ⏱️ COUNTDOWN TIMER
 // ============================================================
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);
@@ -127,7 +127,6 @@ function startCountdown() {
     const start = CAMPAIGN.startDate.getTime();
     const end = CAMPAIGN.endDate.getTime();
     
-    // अगर ऑफर खत्म हो गया है
     if (now > end) {
       if (el.countdownWrapper) el.countdownWrapper.style.display = "none";
       if (el.campaignEndedMessage) el.campaignEndedMessage.style.display = "block";
@@ -135,8 +134,6 @@ function startCountdown() {
       return;
     }
 
-    // अगर ऑफर शुरू नहीं हुआ है तो टाइमर स्टार्ट (Start) तक का दिखाओ
-    // अगर चल रहा है तो टाइमर एंड (End) तक का दिखाओ
     const targetTime = now < start ? start : end;
     const diff = targetTime - now;
 
@@ -156,7 +153,7 @@ function startCountdown() {
 }
 
 // ============================================================
-// 🔥 DYNAMIC HTML INJECTION FOR WITHDRAWAL INPUT
+// 🔥 WITHDRAWAL INPUT INJECTION
 // ============================================================
 function injectWithdrawalInput() {
   if (!document.getElementById('withdrawAmountInput')) {
@@ -195,7 +192,7 @@ async function syncDiwaliData(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // 1. Fetch all users to find direct referrals
+    // 1. Fetch all users
     const usersSnap = await get(ref(db, "users"));
     const allUsers = usersSnap.val() || {};
     const referredUsers = new Set();
@@ -219,7 +216,7 @@ async function syncDiwaliData(uid) {
     let totalEarned = 0;
     const updates = {};
 
-    // 3. Calculate Total Earned (and save new purchases)
+    // 3. Calculate Total Earned
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       if (!referredUsers.has(refUserUid)) continue;
       
@@ -268,7 +265,7 @@ async function syncDiwaliData(uid) {
       console.log("🔥 New Diwali data synced!");
     }
 
-    // 4. Calculate Pending, Paid & Latest Withdrawal
+    // 4. Calculate Pending & Paid
     let latestWithdrawal = null;
     let totalPaid = 0;
     let totalPending = 0;
@@ -590,7 +587,7 @@ onAuthStateChanged(auth, async (user) => {
   currentUserId = user.uid;
   
   setupListeners();
-  startCountdown(); // 🔥 टाइमर चालू करें
+  startCountdown(); 
   startAutoSync(user.uid); 
   
   if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");

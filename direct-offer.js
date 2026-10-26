@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL PERFECT SCRIPT
+// DIWALI BUMPER OFFER 2026 — FINAL PERFECT SCRIPT (Live Timer)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -117,6 +117,45 @@ function showToast(message, type = "success") {
 }
 
 // ============================================================
+// ⏱️ COUNTDOWN TIMER LOGIC
+// ============================================================
+function startCountdown() {
+  if (countdownInterval) clearInterval(countdownInterval);
+  
+  const update = () => {
+    const now = getNow().getTime();
+    const start = CAMPAIGN.startDate.getTime();
+    const end = CAMPAIGN.endDate.getTime();
+    
+    // अगर ऑफर खत्म हो गया है
+    if (now > end) {
+      if (el.countdownWrapper) el.countdownWrapper.style.display = "none";
+      if (el.campaignEndedMessage) el.campaignEndedMessage.style.display = "block";
+      if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+      return;
+    }
+
+    // अगर ऑफर शुरू नहीं हुआ है तो टाइमर स्टार्ट (Start) तक का दिखाओ
+    // अगर चल रहा है तो टाइमर एंड (End) तक का दिखाओ
+    const targetTime = now < start ? start : end;
+    const diff = targetTime - now;
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    if (el.countdownDays) el.countdownDays.textContent = String(days).padStart(2, "0");
+    if (el.countdownHours) el.countdownHours.textContent = String(hours).padStart(2, "0");
+    if (el.countdownMinutes) el.countdownMinutes.textContent = String(minutes).padStart(2, "0");
+    if (el.countdownSeconds) el.countdownSeconds.textContent = String(seconds).padStart(2, "0");
+  };
+  
+  update();
+  countdownInterval = setInterval(update, 1000);
+}
+
+// ============================================================
 // 🔥 DYNAMIC HTML INJECTION FOR WITHDRAWAL INPUT
 // ============================================================
 function injectWithdrawalInput() {
@@ -156,7 +195,7 @@ async function syncDiwaliData(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // Fetch all users to find direct referrals
+    // 1. Fetch all users to find direct referrals
     const usersSnap = await get(ref(db, "users"));
     const allUsers = usersSnap.val() || {};
     const referredUsers = new Set();
@@ -169,7 +208,7 @@ async function syncDiwaliData(uid) {
       }
     }
 
-    // Fetch existing Diwali data
+    // 2. Fetch existing Diwali data
     const diwaliSnap = await get(ref(db, CAMPAIGN.id));
     const diwaliData = diwaliSnap.val() || {};
     const existingPurchases = diwaliData.purchases || {};
@@ -180,7 +219,7 @@ async function syncDiwaliData(uid) {
     let totalEarned = 0;
     const updates = {};
 
-    // 1. Calculate Total Earned (and save new purchases)
+    // 3. Calculate Total Earned (and save new purchases)
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       if (!referredUsers.has(refUserUid)) continue;
       
@@ -229,7 +268,7 @@ async function syncDiwaliData(uid) {
       console.log("🔥 New Diwali data synced!");
     }
 
-    // 2. Calculate Pending, Paid & Latest Withdrawal
+    // 4. Calculate Pending, Paid & Latest Withdrawal
     let latestWithdrawal = null;
     let totalPaid = 0;
     let totalPending = 0;
@@ -239,7 +278,7 @@ async function syncDiwaliData(uid) {
       
       const amt = Number(w.amount || 0);
       if (w.status === 'paid' || w.status === 'approved') {
-        totalPaid += amt; // अप्रूव्ड का मतलब है पैसे भेज दिए गए
+        totalPaid += amt; 
       } else if (w.status === 'pending') {
         totalPending += amt;
       }
@@ -249,7 +288,7 @@ async function syncDiwaliData(uid) {
       }
     }
 
-    // 3. 🔥 Final Withdrawable Balance Calculation
+    // 5. Final Withdrawable Balance Calculation
     const actualWithdrawable = Math.max(0, totalEarned - totalPaid - totalPending);
 
     calculatedRewards = {
@@ -304,7 +343,6 @@ function updateUI() {
   const breakdown  = calculatedRewards.breakdown || {};
   const totalIds   = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
 
-  // 🔥 यहाँ बैलेंस तुरंत कटा हुआ दिखेगा
   if (el.walletAmount) el.walletAmount.textContent = fmt(withdrawable);
   if (el.statEligibleIds) el.statEligibleIds.textContent = totalIds;
   if (el.statEligibleReward) el.statEligibleReward.textContent = `$${fmt(totalEarned)}`;
@@ -552,6 +590,7 @@ onAuthStateChanged(auth, async (user) => {
   currentUserId = user.uid;
   
   setupListeners();
+  startCountdown(); // 🔥 टाइमर चालू करें
   startAutoSync(user.uid); 
   
   if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");
@@ -559,4 +598,5 @@ onAuthStateChanged(auth, async (user) => {
 
 window.addEventListener("beforeunload", () => {
   stopAutoSync();
+  if (countdownInterval) clearInterval(countdownInterval);
 });

@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL PERFECT SCRIPT
+// DIWALI BUMPER OFFER 2026 — FINAL PERFECT LIVE SCRIPT
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -25,12 +25,11 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION (Start Date = Aaj, End = 7 Nov)
+// 🎯 CONFIGURATION (26 Oct - 7 Nov)
 // ============================================================
 const CAMPAIGN = {
   id: "direct_diwali_offer_2026",
   name: "Diwali Bumper Offer 2026",
-  // 🔥 आज की तारीख (26 Oct 2026) से स्टार्ट
   startDate: new Date("2026-10-26T00:00:00+05:30"), 
   endDate:   new Date("2026-11-07T23:59:59.999+05:30"),
   rewards: { 
@@ -174,7 +173,7 @@ function injectWithdrawalInput() {
 }
 
 // ============================================================
-// 🔥 AUTO-SYNC FUNCTION (Correct Balance Engine)
+// 🔥 AUTO-SYNC FUNCTION (Perfect Balance & Reward Logic)
 // ============================================================
 async function syncDiwaliData(uid) {
   if (isSyncing) return;
@@ -217,7 +216,7 @@ async function syncDiwaliData(uid) {
     let totalEarned = 0;
     const updates = {};
 
-    // 3. Calculate Total Earned (with Tolerant Time Check)
+    // 3. Calculate Total Earned
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       if (!referredUsers.has(refUserUid)) continue;
       
@@ -230,12 +229,12 @@ async function syncDiwaliData(uid) {
         if (!CAMPAIGN.rewards[amt]) continue; 
 
         const purchaseTime = pkg.purchaseDate || pkg.timestamp || 0;
-        // 🔥 यहाँ हम सिर्फ यह देखेंगे कि पैकेज आज या उसके बाद का है
-        // (पुराने पैकेज जो 26 Oct से पहले के हैं, वो नहीं गिने जाएंगे)
         if (purchaseTime < CAMPAIGN.startDate.getTime()) continue;
 
         const rewardAmt = CAMPAIGN.rewards[amt];
-        const purchaseId = pkgId; 
+        
+        // 🔥 हर पैकेज के लिए स्थायी यूनिक ID
+        const purchaseId = `${refUserUid}_${pkgId}`; 
 
         if (!existingPurchases[purchaseId]) {
           updates[`purchases/${purchaseId}`] = {
@@ -360,7 +359,7 @@ function updateUI() {
 function updateWithdrawalUI(withdrawable, status) {
   const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
   
-  // 🔥 विड्रॉल लॉक का लॉजिक
+  // 🔥 7 नवंबर के बाद ही विड्रॉल खुलेगा
   const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
   injectWithdrawalInput(); 
@@ -504,10 +503,32 @@ async function submitWithdrawal() {
 
     if (amountVal <= 0 || amountVal > avail) { showToast("Invalid amount.", "error"); return; }
 
+    // 🔥 रनट्रांजैक्शन से डबल विड्रॉल रोकना
+    const rewardsRoot = ref(db, `${CAMPAIGN.id}/rewards/${currentUserId}`);
     const withdrawalId = generateId("dw");
     const txId = generateId("tx");
     const timestamp = Date.now();
 
+    const lockResult = await runTransaction(rewardsRoot, (current) => {
+      if (current && (current.status === "pending" || current.status === "approved")) {
+        return; // abort
+      }
+      return { 
+        ...current, 
+        status: "pending", 
+        walletAddress: addr, 
+        withdrawalId, 
+        transactionId: txId, 
+        requestedAmount: amountVal, 
+        requestedAt: timestamp, 
+        updatedAt: timestamp 
+      };
+    });
+
+    if (!lockResult.committed) { showToast("Withdrawal already submitted or nothing available.", "warning"); return; }
+
+    // रिकॉर्ड सेव करें
+    const date = new Date(timestamp).toISOString().split("T")[0];
     const adminData = {
       campaignName: CAMPAIGN.name, campaignId: CAMPAIGN.id, type: "diwali_offer_withdrawal",
       asset: "USDT", network: "BEP-20 / BNB Smart Chain", amount: amountVal, status: "pending",
@@ -517,7 +538,7 @@ async function submitWithdrawal() {
     const userTx = {
       type: "diwali_offer_withdrawal", subtype: `${CAMPAIGN.name} Withdrawal`,
       amount: amountVal, currency: "USDT", network: "BEP-20 / BNB Smart Chain",
-      status: "pending", walletAddress: addr, withdrawalId, timestamp, date: new Date(timestamp).toISOString().split("T")[0],
+      status: "pending", walletAddress: addr, withdrawalId, timestamp, date,
       description: `${CAMPAIGN.name} Withdrawal of $${amountVal} USDT (BEP-20)`, txId, txHash: null
     };
     const globalTx = { ...userTx, userId: currentUserId };
@@ -533,6 +554,7 @@ async function submitWithdrawal() {
     if (el.walletAddressInput) el.walletAddressInput.value = "";
     if (withdrawalAmountInput) withdrawalAmountInput.value = "";
 
+    // तुरंत बैलेंस काटें
     calculatedRewards.withdrawable = Math.max(0, calculatedRewards.withdrawable - amountVal);
     calculatedRewards.pendingAmount += amountVal;
     calculatedRewards.currentStatus = "pending";

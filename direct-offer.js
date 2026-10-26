@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL LOCK SCRIPT
+// DIWALI BUMPER OFFER 2026 — FINAL LOCK SCRIPT (Start Now)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -25,13 +25,13 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION (27 Oct to 7 Nov)
+// 🎯 CONFIGURATION (Start Date = Now, End Date = 7 Nov)
 // ============================================================
 const CAMPAIGN = {
   id: "direct_diwali_offer_2026",
   name: "Diwali Bumper Offer 2026",
-  // 🔥 आज रात 12 बजे (27 Oct) से स्टार्ट होगा
-  startDate: new Date("2026-10-27T00:00:00+05:30"), 
+  // 🔥 स्टार्ट डेट को 'अभी' (आज) सेट किया गया है
+  startDate: new Date(), 
   // 🔥 7 Nov रात 11:59:59 बजे खत्म होगा
   endDate:   new Date("2026-11-07T23:59:59.999+05:30"),
   rewards: { 
@@ -319,7 +319,7 @@ function stopAutoSync() {
 }
 
 // ============================================================
-// 🎨 UI RENDER (यहाँ विड्रॉल लॉक का लॉजिक है)
+// 🎨 UI RENDER (विड्रॉल लॉक का लॉजिक)
 // ============================================================
 function updateUI() {
   const status = getCampaignStatus();
@@ -359,7 +359,7 @@ function updateUI() {
 function updateWithdrawalUI(withdrawable, status) {
   const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
   
-  // 🔥 नियम: विड्रॉल सिर्फ तब खुलेगा जब ऑफर खत्म (ENDED) हो जाए
+  // 🔥 विड्रॉल सिर्फ तब खुलेगा जब ऑफर खत्म (ENDED) हो जाए
   const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
   injectWithdrawalInput(); 

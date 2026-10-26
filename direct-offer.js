@@ -1,5 +1,5 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL SCRIPT (With Deduction & Sync)
+// DIWALI BUMPER OFFER 2026 — PERFECT BALANCE DEDUCTION & SYNC
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -81,12 +81,12 @@ const el = {
 
 let currentUserId = null;
 let currentUserData = null;
-let calculatedRewards = { balance: 0, paidAmount: 0, counts: {}, breakdown: {} };
+let calculatedRewards = { totalEarned: 0, paidAmount: 0, pendingAmount: 0, withdrawable: 0, counts: {}, breakdown: {}, currentStatus: "available", currentWithdrawal: null };
 let isProcessingWithdrawal = false;
 let isSyncing = false; 
 let syncInterval = null;
 
-// नए विड्रॉल के लिए इनपुट (HTML में जोड़ने के लिए)
+// नए विड्रॉल के लिए इनपुट
 let withdrawalAmountInput = null; 
 
 // ============================================================
@@ -116,7 +116,6 @@ function showToast(message, type = "success") {
 // 🔥 DYNAMIC HTML INJECTION FOR WITHDRAWAL INPUT
 // ============================================================
 function injectWithdrawalInput() {
-  // अगर पहले से इनपुट नहीं है, तो हम HTML में जोड़ देंगे
   if (!document.getElementById('withdrawAmountInput')) {
     const formGroup = el.walletFormGroup;
     if (formGroup) {
@@ -134,7 +133,7 @@ function injectWithdrawalInput() {
 }
 
 // ============================================================
-// 🔥 AUTO-SYNC FUNCTION (Direct Referral Only)
+// 🔥 AUTO-SYNC FUNCTION (Fixed Balance & Status)
 // ============================================================
 async function syncDiwaliData(uid) {
   if (isSyncing) return;
@@ -170,13 +169,15 @@ async function syncDiwaliData(uid) {
     const diwaliSnap = await get(ref(db, CAMPAIGN.id));
     const diwaliData = diwaliSnap.val() || {};
     const existingPurchases = diwaliData.purchases || {};
+    const userWithdrawals = diwaliData.withdrawals || {};
+    const userRewardData = diwaliData.rewards?.[uid] || {};
     
     const counts = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
     const breakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
-    let totalBal = 0;
+    let totalEarned = 0;
     const updates = {};
 
-    // 3. Loop through packages
+    // 3. Loop through packages to calculate Total Earned
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       if (!referredUsers.has(refUserUid)) continue;
       
@@ -211,10 +212,9 @@ async function syncDiwaliData(uid) {
           };
         }
 
-        if (!counts[amt]) counts[amt] = 0; 
         counts[amt]++;
         breakdown[amt] += rewardAmt;
-        totalBal += rewardAmt;
+        totalEarned += rewardAmt; // यह टोटल कमाई है
       }
     }
 
@@ -223,27 +223,39 @@ async function syncDiwaliData(uid) {
       console.log("🔥 New Diwali data synced!");
     }
 
-    // 4. Fetch admin paid status
-    const rewardSnap = await get(ref(db, `${CAMPAIGN.id}/rewards/${uid}`));
-    let adminPaidAmount = 0, adminStatus = "available", adminWallet = "", adminTxHash = "", adminPaidAt = null;
+    // 4. Find the LATEST withdrawal for this user to calculate balance & status
+    let latestWithdrawal = null;
+    let totalPaid = 0;
+    let totalPending = 0;
 
-    if (rewardSnap.exists()) {
-      const data = rewardSnap.val();
-      adminPaidAmount = data.paidAmount || 0;
-      adminStatus = data.status || "available";
-      adminWallet = data.walletAddress || "";
-      adminTxHash = data.txHash || "";
-      adminPaidAt = data.paidAt || null;
+    for (const [wId, w] of Object.entries(userWithdrawals)) {
+      if (w.userId !== uid) continue;
+      
+      const amt = Number(w.amount || 0);
+      if (w.status === 'paid' || w.status === 'approved') {
+        totalPaid += amt;
+      } else if (w.status === 'pending') {
+        totalPending += amt;
+      }
+      
+      // हम सबसे नए विड्रॉल को ट्रैक करेंगे UI के लिए
+      if (!latestWithdrawal || w.requestedAt > latestWithdrawal.requestedAt) {
+        latestWithdrawal = w;
+      }
     }
 
+    // 🔥 असली बैलेंस कैलकुलेशन:
+    // टोटल कमाई - (भेजे गए पैसे + पेंडिंग पैसे)
+    const actualWithdrawable = Math.max(0, totalEarned - totalPaid - totalPending);
+
     calculatedRewards = {
-      balance: totalBal,
+      totalEarned: totalEarned,
+      paidAmount: totalPaid,
+      pendingAmount: totalPending,
+      withdrawable: actualWithdrawable,
       counts, breakdown,
-      paidAmount: adminPaidAmount,
-      status: adminStatus,
-      walletAddress: adminWallet,
-      txHash: adminTxHash,
-      paidAt: adminPaidAt
+      currentStatus: latestWithdrawal ? latestWithdrawal.status : "available",
+      currentWithdrawal: latestWithdrawal
     };
 
     updateUI();
@@ -274,24 +286,23 @@ function updateUI() {
   if (el.campaignDuration) el.campaignDuration.textContent = `No Limit`;
   if (el.campaignStatusBadge) el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge active">🔥 TESTING ACTIVE</span>`;
 
-  const balance    = Number(calculatedRewards.balance || 0);
-  const paidAmount = Number(calculatedRewards.paidAmount || 0);
+  const totalEarned = Number(calculatedRewards.totalEarned || 0);
+  const totalPaid = Number(calculatedRewards.paidAmount || 0);
+  const totalPending = Number(calculatedRewards.pendingAmount || 0);
+  const withdrawable = Number(calculatedRewards.withdrawable || 0);
   const counts     = calculatedRewards.counts || {};
   const breakdown  = calculatedRewards.breakdown || {};
   const totalIds   = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
 
-  // 🔥 बैलेंस कटौती: अगर पेंडिंग है, तो बैलेंस से काट दें (सिर्फ दिखाने के लिए)
-  let displayBalance = balance;
-  if (calculatedRewards.status === "pending" || calculatedRewards.status === "approved" || calculatedRewards.status === "paid") {
-    displayBalance = Math.max(0, balance - paidAmount - (calculatedRewards.withdrawalAmount || 0));
-  }
-
-  if (el.walletAmount) el.walletAmount.textContent = fmt(displayBalance);
+  // 🔥 यहाँ हम बैलेंस दिखा रहे हैं, जो कट चुका है
+  if (el.walletAmount) el.walletAmount.textContent = fmt(withdrawable);
   if (el.statEligibleIds) el.statEligibleIds.textContent = totalIds;
-  if (el.statEligibleReward) el.statEligibleReward.textContent = `$${fmt(balance)}`;
-  if (el.statPaid) el.statPaid.textContent = `$${fmt(paidAmount)}`;
+  
+  // टोटल रिवॉर्ड हमेशा पूरा दिखेगा
+  if (el.statEligibleReward) el.statEligibleReward.textContent = `$${fmt(totalEarned)}`;
+  
+  if (el.statPaid) el.statPaid.textContent = `$${fmt(totalPaid)}`;
 
-  const withdrawable = Math.max(0, displayBalance);
   if (el.statWithdrawable) el.statWithdrawable.textContent = `$${fmt(withdrawable)}`;
   if (el.statWithdrawNote) el.statWithdrawNote.textContent = `Testing mode: Open now!`;
 
@@ -301,36 +312,47 @@ function updateUI() {
   });
 
   if (el.walletStatusText) {
-    if (balance === 0) el.walletStatusText.textContent = "Refer eligible packages to grow your Diwali reward balance!";
-    else el.walletStatusText.textContent = `💰 $${fmt(balance)} earned so far. Keep referring!`;
+    if (totalEarned === 0) el.walletStatusText.textContent = "Refer eligible packages to grow your Diwali reward balance!";
+    else if (withdrawable === 0) el.walletStatusText.textContent = `✅ All earned rewards have been withdrawn or are pending.`;
+    else el.walletStatusText.textContent = `💰 $${fmt(withdrawable)} available to withdraw.`;
   }
   
   if (el.finalBadge) el.finalBadge.style.display = "none";
 
-  updateWithdrawalUI(balance, paidAmount, withdrawable, status, "Testing Mode");
+  updateWithdrawalUI(withdrawable, totalPending, status);
 }
 
-function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
-  const withdrawalStatus = String(calculatedRewards.status || "").toLowerCase();
-  const canWithdraw = withdrawable > 0;
+function updateWithdrawalUI(withdrawable, totalPending, status) {
+  const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
+  const canWithdraw = withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
-  injectWithdrawalInput(); // 🔥 इनपुट बॉक्स जोड़ें
+  injectWithdrawalInput(); // इनपुट बॉक्स जोड़ें
   
   if (el.withdrawAmount) el.withdrawAmount.textContent = `$${fmt(withdrawable)} USDT`;
   
   if (el.withdrawalInfoBox) el.withdrawalInfoBox.classList.add("visible");
   
   if (el.withdrawalInfoText) {
-    el.withdrawalInfoText.textContent = `🔓 Testing Mode: Withdrawals are unlocked right now.`;
+    if (withdrawalStatus === "pending") el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
+    else if (withdrawalStatus === "approved") el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved and being processed.`;
+    else el.withdrawalInfoText.textContent = `🔓 Testing Mode: Withdrawals are unlocked right now.`;
   }
 
-  // अगर पेंडिंग, अप्रूव्ड या पेड है
   if (["pending", "approved", "paid"].includes(withdrawalStatus)) {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = true;
       if (withdrawalStatus === "pending") el.withdrawBtn.innerHTML = `<i class="bi bi-clock me-2"></i>Pending Approval`;
       else if (withdrawalStatus === "approved") el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle me-2"></i>Approved`;
-      else if (withdrawalStatus === "paid") el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
+      else if (withdrawalStatus === "paid") {
+         // अगर पेड है, लेकिन नया बैलेंस है, तो बटन खोल दें
+         if (canWithdraw) {
+             el.withdrawBtn.disabled = false;
+             el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw New Rewards`;
+             el.withdrawBtn.className = "btn-withdraw";
+         } else {
+             el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
+         }
+      }
     }
     
     if (el.withdrawalStatus) {
@@ -342,12 +364,12 @@ function updateWithdrawalUI(balance, paid, withdrawable, status, endStr) {
         "✅ Payment has been sent to your wallet.";
     }
     
-    if (withdrawalStatus === "paid" && el.withdrawalDetails) {
+    if (withdrawalStatus === "paid" && el.withdrawalDetails && calculatedRewards.currentWithdrawal) {
       el.withdrawalDetails.classList.add("visible");
-      if (el.detailAmount) el.detailAmount.textContent = `$${fmt(calculatedRewards.paidAmount || balance)} USDT`;
-      if (el.detailWallet) el.detailWallet.textContent = calculatedRewards.walletAddress || "---";
-      if (el.detailPaidDate) el.detailPaidDate.textContent = calculatedRewards.paidAt ? new Date(calculatedRewards.paidAt).toLocaleString() : "---";
-      if (el.detailTxHash) el.detailTxHash.textContent = calculatedRewards.txHash || "---";
+      if (el.detailAmount) el.detailAmount.textContent = `$${fmt(calculatedRewards.currentWithdrawal.amount)} USDT`;
+      if (el.detailWallet) el.detailWallet.textContent = calculatedRewards.currentWithdrawal.walletAddress || "---";
+      if (el.detailPaidDate) el.detailPaidDate.textContent = calculatedRewards.currentWithdrawal.paidAt ? new Date(calculatedRewards.currentWithdrawal.paidAt).toLocaleString() : "---";
+      if (el.detailTxHash) el.detailTxHash.textContent = calculatedRewards.currentWithdrawal.txHash || "---";
     }
     
     if (el.walletFormGroup) el.walletFormGroup.style.display = canWithdraw ? "block" : "none";
@@ -400,14 +422,12 @@ function validateWallet() {
 }
 
 function handleWithdrawClick() {
-  const bal = Number(calculatedRewards.balance || 0);
-  const paid = Number(calculatedRewards.paidAmount || 0);
-  const avail = Math.max(0, bal - paid);
+  const avail = calculatedRewards.withdrawable;
   
   if (avail <= 0) { showToast("Nothing to withdraw.", "warning"); return; }
   if (!validateWallet()) { showToast("Enter a valid BEP-20 wallet address.", "error"); return; }
 
-  // 🔥 अमाउंट वैलिडेशन
+  // अमाउंट वैलिडेशन
   const amountVal = parseFloat(withdrawalAmountInput?.value || 0);
   if (!amountVal || amountVal <= 0) { showToast("Enter a valid amount.", "error"); return; }
   if (amountVal > avail) { showToast("Amount exceeds available balance.", "error"); return; }
@@ -433,46 +453,14 @@ async function submitWithdrawal() {
     if (!validateBEP20Wallet(addr)) { showToast("Invalid wallet.", "error"); return; }
 
     const amountVal = parseFloat(withdrawalAmountInput?.value || 0);
-    const bal = Number(calculatedRewards.balance || 0);
-    const paid = Number(calculatedRewards.paidAmount || 0);
-    const avail = Math.max(0, bal - paid);
+    const avail = calculatedRewards.withdrawable;
 
     if (amountVal <= 0 || amountVal > avail) { showToast("Invalid amount.", "error"); return; }
 
-    const rewardsRoot = ref(db, `${CAMPAIGN.id}/rewards/${currentUserId}`);
+    // 🔥 सीधे withdrawals नोड में सेव करें, rewards नोड में नहीं
     const withdrawalId = generateId("dw");
     const txId = generateId("tx");
     const timestamp = Date.now();
-
-    const lockResult = await runTransaction(rewardsRoot, (current) => {
-      if (!current) {
-        return { status: "pending", walletAddress: addr, withdrawalId, transactionId: txId, requestedAmount: amountVal, requestedAt: timestamp, updatedAt: timestamp };
-      }
-      
-      const cStatus = String(current.status || "").toLowerCase();
-      if (cStatus === "pending" || cStatus === "approved") return; 
-      
-      const cPaid = Number(current.paidAmount || 0);
-      const cBal = Number(calculatedRewards.balance || 0);
-      const cAvail = Math.max(0, cBal - cPaid);
-      
-      if (cAvail <= 0 || amountVal > cAvail) return;
-
-      return { 
-        ...current, 
-        status: "pending", 
-        walletAddress: addr, 
-        withdrawalId, 
-        transactionId: txId, 
-        requestedAmount: amountVal, // यहाँ यूजर का डाला अमाउंट सेव होगा
-        requestedAt: timestamp, 
-        updatedAt: timestamp 
-      };
-    });
-
-    if (!lockResult.committed) { showToast("Withdrawal already submitted or invalid amount.", "warning"); return; }
-
-    const date = new Date(timestamp).toISOString().split("T")[0];
 
     const adminData = {
       campaignName: CAMPAIGN.name, campaignId: CAMPAIGN.id, type: "diwali_offer_withdrawal",
@@ -483,11 +471,12 @@ async function submitWithdrawal() {
     const userTx = {
       type: "diwali_offer_withdrawal", subtype: `${CAMPAIGN.name} Withdrawal`,
       amount: amountVal, currency: "USDT", network: "BEP-20 / BNB Smart Chain",
-      status: "pending", walletAddress: addr, withdrawalId, timestamp, date,
+      status: "pending", walletAddress: addr, withdrawalId, timestamp, date: new Date(timestamp).toISOString().split("T")[0],
       description: `${CAMPAIGN.name} Withdrawal of $${amountVal} USDT (BEP-20)`, txId, txHash: null
     };
     const globalTx = { ...userTx, userId: currentUserId };
 
+    // सेव करें
     await update(ref(db), {
       [`${CAMPAIGN.id}/withdrawals/${withdrawalId}`]: adminData,
       [`users/${currentUserId}/diwali_transactions/${txId}`]: userTx,
@@ -498,13 +487,14 @@ async function submitWithdrawal() {
     if (el.confirmationModal) el.confirmationModal.classList.remove("visible");
     if (el.walletAddressInput) el.walletAddressInput.value = "";
     if (withdrawalAmountInput) withdrawalAmountInput.value = "";
-    
-    calculatedRewards.status = "pending";
-    calculatedRewards.withdrawalAmount = amountVal; // UI से बैलेंस काटने के लिए
-    updateUI();
 
-    // 2 सेकंड बाद ऑटो-सिंक से रिफ्रेश हो जाएगा
-    setTimeout(() => syncDiwaliData(currentUserId), 2000);
+    // 🔥 तुरंत बैलेंस काटें
+    calculatedRewards.withdrawable = Math.max(0, calculatedRewards.withdrawable - amountVal);
+    calculatedRewards.pendingAmount += amountVal;
+    calculatedRewards.currentStatus = "pending";
+    
+    updateUI();
+    syncDiwaliData(currentUserId); // तुरंत रिफ्रेश करें
 
   } catch (err) {
     console.error(err);

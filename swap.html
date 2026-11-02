@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swap RND — RND Staking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <style>
+        body {
+            background: #0a0e1a;
+            color: #e5e7eb;
+            font-family: 'Inter', system-ui, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .swap-container {
+            max-width: 520px;
+            margin: 40px auto;
+        }
+        .swap-card {
+            background: linear-gradient(145deg, #131824 0%, #0f1420 100%);
+            border: 1px solid rgba(46, 204, 113, 0.15);
+            border-radius: 20px;
+            padding: 32px 28px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .swap-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .swap-header h2 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            background: linear-gradient(90deg, #2ecc71, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .swap-header p {
+            color: #8b95a5;
+            font-size: 0.85rem;
+            margin: 0;
+        }
+        .rnd-balance-box {
+            background: rgba(96, 165, 250, 0.08);
+            border: 1px solid rgba(96, 165, 250, 0.25);
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin-bottom: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .rnd-balance-box .label {
+            font-size: 0.8rem;
+            color: #8b95a5;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .rnd-balance-box .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #60a5fa;
+        }
+        .form-label-custom {
+            font-size: 0.8rem;
+            color: #8b95a5;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .form-control-custom,
+        .form-select-custom {
+            background: #0a0e1a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #e5e7eb;
+            padding: 14px 16px;
+            font-size: 1rem;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        .form-control-custom:focus,
+        .form-select-custom:focus {
+            outline: none;
+            border-color: #2ecc71;
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+        }
+        .form-select-custom option {
+            background: #131824;
+            color: #e5e7eb;
+        }
+        .rate-preview {
+            background: rgba(46, 204, 113, 0.06);
+            border: 1px dashed rgba(46, 204, 113, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 18px 0;
+        }
+        .rate-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 0.9rem;
+        }
+        .rate-row.total {
+            border-top: 1px solid rgba(46, 204, 113, 0.2);
+            padding-top: 12px;
+            margin-top: 8px;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+        .rate-row .label { color: #8b95a5; }
+        .rate-row .value { color: #e5e7eb; }
+        .rate-row.total .value { color: #2ecc71; font-size: 1.1rem; }
+        .swap-btn {
+            width: 100%;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+            border: none;
+            color: #fff;
+            padding: 16px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.15s, opacity 0.15s;
+            margin-top: 10px;
+        }
+        .swap-btn:hover:not(:disabled) { transform: translateY(-2px); }
+        .swap-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .back-link {
+            display: inline-block;
+            color: #8b95a5;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .back-link:hover { color: #2ecc71; }
+        .toast-container-custom {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast-custom {
+            background: #131824;
+            border-left: 4px solid #2ecc71;
+            padding: 14px 20px;
+            border-radius: 10px;
+            color: #e5e7eb;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 260px;
+            animation: slideIn 0.3s ease;
+        }
+        .toast-custom.error { border-left-color: #e74c3c; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .loading-overlay {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b95a5;
+        }
+        .spinner-custom {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(46, 204, 113, 0.2);
+            border-top-color: #2ecc71;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="toast-container-custom" id="toastContainer"></div>
+
+<div class="swap-container">
+
+    <a href="dashboard.html" class="back-link">
+        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+    </a>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="loading-overlay">
+        <div class="spinner-custom"></div>
+        <p>Loading your RND wallet...</p>
+    </div>
+
+    <!-- Swap Form -->
+    <div id="swapFormCard" class="swap-card hidden">
+        <div class="swap-header">
+            <h2><i class="bi bi-arrow-left-right me-2"></i>Swap RND</h2>
+            <p>Convert your RND to USDT instantly</p>
+        </div>
+
+        <!-- RND Wallet Display -->
+        <div class="rnd-balance-box">
+            <div>
+                <div class="label">RND Wallet Balance</div>
+                <div class="value" id="rndWalletValue">0.0000 RND</div>
+            </div>
+            <i class="bi bi-database" style="font-size: 2rem; color: #60a5fa; opacity: 0.6;"></i>
+        </div>
+
+        <!-- Destination Wallet -->
+        <div style="margin-bottom: 18px;">
+            <label class="form-label-custom">Swap To</label>
+            <select id="toWallet" class="form-select-custom">
+                <option value="depositWallet">Deposit Wallet (USDT)</option>
+                <option value="referralWallet">Referral Wallet (USDT)</option>
+            </select>
+        </div>
+
+        <!-- Amount Input -->
+        <div style="margin-bottom: 8px;">
+            <label class="form-label-custom">Amount to Swap (RND)</label>
+            <input type="number" id="swapAmount" class="form-control-custom"
+                   placeholder="0.0000" step="0.0001" min="0" autocomplete="off">
+        </div>
+
+        <!-- Rate Preview -->
+        <div class="rate-preview">
+            <div class="rate-row">
+                <span class="label">Live RND Rate</span>
+                <span class="value" id="liveRate">$0.00</span>
+            </div>
+            <div class="rate-row">
+                <span class="label">Swap Rate (+$0.05)</span>
+                <span class="value" id="swapRate">$0.00</span>
+            </div>
+            <div class="rate-row total">
+                <span class="label">You Will Receive</span>
+                <span class="value" id="youReceive">0.00 USDT</span>
+            </div>
+        </div>
+
+        <!-- Swap Button -->
+        <button class="swap-btn" id="swapBtn" onclick="handleSwap()">
+            <i class="bi bi-arrow-left-right me-2"></i>Swap Now
+        </button>
+    </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getDatabase, ref, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+// ============================================================
+// FIREBASE CONFIG (dashboard.js जैसा ही)
+// ============================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+    authDomain: "rwebsite-e031b.firebaseapp.com",
+    databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "rwebsite-e031b",
+    storageBucket: "rwebsite-e031b.firebasestorage.app",
+    messagingSenderId: "376966041558",
+    appId: "1:376966041558:web:02bc9062ec182590275e77",
+    measurementId: "G-0T1FREXHD3"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+const SWAP_MARKUP = 0.05; // +5 सेंट
+const WALLET_LABELS = {
+    depositWallet: 'Deposit Wallet',
+    referralWallet: 'Referral Wallet'
+};
+const DEST_CURRENCY = 'USDT';
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUserId = null;
+let liveRate = 1.00;
+let swapInProgress = false;
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast-custom ${type}`;
+    const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
+    toast.innerHTML = `<i class="bi ${icon}"></i><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s';
+        setTimeout(() => toast.remove(), 300);
+    }, 4500);
+}
+
+function getTodayDate() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function generateTxId() {
+    return 'swap_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+}
+
+function roundTo(value, precision) {
+    const f = Math.pow(10, precision);
+    return Math.round(value * f) / f;
+}
+
+// ============================================================
+// FETCH LIVE RATE
+// ============================================================
+async function fetchLiveRate() {
+    try {
+        const snap = await get(ref(db, 'settings/rate'));
+        liveRate = snap.exists() ? Number(snap.val()) : 1.00;
+        if (!isFinite(liveRate) || liveRate <= 0) liveRate = 1.00;
+    } catch (err) {
+        console.warn('Rate fetch failed, using default:', err);
+        liveRate = 1.00;
+    }
+    return liveRate;
+}
+
+// ============================================================
+// UPDATE RATE PREVIEW
+// ============================================================
+function updateRatePreview() {
+    const swapRate = roundTo(liveRate + SWAP_MARKUP, 4);
+    const amount = parseFloat(document.getElementById('swapAmount').value) || 0;
+    const youReceive = roundTo(amount * swapRate, 2);
+
+    document.getElementById('liveRate').textContent = '$' + liveRate.toFixed(4);
+    document.getElementById('swapRate').textContent = '$' + swapRate.toFixed(4);
+    document.getElementById('youReceive').textContent = youReceive.toFixed(2) + ' ' + DEST_CURRENCY;
+}
+
+// ============================================================
+// LOAD RND WALLET
+// ============================================================
+async function loadRndWallet() {
+    try {
+        const snap = await get(ref(db, 'users/' + currentUserId));
+        if (!snap.exists()) {
+            showToast('User data not found', 'error');
+            return;
+        }
+        const data = snap.val();
+        const rnd = Number(data.rndWallet || 0);
+        document.getElementById('rndWalletValue').textContent = rnd.toFixed(4) + ' RND';
+    } catch (err) {
+        console.error('Load wallet error:', err);
+        showToast('Failed to load wallet', 'error');
+    }
+}
+
+// ============================================================
+// HANDLE SWAP
+// ============================================================
+async function handleSwap() {
+    if (swapInProgress) {
+        showToast('⏳ Swap already in progress...', 'error');
+        return;
+    }
+
+    const amountRaw = document.getElementById('swapAmount').value;
+    const amount = parseFloat(amountRaw);
+    const toWallet = document.getElementById('toWallet').value;
+    const btn = document.getElementById('swapBtn');
+
+    // Validation
+    if (!WALLET_LABELS[toWallet]) {
+        showToast('❌ Invalid destination wallet', 'error');
+        return;
+    }
+    if (!isFinite(amount) || Number.isNaN(amount) || amount <= 0) {
+        showToast('❌ Enter a valid amount', 'error');
+        return;
+    }
+    if (Math.abs(roundTo(amount, 4) - amount) > 1e-9) {
+        showToast('❌ Amount can have max 4 decimals', 'error');
+        return;
+    }
+
+    const swapRate = roundTo(liveRate + SWAP_MARKUP, 4);
+    const usdtReceived = roundTo(amount * swapRate, 2);
+
+    if (usdtReceived <= 0) {
+        showToast('❌ Amount too small', 'error');
+        return;
+    }
+
+    swapInProgress = true;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Swapping...';
+
+    const userRef = ref(db, 'users/' + currentUserId);
+    const txId = generateTxId();
+    const today = getTodayDate();
+    const now = Date.now();
+
+    try {
+        const result = await runTransaction(userRef, (data) => {
+            if (!data) return data;
+
+            const rndBalance = roundTo(Number(data.rndWallet) || 0, 8);
+
+            // ✅ Balance check INSIDE transaction (atomic)
+            if (rndBalance < amount) {
+                // abort — return undefined to cancel
+                return undefined;
+            }
+
+            const currentDest = roundTo(Number(data[toWallet]) || 0, 2);
+
+            data.rndWallet = roundTo(rndBalance - amount, 8);
+            data[toWallet] = roundTo(currentDest + usdtReceived, 2);
+
+            // Transaction record
+            const transactions = data.transactions || {};
+            transactions[txId] = {
+                type: 'swap',
+                from: 'rndWallet',
+                to: toWallet,
+                amountIn: amount,
+                currencyIn: 'RND',
+                amountOut: usdtReceived,
+                currencyOut: DEST_CURRENCY,
+                liveRate: liveRate,
+                swapRate: swapRate,
+                markup: SWAP_MARKUP,
+                timestamp: now,
+                date: today,
+                status: 'completed',
+                txId: txId,
+                description: `Swapped ${amount.toFixed(4)} RND → ${usdtReceived.toFixed(2)} USDT at $${swapRate}`
+            };
+            data.transactions = transactions;
+
+            return data;
+        });
+
+        if (!result.committed) {
+            showToast('❌ Insufficient RND balance or swap cancelled', 'error');
+            swapInProgress = false;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-left-right me-2"></i>Swap Now';
+            return;
+        }
+
+        const finalData = result.snapshot.val();
+        const newRnd = Number(finalData.rndWallet || 0);
+        const newDest = Number(finalData[toWallet] || 0);
+
+        showToast(`✅ Swapped ${amount.toFixed(4)} RND → ${usdtReceived.toFixed(2)} USDT (${WALLET_LABELS[toWallet]})`, 'success');
+
+        // Update UI immediately
+        document.getElementById('rndWalletValue').textContent = newRnd.toFixed(4) + ' RND';
+        document.getElementById('swapAmount').value = '';
+        updateRatePreview();
+
+    } catch (err) {
+        console.error('Swap error:', err);
+        showToast('❌ Swap failed. Please try again.', 'error');
+    } finally {
+        swapInProgress = false;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-left-right me-2"></i>Swap Now';
+    }
+}
+
+// Expose for inline onclick
+window.handleSwap = handleSwap;
+
+// ============================================================
+// AUTH GUARD + INIT
+// ============================================================
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+    currentUserId = user.uid;
+
+    // Ban check
+    try {
+        const snap = await get(ref(db, 'users/' + user.uid));
+        if (snap.exists() && snap.val().banned === true) {
+            alert('Your account has been banned.');
+            window.location.href = 'login.html';
+            return;
+        }
+    } catch (_) {}
+
+    await fetchLiveRate();
+    await loadRndWallet();
+
+    document.getElementById('loadingState').classList.add('hidden');
+    document.getElementById('swapFormCard').classList.remove('hidden');
+
+    updateRatePreview();
+    document.getElementById('swapAmount').addEventListener('input', updateRatePreview);
+    document.getElementById('toWallet').addEventListener('change', updateRatePreview);
+});
+</script>
+
+</body>
+</html>

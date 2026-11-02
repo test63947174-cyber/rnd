@@ -1163,7 +1163,8 @@ function renderDashboard(u) {
                         </div>
                         <div>
                             <a href="deposit.html" class="btn-primary-custom me-2"><i class="bi bi-plus-circle me-1"></i>Deposit</a>
-                            <a href="withdrawal.html" class="btn-outline-custom"><i class="bi bi-arrow-up-right me-1"></i>Withdraw</a>
+    <a href="withdrawal.html" class="btn-outline-custom me-2"><i class="bi bi-arrow-up-right me-1"></i>Withdraw</a>
+    <a href="swap.html" class="btn-outline-custom"><i class="bi bi-arrow-left-right me-1"></i>Swap</a>
                         </div>
                     </div>
                 </div>

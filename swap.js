@@ -24,7 +24,6 @@ const db = getDatabase(app);
 // ============================================================
 // CONSTANTS & STATE
 // ============================================================
-const SWAP_MARKUP = 0.05; 
 const DEST_CURRENCY = 'USDT';
 const RATE_REFRESH_MS = 30000; 
 
@@ -35,7 +34,6 @@ const RND_TOKEN = "0xcF1FbF18bE9202865bcf88E6349B9D207F75942d";
 const USDT_TOKEN = "0x55d398326f99059fF775485246999027B3197955"; 
 const WBNB_TOKEN = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"; 
 
-// फीस टियर्स जिन्हें हम चेक करेंगे
 const FEE_TIERS = [100, 500, 2500, 10000]; 
 
 let currentUserId = null;
@@ -47,7 +45,6 @@ let rndBalance = 0;
 let swapInProgress = false;
 let uiInitialized = false;
 let rateTimer = null;
-let detectedFee = null; // सही फीस यहाँ सेव होगी
 
 // ============================================================
 // DOM HELPERS
@@ -75,7 +72,6 @@ function showToast(message, type = 'success') {
 function getTodayDate() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function generateTxId() { const rand = (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g, '').slice(0, 12) : Math.random().toString(36).slice(2, 10); return 'swap_' + Date.now() + '_' + rand; }
 function roundTo(value, precision) { const f = Math.pow(10, precision); return Math.round(value * f) / f; }
-function getSwapRate() { return roundTo(liveRate + SWAP_MARKUP, 4); }
 function fmtRnd(n) { return Number(n || 0).toFixed(4) + ' RND'; }
 function fmtUsdt(n) { return Number(n || 0).toFixed(2) + ' ' + DEST_CURRENCY; }
 
@@ -87,7 +83,8 @@ function validateAmount(raw) {
     if (raw === '' || raw === null || raw === undefined) return { ok: false, amount: 0, error: null };
     if (!isFinite(amount) || amount <= 0) return { ok: false, amount: 0, error: 'Enter a valid amount' };
     if (Math.abs(roundTo(amount, 4) - amount) > 1e-9) return { ok: false, amount, error: 'Maximum 4 decimals allowed' };
-    if (rateReady && roundTo(amount * getSwapRate(), 2) <= 0) return { ok: false, amount, error: 'Amount too small' };
+    // चूंकि मार्कअप हटा दिया है, इसलिए सीधे liveRate इस्तेमाल होगा
+    if (rateReady && roundTo(amount * liveRate, 2) <= 0) return { ok: false, amount, error: 'Amount too small' };
     if (walletReady && amount > rndBalance) return { ok: false, amount, error: 'Insufficient RND balance' };
     return { ok: true, amount, error: null };
 }
@@ -106,11 +103,12 @@ function updateRatePreview() {
     const amountInput = $('swapAmount');
     const raw = amountInput ? amountInput.value : '';
     const check = validateAmount(raw);
+    
     if (rateReady) {
-        const swapRate = getSwapRate();
+        // यहाँ सीधे liveRate दिखेगा (कोई +0.05 नहीं)
         setText('liveRate', '$' + liveRate.toFixed(4));
-        setText('swapRate', '$' + swapRate.toFixed(4));
-        const receive = check.ok ? roundTo(check.amount * swapRate, 2) : 0;
+        setText('swapRate', '$' + liveRate.toFixed(4)); 
+        const receive = check.ok ? roundTo(check.amount * liveRate, 2) : 0;
         setText('youReceive', fmtUsdt(receive));
     } else {
         setText('liveRate', '--'); setText('swapRate', '--'); setText('youReceive', '--');
@@ -136,46 +134,37 @@ async function fetchLiveRate() {
         const quoter = new ethers.Contract(QUOTER_V2, quoterAbi, provider);
         const amountIn = ethers.utils.parseUnits("1", 18); 
 
-        // 1. सबसे पहले सीधा RND -> USDT का रास्ता चेक करें
         for (const fee of FEE_TIERS) {
             try {
                 const params = { tokenIn: RND_TOKEN, tokenOut: USDT_TOKEN, amountIn: amountIn, fee: fee, sqrtPriceLimitX96: 0 };
                 const result = await quoter.callStatic.quoteExactInputSingle(params);
                 if (result.amountOut > 0) {
                     liveRate = parseFloat(ethers.utils.formatUnits(result.amountOut, 18));
-                    detectedFee = fee;
                     rateReady = true;
-                    console.log(`✅ सीधा पूल मिला! Fee: ${fee}, Rate: $${liveRate.toFixed(4)}`);
                     return true;
                 }
-            } catch (e) { /* इस फीस पर पूल नहीं है, आगे चेक करें */ }
+            } catch (e) { }
         }
 
-        // 2. अगर सीधा USDT पूल नहीं मिला, तो RND -> WBNB -> USDT का रास्ता चेक करें
         for (const fee of FEE_TIERS) {
             try {
-                // पहले 1 RND से कितना WBNB मिलेगा
                 const params1 = { tokenIn: RND_TOKEN, tokenOut: WBNB_TOKEN, amountIn: amountIn, fee: fee, sqrtPriceLimitX96: 0 };
                 const res1 = await quoter.callStatic.quoteExactInputSingle(params1);
                 const wbnbOut = ethers.utils.formatUnits(res1.amountOut, 18);
 
                 if (parseFloat(wbnbOut) > 0) {
-                    // अब उतने WBNB से कितना USDT मिलेगा (WBNB/USDT का फीस आमतौर पर 500 या 2500 होता है)
                     const params2 = { tokenIn: WBNB_TOKEN, tokenOut: USDT_TOKEN, amountIn: ethers.utils.parseUnits(wbnbOut, 18), fee: 500, sqrtPriceLimitX96: 0 };
                     const res2 = await quoter.callStatic.quoteExactInputSingle(params2);
                     liveRate = parseFloat(ethers.utils.formatUnits(res2.amountOut, 18));
-                    detectedFee = fee;
                     rateReady = true;
-                    console.log(`✅ RND -> WBNB पूल मिला! Fee: ${fee}, Rate: $${liveRate.toFixed(4)}`);
                     return true;
                 }
-            } catch (e) { /* इस फीस पर WBNB पूल नहीं है */ }
+            } catch (e) { }
         }
 
         throw new Error('कोई भी पूल नहीं मिला');
     } catch (err) {
         console.warn('Pancake rate fetch failed, using fallback:', err);
-        // फॉलबैक: अगर ब्लॉकचेन से रेट न आए तो डेटाबेस का रेट (सिर्फ इस पेज पर)
         try {
             const snap = await get(ref(db, 'settings/rate'));
             const val = snap.exists() ? Number(snap.val()) : 0.95;
@@ -204,7 +193,7 @@ async function loadWallets() {
 }
 
 // ============================================================
-// HANDLE SWAP
+// HANDLE SWAP (Locked Rate)
 // ============================================================
 async function handleSwap() {
     if (swapInProgress) return showToast('⏳ Swap already in progress...', 'error');
@@ -224,17 +213,10 @@ async function handleSwap() {
     refreshButtonState();
 
     try {
-        const shownRate = getSwapRate();
-        const fetched = await fetchLiveRate();
-        if (!fetched) return showToast('❌ Could not fetch current rate.', 'error');
+        // ✅ यहाँ हमने रेट लॉक कर दिया है। बार-बार चेक नहीं करेंगे, जो स्क्रीन पर है उसी से स्वैप होगा।
+        const lockedRate = liveRate; 
         
-        const swapRate = getSwapRate();
-        if (swapRate !== shownRate) {
-            updateRatePreview();
-            return showToast('⚠️ Rate has changed. Please check and swap again.', 'error');
-        }
-
-        const usdtReceived = roundTo(amount * swapRate, 2);
+        const usdtReceived = roundTo(amount * lockedRate, 2);
         if (usdtReceived <= 0) return showToast('❌ Amount too small', 'error');
 
         const userRef = ref(db, 'users/' + currentUserId);
@@ -259,9 +241,9 @@ async function handleSwap() {
                 type: 'swap', from: 'rndWallet', to: toWallet,
                 amount: usdtReceived, amountIn: amount, currencyIn: 'RND',
                 amountOut: usdtReceived, currencyOut: DEST_CURRENCY,
-                liveRate: liveRate, swapRate: swapRate, markup: SWAP_MARKUP,
+                liveRate: lockedRate, swapRate: lockedRate,
                 timestamp: now, date: today, status: 'completed', txId: txId,
-                description: `Swapped ${amount.toFixed(4)} RND → ${usdtReceived.toFixed(2)} USDT at $${swapRate}`
+                description: `Swapped ${amount.toFixed(4)} RND → ${usdtReceived.toFixed(2)} USDT at $${lockedRate}`
             };
             data.transactions = transactions;
             return data;
@@ -302,6 +284,7 @@ function initUI() {
     if (walletEl) walletEl.addEventListener('change', updateRatePreview);
     if (btnEl) btnEl.addEventListener('click', handleSwap);
 
+    // हर 30 सेकंड में रेट अपडेट होगा UI पर
     const refreshRate = async () => { if (swapInProgress) return; await fetchLiveRate(); refreshButtonState(); updateRatePreview(); };
     rateTimer = setInterval(refreshRate, RATE_REFRESH_MS);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshRate(); });

@@ -83,7 +83,6 @@ function validateAmount(raw) {
     if (raw === '' || raw === null || raw === undefined) return { ok: false, amount: 0, error: null };
     if (!isFinite(amount) || amount <= 0) return { ok: false, amount: 0, error: 'Enter a valid amount' };
     if (Math.abs(roundTo(amount, 4) - amount) > 1e-9) return { ok: false, amount, error: 'Maximum 4 decimals allowed' };
-    // चूंकि मार्कअप हटा दिया है, इसलिए सीधे liveRate इस्तेमाल होगा
     if (rateReady && roundTo(amount * liveRate, 2) <= 0) return { ok: false, amount, error: 'Amount too small' };
     if (walletReady && amount > rndBalance) return { ok: false, amount, error: 'Insufficient RND balance' };
     return { ok: true, amount, error: null };
@@ -105,13 +104,13 @@ function updateRatePreview() {
     const check = validateAmount(raw);
     
     if (rateReady) {
-        // यहाँ सीधे liveRate दिखेगा (कोई +0.05 नहीं)
         setText('liveRate', '$' + liveRate.toFixed(4));
-        setText('swapRate', '$' + liveRate.toFixed(4)); 
+        // Swap Rate वाली लाइन हटा दी गई है, इसलिए सिर्फ liveRate से कैलकुलेशन होगा
         const receive = check.ok ? roundTo(check.amount * liveRate, 2) : 0;
         setText('youReceive', fmtUsdt(receive));
     } else {
-        setText('liveRate', '--'); setText('swapRate', '--'); setText('youReceive', '--');
+        setText('liveRate', '--'); 
+        setText('youReceive', '--');
     }
     const errEl = $('swapError'); if (errEl) { errEl.textContent = check.error || ''; errEl.style.display = check.error ? 'block' : 'none'; }
 }
@@ -213,7 +212,7 @@ async function handleSwap() {
     refreshButtonState();
 
     try {
-        // ✅ यहाँ हमने रेट लॉक कर दिया है। बार-बार चेक नहीं करेंगे, जो स्क्रीन पर है उसी से स्वैप होगा।
+        // ✅ रेट लॉक: जो स्क्रीन पर दिख रहा है, उसी से स्वैप होगा
         const lockedRate = liveRate; 
         
         const usdtReceived = roundTo(amount * lockedRate, 2);
@@ -307,4 +306,20 @@ onAuthStateChanged(auth, async (user) => {
     $('loadingState')?.classList.add('hidden');
     $('swapFormCard')?.classList.remove('hidden');
     initUI(); updateRatePreview(); refreshButtonState();
+});
+
+// ============================================================
+// ✅ डैशबोर्ड पर वापस जाने पर रिफ्रेश कराने का कोड
+// ============================================================
+// 1. "Back to Dashboard" लिंक पर क्लिक करने पर रिफ्रेश होकर जाए
+document.querySelector('a[href="dashboard.html"]')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.location.replace('dashboard.html'); 
+});
+
+// 2. मोबाइल/ब्राउज़र के "Back" बटन से जाने पर रिफ्रेश होकर जाए
+window.addEventListener("pageshow", function (event) {
+    if (event.persisted || (typeof performance !== 'undefined' && performance.getEntriesByType("navigation")[0]?.type === "back_forward")) {
+        window.location.reload(); 
+    }
 });

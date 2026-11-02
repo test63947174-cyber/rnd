@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getDatabase, ref, get, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-// ✅ Ethers.js इम्पोर्ट (PancakeSwap लाइव रेट के लिए)
-import { ethers } from "https://cdn.ethers.io/lib/ethers-5.7.2.esm.min.js";
+// ✅ Ethers.js का नया और स्टेबल लिंक (jsDelivr)
+import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js";
 
 // ============================================================
 // FIREBASE CONFIG (वही पुराना - rwebsite-e031b)
@@ -25,13 +25,13 @@ const db = getDatabase(app);
 // ============================================================
 // CONSTANTS & STATE
 // ============================================================
-const SWAP_MARKUP = 0.05; // यूजर को पैनकेक रेट से 5 सेंट ज्यादा मिलेंगे
+const SWAP_MARKUP = 0.05; 
 const WALLET_LABELS = {
     depositWallet: 'Deposit Wallet',
     referralWallet: 'Referral Wallet'
 };
 const DEST_CURRENCY = 'USDT';
-const RATE_REFRESH_MS = 30000; // हर 30 सेकंड में रेट अपडेट
+const RATE_REFRESH_MS = 30000; 
 const MAX_AMOUNT_DECIMALS = 4;
 
 // ✅ PancakeSwap V3 कॉन्ट्रैक्ट डिटेल्स (BSC)
@@ -39,7 +39,7 @@ const BSC_RPC = "https://bsc-dataseed.binance.org/";
 const QUOTER_V2 = "0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997";
 const RND_TOKEN = "0xcF1FbF18bE9202865bcf88E6349B9D207F75942d";
 const USDT_TOKEN = "0x55d398326f99059fF775485246999027B3197955"; // BSC USDT
-const POOL_FEE = 2500; // आपके पूल की फीस (0.25%)
+const POOL_FEE = 2500; 
 
 let currentUserId = null;
 let liveRate = 0;
@@ -191,17 +191,14 @@ function renderWallets(data) {
 // ============================================================
 async function fetchLiveRate() {
     try {
-        // BSC नेटवर्क से कनेक्ट करें
         const provider = new ethers.providers.JsonRpcProvider(BSC_RPC);
         
-        // QuoterV2 का ABI (सिर्फ quoteExactInputSingle के लिए)
         const quoterAbi = [
             "function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)"
         ];
         
         const quoter = new ethers.Contract(QUOTER_V2, quoterAbi, provider);
 
-        // हम पूछ रहे हैं: 1 RND बेचने पर कितना USDT मिलेगा?
         const amountIn = ethers.utils.parseUnits("1", 18); 
 
         const params = {
@@ -212,16 +209,11 @@ async function fetchLiveRate() {
             sqrtPriceLimitX96: 0 
         };
         
-        // स्मार्ट कॉन्ट्रैक्ट से रेट मांगें
         const result = await quoter.callStatic.quoteExactInputSingle(params);
-        
-        // रिजल्ट को USDT फॉर्मेट में बदलें (BSC पर USDT में 18 डेसिमल्स होते हैं)
         const usdtOut = ethers.utils.formatUnits(result.amountOut, 18);
         
-        // लाइव रेट सेट करें
         liveRate = parseFloat(usdtOut); 
         
-        // अगर रेट 0 है या नहीं मिला, तो एरर दें
         if (!isFinite(liveRate) || liveRate <= 0) {
             throw new Error('Invalid rate from PancakeSwap');
         }
@@ -230,7 +222,6 @@ async function fetchLiveRate() {
         return true;
     } catch (err) {
         console.warn('Pancake rate fetch failed, using fallback:', err);
-        // अगर ब्लॉकचेन से रेट न आए, तो बैकअप के तौर पर डेटाबेस का रेट इस्तेमाल करें
         try {
             const snap = await get(ref(db, 'settings/rate'));
             const val = snap.exists() ? Number(snap.val()) : 0.95;
@@ -307,7 +298,6 @@ async function handleSwap() {
     refreshButtonState();
 
     try {
-        // स्वैप से ठीक पहले एक बार फिर से ताज़ा रेट चेक करें
         const shownRate = getSwapRate();
         const fetched = await fetchLiveRate();
         if (!fetched) {
@@ -316,7 +306,6 @@ async function handleSwap() {
         }
         const swapRate = getSwapRate();
 
-        // अगर रेट बदल गया है तो यूजर को रोकें
         if (swapRate !== shownRate) {
             updateRatePreview();
             showToast('⚠️ Rate has changed. Please check the new rate and swap again.', 'error');
@@ -336,7 +325,6 @@ async function handleSwap() {
         const usedLiveRate = liveRate;
         let abortReason = null;
 
-        // ✅ डेटाबेस में वॉलेट अपडेट
         const result = await runTransaction(userRef, (data) => {
             abortReason = null;
             if (data === null) return data;

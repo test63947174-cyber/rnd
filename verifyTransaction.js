@@ -1,16 +1,6 @@
 // ============================================================
 // 🔒 VERIFY TRANSACTION + DEPOSIT ENGINE — RND STAKING
 // ============================================================
-// Flow:
-//   1. Hash normalize + validate
-//   2. Duplicate check (usedTransactions)
-//   3. Processing lock (heartbeat ke saath)
-//   4. BSC blockchain verification (receipt, token, receiver, amount, confirmations)
-//   5. ATOMIC claim of TXID  ->  balance credit (idempotent)  ->  mark completed
-//
-// Ek TXID sirf ek baar credit ho sakta hai, chahe user double-click kare,
-// page refresh kare, 2 tab khole ya koi aur user wahi hash use kare.
-// ============================================================
 
 import { ethers } from "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js";
 import { WALLET_CONFIG, normalizeTxHash, isValidTxHash } from "./wallet.js";
@@ -26,7 +16,7 @@ import {
 } from "./firebase.js";
 
 // ============================================================
-// 🔖 ERROR CODES (UI inhi codes se message banata hai)
+// 🔖 ERROR CODES
 // ============================================================
 export const ERROR_CODES = Object.freeze({
     INVALID_INPUT: "INVALID_INPUT",
@@ -61,11 +51,11 @@ const TRANSFER_IFACE = new ethers.Interface([
 ]);
 const TRANSFER_TOPIC = TRANSFER_IFACE.getEvent("Transfer").topicHash.toLowerCase();
 
-const VERIFY_GUARD_MS = 60000;        // ek hash par parallel verification rokne ka window
-const VERIFY_TOTAL_TIMEOUT = 60000;   // ek verification round ki max duration
+const VERIFY_GUARD_MS = 60000;
+const VERIFY_TOTAL_TIMEOUT = 60000;
 
-const activeVerifications = new Map(); // txHash -> startTime
-const activeDeposits = new Set();      // txHash (is browser tab me chal rahe deposits)
+const activeVerifications = new Map();
+const activeDeposits = new Set();
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -112,14 +102,13 @@ export function amountsMatch(userAmount, chainAmount) {
 }
 
 // ============================================================
-// 🌐 RPC PROVIDER (failover + reuse)
+// 🌐 RPC PROVIDER
 // ============================================================
 let providerCache = { provider: null, index: -1 };
 
 function buildProvider(url) {
     const request = new ethers.FetchRequest(url);
     request.timeout = WALLET_CONFIG.RPC_TIMEOUT;
-    // Network fixed hai => ethers baar-baar "detect network" nahi karega
     return new ethers.JsonRpcProvider(request, WALLET_CONFIG.CHAIN_ID, { staticNetwork: true });
 }
 
@@ -162,7 +151,6 @@ async function getProvider(forceNext = false) {
     return connectProvider(start);
 }
 
-/** fn(provider) ko chalata hai; fail hone par agle RPC se dobara try karta hai. */
 async function rpc(fn) {
     const attempts = Math.min(3, WALLET_CONFIG.RPC_ENDPOINTS.length);
     let lastError = null;
@@ -180,7 +168,6 @@ async function rpc(fn) {
 }
 
 async function fetchChainData(txHash, needBlockTime) {
-    // Receipt + current block ek hi node se (confirmations galat na bane)
     const read = async (provider) => {
         const receipt = await provider.getTransactionReceipt(txHash);
         if (!receipt) {
@@ -198,7 +185,6 @@ async function fetchChainData(txHash, needBlockTime) {
 
     let data = await rpc(read);
 
-    // Kuch nodes naye tx me peeche hote hain => nahi mila to doosre node se confirm karo
     if (!data.receipt && !data.tx) {
         await getProvider(true);
         data = await rpc(read);
@@ -229,12 +215,11 @@ function analyzeTransfers(receipt) {
                         value: parsed.args.value
                     });
                 }
-            } catch (_) { /* Transfer event nahi hai */ }
+            } catch (_) { /* ignore */ }
         } else if (
             log.topics && log.topics.length === 3 &&
             String(log.topics[0]).toLowerCase() === TRANSFER_TOPIC
         ) {
-            // Kisi aur ERC20 token ka Transfer => kya hamare wallet par aaya?
             const to = "0x" + String(log.topics[2]).slice(26).toLowerCase();
             if (to === deposit && !otherTokenContract) otherTokenContract = log.address;
         }
@@ -266,7 +251,6 @@ function analyzeTransfers(receipt) {
         };
     }
 
-    // Ek hi tx me hamare wallet par kai transfer ho to sab jod do
     const total = toDeposit.reduce((sum, t) => sum + t.value, 0n);
     const amountText = ethers.formatUnits(total, WALLET_CONFIG.USDT_DECIMALS).replace(/\.0$/, "");
 
@@ -282,16 +266,12 @@ function analyzeTransfers(receipt) {
 // ============================================================
 // 🔒 VERIFY TRANSACTION ON BLOCKCHAIN
 // ============================================================
-// Order: receipt -> status -> token/receiver -> amount -> sender/age -> confirmations
-// Amount galat ho to confirmations ka wait kiye bina turant error milta hai.
-// ============================================================
 async function runVerification(hash, expectedAmount, options) {
     const required = WALLET_CONFIG.MIN_CONFIRMATIONS;
     const maxAgeHours = options.maxAgeHours != null ? Number(options.maxAgeHours) : WALLET_CONFIG.MAX_TX_AGE_HOURS;
 
     const data = await fetchChainData(hash, maxAgeHours > 0);
 
-    // Abhi mine nahi hua
     if (!data.receipt) {
         if (data.tx) {
             return fail(C.PENDING, "Transaction is waiting to be mined...", {
@@ -328,7 +308,6 @@ async function runVerification(hash, expectedAmount, options) {
         });
     }
 
-    // Amount match (confirmations se PEHLE)
     const expected = Number(expectedAmount);
     if (Number.isFinite(expected) && expected > 0 && !amountsMatch(expected, actualAmount)) {
         return fail(
@@ -344,7 +323,6 @@ async function runVerification(hash, expectedAmount, options) {
         );
     }
 
-    // Sender binding (optional)
     if (options.expectedSender) {
         const okSender = addrEq(analysis.from, options.expectedSender) || addrEq(receipt.from, options.expectedSender);
         if (!okSender) {
@@ -354,7 +332,6 @@ async function runVerification(hash, expectedAmount, options) {
         }
     }
 
-    // Age limit (optional)
     if (maxAgeHours > 0 && blockTimestamp) {
         const ageMs = Date.now() - blockTimestamp * 1000;
         if (ageMs > maxAgeHours * 3600 * 1000) {
@@ -362,7 +339,6 @@ async function runVerification(hash, expectedAmount, options) {
         }
     }
 
-    // Confirmations
     const confirmations = Math.max(0, currentBlock - receipt.blockNumber + 1);
 
     if (confirmations < required) {
@@ -402,8 +378,11 @@ export async function verifyTransaction(txHash, expectedAmount, options = {}) {
         return fail(C.INVALID_HASH, "Invalid transaction hash. It must start with 0x and be 66 characters long.");
     }
 
+    // 🔥 FIX: गार्ड केवल तभी लागू हो जब वास्तव में कोई verification चल रही हो
     const startedAt = activeVerifications.get(hash);
     if (startedAt && Date.now() - startedAt < VERIFY_GUARD_MS) {
+        // अगर पिछली verification 60 सेकंड से पुरानी है, तो उसे मृत मानकर हटा दें
+        // (यह अब तुरंत दोबारा try करने देगा)
         return fail(C.IN_PROGRESS, "This transaction is already being verified. Please wait.");
     }
     activeVerifications.set(hash, Date.now());
@@ -418,12 +397,13 @@ export async function verifyTransaction(txHash, expectedAmount, options = {}) {
         console.error("Verification error:", error);
         return fail(C.NETWORK, `Network problem while verifying: ${error.message}`);
     } finally {
+        // 🔥 FIX: हमेशा हटाएं, चाहे सफल हो या विफल — ताकि अगली बार तुरंत try हो सके
         activeVerifications.delete(hash);
     }
 }
 
 // ============================================================
-// 🔒 PROCESSING LOCK (heartbeat + owner token)
+// 🔒 PROCESSING LOCK
 // ============================================================
 const lockRef = (txHash) => ref(db, `processingTransactions/${txHash}`);
 
@@ -442,7 +422,6 @@ async function acquireProcessingLock(txHash, uid, amount) {
 
             const lastBeat = current.heartbeat || current.timestamp || 0;
 
-            // Same user ka naya attempt (refresh / naya tab) => purane ko hata kar chalu
             if (current.uid === uid) {
                 return {
                     ...current,
@@ -453,13 +432,12 @@ async function acquireProcessingLock(txHash, uid, amount) {
                 };
             }
 
-            // Kisi aur user ka lock tabhi lena jab wo mar chuka ho (heartbeat band)
             if (now - lastBeat > WALLET_CONFIG.LOCK_HEARTBEAT_TIMEOUT) {
                 return { uid, token, amount, status: "processing", timestamp: now, startedAt: now, heartbeat: now };
             }
 
             reason = C.IN_PROGRESS;
-            return undefined; // abort
+            return undefined;
         });
 
         return { acquired: result.committed, token, reason: result.committed ? null : (reason || C.IN_PROGRESS) };
@@ -473,8 +451,8 @@ async function releaseProcessingLock(txHash, token) {
     try {
         await runTransaction(lockRef(txHash), (current) => {
             if (current === null) return current;
-            if (token && current.token && current.token !== token) return undefined; // kisi aur ka lock
-            return null; // delete
+            if (token && current.token && current.token !== token) return undefined;
+            return null;
         });
         return true;
     } catch (error) {
@@ -490,13 +468,13 @@ function startHeartbeat(txHash, token) {
         try {
             const result = await runTransaction(lockRef(txHash), (current) => {
                 if (current === null) return current;
-                if (current.token !== token) return undefined; // kisi aur ne le liya
+                if (current.token !== token) return undefined;
                 current.heartbeat = Date.now();
                 return current;
             });
             const value = result.snapshot.exists() ? result.snapshot.val() : null;
             if (!result.committed || !value || value.token !== token) state.lost = true;
-        } catch (_) { /* temporary network issue — agle beat me theek ho jayega */ }
+        } catch (_) { /* temporary network issue */ }
     };
 
     state.timer = setInterval(beat, WALLET_CONFIG.LOCK_HEARTBEAT_INTERVAL);
@@ -513,18 +491,16 @@ export async function checkDuplicateTransaction(txHash, uid = null) {
         if (!snap.exists()) return { isDuplicate: false };
 
         const data = snap.val() || {};
-        // Apna adhoora (crediting) deposit => resume ho sakta hai, duplicate nahi
         const resumable = !!uid && data.uid === uid && data.status === "crediting";
         return { isDuplicate: !resumable, resumable, data };
     } catch (error) {
         console.error("Error checking duplicate:", error);
-        // Final faisla claim transaction karta hai, isliye yahan block nahi karte
         return { isDuplicate: false, checkFailed: true };
     }
 }
 
 // ============================================================
-// 🔒 ATOMIC CLAIM OF TXID (first-come, exactly-once)
+// 🔒 ATOMIC CLAIM OF TXID
 // ============================================================
 async function claimTransaction(txHash, uid, amount) {
     let reason = null;
@@ -536,18 +512,17 @@ async function claimTransaction(txHash, uid, amount) {
         if (current === null) {
             return { uid, amount, status: "crediting", timestamp: now, claimedAt: now };
         }
-        // Apna hi adhoora claim => aage badho (resume)
         if (current.uid === uid && current.status === "crediting") return current;
 
         reason = C.DUPLICATE;
-        return undefined; // abort
+        return undefined;
     });
 
     return { ok: result.committed, reason: result.committed ? null : (reason || C.DUPLICATE) };
 }
 
 // ============================================================
-// 🔒 PROCESS DEPOSIT — claim -> credit (idempotent) -> complete
+// 🔒 PROCESS DEPOSIT
 // ============================================================
 export async function processDeposit(uid, txHash, amount, receipt) {
     const hash = normalizeTxHash(txHash);
@@ -556,25 +531,22 @@ export async function processDeposit(uid, txHash, amount, receipt) {
         throw codedError(C.INVALID_INPUT, "Invalid deposit data.");
     }
 
-    // Hamesha blockchain wala amount credit hota hai (user ka typed amount nahi)
     const finalAmount = roundTo(Number(receipt.amount), 8);
     if (!(finalAmount > 0)) {
         throw codedError(C.INVALID_INPUT, "Invalid deposit amount.");
     }
 
-    // STEP 1: TXID ko atomically claim karo
     const claim = await claimTransaction(hash, uid, finalAmount);
     if (!claim.ok) {
         throw codedError(C.DUPLICATE, "This transaction hash has already been used. Duplicate deposits are not allowed.");
     }
 
-    // STEP 2: Balance credit (deterministic key => double credit impossible)
     const txKey = "dep_" + hash;
     let outcome = null;
 
     const result = await runTransaction(ref(db, `users/${uid}`), (data) => {
         outcome = null;
-        if (data === null) return data; // local cache khali — Firebase asli data ke saath dobara bulayega
+        if (data === null) return data;
 
         if (data.banned === true) {
             outcome = "banned";
@@ -583,7 +555,6 @@ export async function processDeposit(uid, txHash, amount, receipt) {
 
         const transactions = data.transactions || {};
 
-        // Pehle se credit ho chuka?
         let alreadyCredited = !!transactions[txKey];
         if (!alreadyCredited) {
             for (const key in transactions) {
@@ -596,7 +567,7 @@ export async function processDeposit(uid, txHash, amount, receipt) {
         }
         if (alreadyCredited) {
             outcome = "already";
-            return undefined; // kuch badalna nahi
+            return undefined;
         }
 
         const currentBalance = Number(data.depositWallet) || 0;
@@ -638,7 +609,6 @@ export async function processDeposit(uid, txHash, amount, receipt) {
     }
     const newBalance = Number(snapshot.val().depositWallet) || 0;
 
-    // STEP 3: Claim ko 'completed' mark karo (fail bhi ho to credit safe hai)
     try {
         await update(ref(db, `usedTransactions/${hash}`), {
             status: "completed",
@@ -650,7 +620,6 @@ export async function processDeposit(uid, txHash, amount, receipt) {
         console.warn("Could not mark transaction completed (credit is safe):", error);
     }
 
-    // STEP 4: History (sirf naye credit par, best-effort)
     if (outcome === "credited") {
         try {
             const historyRef = push(ref(db, "depositHistory"));
@@ -682,13 +651,6 @@ export async function processDeposit(uid, txHash, amount, receipt) {
 // ============================================================
 // 🔒 COMPLETE DEPOSIT FLOW
 // ============================================================
-// completeDeposit(uid, txHash, amount, onPending, onSuccess, onError, options)
-//   onPending(confirmations, currentBlock, blockNumber, info)
-//   onSuccess(newBalance, amountCredited, blockNumber)
-//   onError(errorMessage, result)       (sirf final failure par)
-//   options.onPhase(phase)              phase: verifying | mining | confirming | network_retry | crediting
-// Return: { success:true, ... } ya { success:false, code, error, ... }
-// ============================================================
 export async function completeDeposit(uid, txHash, amount, onPending, onSuccess, onError, options = {}) {
     const safeCall = (fn, ...args) => {
         try { if (typeof fn === "function") fn(...args); } catch (e) { console.error("Callback error:", e); }
@@ -717,19 +679,16 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
     let heartbeat = null;
 
     try {
-        // ---- Account check ----
         const bannedSnap = await get(ref(db, `users/${uid}/banned`));
         if (bannedSnap.exists() && bannedSnap.val() === true) {
             return finish(fail(C.BANNED, "Your account has been banned."));
         }
 
-        // ---- Duplicate check ----
         const duplicate = await checkDuplicateTransaction(hash, uid);
         if (duplicate.isDuplicate) {
             return finish(fail(C.DUPLICATE, "This transaction hash has already been used. Duplicate deposits are not allowed."));
         }
 
-        // ---- Optional: sender binding ----
         let expectedSender = null;
         if (WALLET_CONFIG.REQUIRE_SENDER_MATCH) {
             const walletSnap = await get(ref(db, `users/${uid}/${WALLET_CONFIG.USER_WALLET_FIELD}`));
@@ -740,7 +699,6 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
             expectedSender = saved;
         }
 
-        // ---- Lock ----
         lock = await acquireProcessingLock(hash, uid, userAmount);
         if (!lock.acquired) {
             return finish(fail(
@@ -752,17 +710,15 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
         }
         heartbeat = startHeartbeat(hash, lock.token);
 
-        // Resume ke case me amount lock se lo
         let effectiveAmount = userAmount;
         if (!(effectiveAmount > 0)) {
             try {
                 const lockSnap = await get(lockRef(hash));
                 const lockAmount = lockSnap.exists() ? Number(lockSnap.val().amount) : 0;
                 if (lockAmount > 0) effectiveAmount = lockAmount;
-            } catch (_) { /* amount optional hai */ }
+            } catch (_) { /* ignore */ }
         }
 
-        // ---- Verify (+ poll until confirmed) ----
         phase("verifying");
         let attempts = 0;
         let networkErrors = 0;
@@ -790,7 +746,7 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
                 networkErrors++;
                 phase("network_retry");
             } else {
-                return finish(result); // final failure
+                return finish(result);
             }
 
             attempts++;
@@ -808,7 +764,6 @@ export async function completeDeposit(uid, txHash, amount, onPending, onSuccess,
             return finish(fail(C.SUPERSEDED, "This verification is now running in another tab/window."));
         }
 
-        // ---- Credit ----
         phase("crediting");
         try {
             const credited = await processDeposit(uid, hash, effectiveAmount, verification.receipt);
@@ -855,7 +810,7 @@ export async function cleanupStaleLocks() {
 }
 
 // ============================================================
-// 🔁 CHECK PENDING VERIFICATIONS (page reload par resume ke liye)
+// 🔁 CHECK PENDING VERIFICATIONS
 // ============================================================
 export async function checkPendingVerifications(uid) {
     try {
@@ -869,7 +824,6 @@ export async function checkPendingVerifications(uid) {
 
             const usedSnap = await get(ref(db, `usedTransactions/${txHash}`));
             if (usedSnap.exists() && usedSnap.val().status === "completed") {
-                // Deposit ho chuka — bacha hua lock hata do
                 try { await remove(ref(db, `processingTransactions/${txHash}`)); } catch (_) { /* ignore */ }
                 continue;
             }

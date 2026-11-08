@@ -1,14 +1,11 @@
 // ============================================================
 // 🔥 WALLET CONFIG — RND STAKING (BSC / USDT BEP20)
 // ============================================================
-// Is file me sirf settings + chhote helper functions hain.
-// Koi bhi value badalne se pehle dhyan rakhein: yeh LIVE site hai.
-// ============================================================
 
 export const WALLET_CONFIG = Object.freeze({
 
     // ---------- Network ----------
-    CHAIN_ID: 56,                         // BNB Smart Chain mainnet
+    CHAIN_ID: 56,
     EXPLORER_TX_URL: "https://bscscan.com/tx/",
 
     // ---------- Token (Official USDT BEP20) ----------
@@ -19,39 +16,34 @@ export const WALLET_CONFIG = Object.freeze({
     DEPOSIT_WALLET: "0x088adFEad63589CAeb8b4d6C3F545e247288C71D",
 
     // ---------- Verification rules ----------
-    MIN_CONFIRMATIONS: 12,                // Safe side par rakha hai (BSC par ~10 second)
-    MIN_DEPOSIT_USDT: 0.01,               // Isse kam deposit accept nahi hoga
-    RELATIVE_TOLERANCE: 0.005,            // User ke amount me ±0.5% tak ka farq chalega
-    ABSOLUTE_TOLERANCE: 0.01,             // ya kam se kam 0.01 USDT
+    MIN_CONFIRMATIONS: 12,
+    MIN_DEPOSIT_USDT: 0.01,
+    RELATIVE_TOLERANCE: 0.005,
+    ABSOLUTE_TOLERANCE: 0.01,
 
     // ---------- Anti-fraud switches (optional) ----------
-    // MAX_TX_AGE_HOURS: 0 = band. Agar 72 kar denge to 72 ghante se purani
-    // transaction accept nahi hogi (purani public tx claim karne se rokta hai).
     MAX_TX_AGE_HOURS: 0,
-
-    // REQUIRE_SENDER_MATCH: true karne par deposit tabhi milega jab USDT user ke
-    // apne saved wallet address se aaya ho (users/{uid}/USER_WALLET_FIELD).
-    // Yeh doosre user ko aapki transaction "chura" ke claim karne se rokta hai.
     REQUIRE_SENDER_MATCH: false,
     USER_WALLET_FIELD: "walletAddress",
 
     // ---------- Polling ----------
-    POLLING_INTERVAL: 5000,               // har 5 second me check
-    MAX_POLLING_ATTEMPTS: 120,            // 120 x 5s = 10 minute
-    MAX_NETWORK_RETRIES: 6,               // lagatar network error par itni baar retry
+    POLLING_INTERVAL: 5000,
+    MAX_POLLING_ATTEMPTS: 120,
+    MAX_NETWORK_RETRIES: 6,
 
     // ---------- Locks ----------
-    LOCK_HEARTBEAT_INTERVAL: 15000,       // active verification har 15s me "zinda hoon" likhti hai
-    LOCK_HEARTBEAT_TIMEOUT: 120000,       // 2 minute heartbeat nahi aaya => lock dead maana jayega
-    STALE_LOCK_TIMEOUT: 10 * 60 * 1000,   // 10 minute purane dead locks cleanup me hat jayenge
+    LOCK_HEARTBEAT_INTERVAL: 15000,
+    LOCK_HEARTBEAT_TIMEOUT: 120000,
+    STALE_LOCK_TIMEOUT: 10 * 60 * 1000,
 
     // ---------- RPC ----------
-    RPC_TIMEOUT: 10000,
+    RPC_TIMEOUT: 15000,   // थोड़ा बढ़ाया ताकि धीमे नोड पर टाइमआउट न हो
     RPC_ENDPOINTS: Object.freeze([
         "https://bsc-dataseed.bnbchain.org",
         "https://bsc-dataseed1.bnbchain.org",
         "https://bsc-dataseed2.bnbchain.org",
         "https://bsc-dataseed1.defibit.io",
+        "https://bsc-dataseed2.defibit.io",
         "https://bsc-rpc.publicnode.com",
         "https://bsc-dataseed.binance.org"
     ])
@@ -62,12 +54,10 @@ export const WALLET_CONFIG = Object.freeze({
 // ============================================================
 const TX_HASH_REGEX = /^0x[0-9a-f]{64}$/;
 
-/** Hash ko trim + lowercase karta hai (0xABC aur 0xabc ek hi mane jayenge). */
 export function normalizeTxHash(hash) {
     return String(hash == null ? "" : hash).trim().toLowerCase();
 }
 
-/** Valid BSC transaction hash: 0x + 64 hex characters. */
 export function isValidTxHash(hash) {
     return TX_HASH_REGEX.test(normalizeTxHash(hash));
 }
@@ -82,7 +72,7 @@ export function getExplorerTxUrl(hash) {
 }
 
 // ============================================================
-// ✅ CONFIG SELF-CHECK (galat address ho to console me turant dikhega)
+// ✅ CONFIG SELF-CHECK
 // ============================================================
 (function validateConfig() {
     const addr = /^0x[0-9a-fA-F]{40}$/;

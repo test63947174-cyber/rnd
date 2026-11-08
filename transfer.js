@@ -36,7 +36,7 @@ const WALLET_PRECISION = { depositWallet: 2, referralWallet: 2, rndWallet: 8 };
 const ACTIVE_REQUESTS_KEY = 'activeTransferRequestIds';
 const STALE_PENDING_MS = 90 * 1000;          // 90 sec
 const STALE_RECHECK_INTERVAL_MS = 60 * 1000;  // 1 min
-const FALLBACK_USER_SCAN = false;             // Production: false
+const FALLBACK_USER_SCAN = true;              // Keep legacy username/referral-code lookup working
 
 // ============================================================
 // State
@@ -189,43 +189,87 @@ function getTodayDate() {
 // Lookup
 // ============================================================
 async function getUserByIdentifier(identifier) {
-    try {
-        if (!identifier) return null;
+    const raw = String(identifier ?? '').trim();
+    if (!raw) return null;
 
-        // 1. Direct UID lookup
-        const uidSnap = await get(ref(db, 'users/' + identifier));
-        if (uidSnap.exists()) return { uid: identifier, data: uidSnap.val(), source: 'uid' };
+    // Firebase keys cannot contain these characters. Avoid building an invalid path.
+    const safeKey = !/[.#$\[\]\/]/.test(raw);
 
-        // 2. Indexed lookup
-        const [unameSnap, refSnap] = await Promise.all([
-            get(ref(db, 'lookup/username/' + identifier)),
-            get(ref(db, 'lookup/referralCode/' + identifier))
-        ]);
-
-        let uid = null;
-        if (unameSnap.exists()) uid = unameSnap.val();
-        else if (refSnap.exists()) uid = refSnap.val();
-
-        if (uid) {
-            const uSnap = await get(ref(db, 'users/' + uid));
-            if (uSnap.exists()) return { uid, data: uSnap.val(), source: 'index' };
+    // 1. Direct Firebase Auth UID lookup.
+    if (safeKey) {
+        try {
+            const uidSnap = await get(ref(db, `users/${raw}`));
+            if (uidSnap.exists() && uidSnap.val() && typeof uidSnap.val() === 'object') {
+                return { uid: raw, data: uidSnap.val(), source: 'uid' };
+            }
+        } catch (error) {
+            console.warn('Direct recipient UID lookup failed; trying legacy lookup:', error);
         }
+    }
 
-        // 3. Fallback scan (dev only)
-        if (!FALLBACK_USER_SCAN) return null;
+    // 2. Use lookup indexes when they exist. An absent/unreadable index must not
+    //    stop the legacy users scan below (older accounts may not have indexes).
+    if (safeKey) {
+        try {
+            const [unameSnap, refSnap] = await Promise.all([
+                get(ref(db, `lookup/username/${raw}`)),
+                get(ref(db, `lookup/referralCode/${raw}`))
+            ]);
+            const indexedUid = unameSnap.exists() ? unameSnap.val()
+                : (refSnap.exists() ? refSnap.val() : null);
+            if (indexedUid && typeof indexedUid === 'string') {
+                const indexedUserSnap = await get(ref(db, `users/${indexedUid}`));
+                if (indexedUserSnap.exists() && indexedUserSnap.val() && typeof indexedUserSnap.val() === 'object') {
+                    return { uid: indexedUid, data: indexedUserSnap.val(), source: 'index' };
+                }
+            }
+        } catch (error) {
+            console.warn('Recipient lookup index unavailable; trying legacy users scan:', error);
+        }
+    }
 
+    // 3. Legacy-compatible lookup. The previous working version searched users
+    //    directly; newer accounts may not have lookup/username or lookup/referralCode.
+    //    This is a read-only lookup: it does not modify user records or balances.
+    if (!FALLBACK_USER_SCAN) return null;
+    try {
         const usersSnap = await get(ref(db, 'users'));
-        if (usersSnap.exists()) {
-            const users = usersSnap.val();
-            for (const uid in users) {
-                const u = users[uid];
-                if (u.username === identifier || u.referralCode === identifier)
-                    return { uid, data: u, source: 'scan' };
+        if (!usersSnap.exists()) return null;
+
+        const users = usersSnap.val() || {};
+        const wanted = raw.toLowerCase();
+        let caseInsensitiveMatch = null;
+
+        for (const [uid, userData] of Object.entries(users)) {
+            if (!userData || typeof userData !== 'object') continue;
+
+            // Preserve the old exact username/referralCode behavior and also
+            // recognize common user-ID field names used by existing records.
+            const candidates = [
+                userData.username,
+                userData.referralCode,
+                userData.userId,
+                userData.userID,
+                userData.user_id,
+                userData.memberId,
+                userData.memberID,
+                userData.uid,
+                userData.id
+            ].filter(value => value !== undefined && value !== null)
+             .map(value => String(value).trim());
+
+            if (candidates.some(value => value === raw)) {
+                return { uid, data: userData, source: 'legacy-scan' };
+            }
+
+            if (!caseInsensitiveMatch && candidates.some(value => value.toLowerCase() === wanted)) {
+                caseInsensitiveMatch = { uid, data: userData, source: 'legacy-scan-insensitive' };
             }
         }
-        return null;
+
+        return caseInsensitiveMatch;
     } catch (error) {
-        console.error('Lookup error:', error);
+        console.error('Recipient lookup failed:', error);
         return null;
     }
 }

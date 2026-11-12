@@ -1,10 +1,10 @@
 // ============================================================
-// DIWALI BUMPER OFFER 2026 — FINAL PERFECT LIVE SCRIPT
+// BUMPER REFERRAL OFFER 2026 (20 – 25 Nov)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase, ref, get, update, onValue, runTransaction } from "firebase/database";
+import { getDatabase, ref, get, update, runTransaction } from "firebase/database";
 
 // ============================================================
 // 🔥 LIVE FIREBASE CONFIG
@@ -25,21 +25,34 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIGURATION (26 Oct - 7 Nov)
+// 🎯 CAMPAIGN CONFIG (20 Nov – 25 Nov 2026, IST)
 // ============================================================
 const CAMPAIGN = {
-  id: "direct_diwali_offer_2026",
-  name: "Diwali Bumper Offer 2026",
-  startDate: new Date("2026-10-26T00:00:00+05:30"), 
-  endDate:   new Date("2026-11-07T23:59:59.999+05:30"),
-  rewards: { 
-    50: 10, 
-    100: 25, 
-    200: 60, 
-    500: 120, 
-    1000: 250 
-  }
+  id: "bumper_referral_offer_2026",
+  name: "Bumper Referral Offer 2026",
+  startDate: new Date("2026-11-20T00:00:00+05:30"),
+  endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
+
+  // ✅ Range-based reward tiers
+  // { min, max (exclusive), reward, key }
+  tiers: [
+    { min: 50,   max: 100,   reward: 10,  key: "50",   label: "$50 – $99"     },
+    { min: 100,  max: 200,   reward: 15,  key: "100",  label: "$100 – $199"   },
+    { min: 200,  max: 500,   reward: 30,  key: "200",  label: "$200 – $499"   },
+    { min: 500,  max: 1000,  reward: 70,  key: "500",  label: "$500 – $999"   },
+    { min: 1000, max: Infinity, reward: 200, key: "1000", label: "$1,000+"     }
+  ]
 };
+
+// 🔎 Find reward for a purchase amount (returns tier or null)
+function getTierForAmount(amount) {
+  const amt = Number(amount || 0);
+  if (!amt || amt < CAMPAIGN.tiers[0].min) return null;
+  for (const t of CAMPAIGN.tiers) {
+    if (amt >= t.min && amt < t.max) return t;
+  }
+  return null;
+}
 
 // ============================================================
 // DOM REFS
@@ -76,20 +89,24 @@ const el = {
   popupCloseBtn: $("popupCloseBtn"),
   confirmationModal: $("confirmationModal"), confirmAmount: $("confirmAmount"),
   confirmWallet: $("confirmWallet"), confirmCancel: $("confirmCancel"),
-  confirmSubmit: $("confirmSubmit")
+  confirmSubmit: $("confirmSubmit"),
+  rewardsTableBody: $("rewardsTableBody")
 };
 
 let currentUserId = null;
 let currentUserData = null;
-let calculatedRewards = { totalEarned: 0, paidAmount: 0, pendingAmount: 0, withdrawable: 0, counts: {}, breakdown: {}, currentStatus: "available", currentWithdrawal: null };
+let calculatedRewards = {
+  totalEarned: 0, paidAmount: 0, pendingAmount: 0, withdrawable: 0,
+  counts: {}, breakdown: {}, currentStatus: "available", currentWithdrawal: null
+};
 let countdownInterval = null;
 let isProcessingWithdrawal = false;
-let isSyncing = false; 
+let isSyncing = false;
 let syncInterval = null;
-let withdrawalAmountInput = null; 
+let withdrawalAmountInput = null;
 
 // ============================================================
-// UTILS & TIME HELPERS
+// UTILS
 // ============================================================
 function getNow() { return new Date(); }
 
@@ -99,7 +116,7 @@ function getCampaignStatus() {
   const end = CAMPAIGN.endDate.getTime();
   if (now < start) return "UPCOMING";
   if (now <= end) return "ACTIVE";
-  return "ENDED"; 
+  return "ENDED";
 }
 
 function fmt(n) { return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -117,16 +134,16 @@ function showToast(message, type = "success") {
 }
 
 // ============================================================
-// ⏱️ COUNTDOWN TIMER
+// ⏱️ COUNTDOWN
 // ============================================================
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);
-  
+
   const update = () => {
     const now = getNow().getTime();
     const start = CAMPAIGN.startDate.getTime();
     const end = CAMPAIGN.endDate.getTime();
-    
+
     if (now > end) {
       if (el.countdownWrapper) el.countdownWrapper.style.display = "none";
       if (el.campaignEndedMessage) el.campaignEndedMessage.style.display = "block";
@@ -147,9 +164,25 @@ function startCountdown() {
     if (el.countdownMinutes) el.countdownMinutes.textContent = String(minutes).padStart(2, "0");
     if (el.countdownSeconds) el.countdownSeconds.textContent = String(seconds).padStart(2, "0");
   };
-  
+
   update();
   countdownInterval = setInterval(update, 1000);
+}
+
+// ============================================================
+// 📋 RENDER REWARD TABLE (dynamic)
+// ============================================================
+function renderRewardsTable() {
+  if (!el.rewardsTableBody) return;
+  el.rewardsTableBody.innerHTML = CAMPAIGN.tiers.map((t, i) => {
+    const isLast = i === CAMPAIGN.tiers.length - 1;
+    return `
+      <tr class="${isLast ? "highlight-row" : ""}">
+        <td><strong>${t.label}</strong></td>
+        <td><span class="gold-text ${isLast ? "big" : ""}">$${t.reward}</span>${isLast ? '<span class="star">★</span>' : ""}</td>
+      </tr>
+    `;
+  }).join("");
 }
 
 // ============================================================
@@ -173,9 +206,9 @@ function injectWithdrawalInput() {
 }
 
 // ============================================================
-// 🔥 AUTO-SYNC FUNCTION (Perfect Balance & Reward Logic)
+// 🔥 AUTO-SYNC
 // ============================================================
-async function syncDiwaliData(uid) {
+async function syncOfferData(uid) {
   if (isSyncing) return;
   isSyncing = true;
 
@@ -183,11 +216,11 @@ async function syncDiwaliData(uid) {
     const userSnap = await get(ref(db, `users/${uid}`));
     if (!userSnap.exists()) return;
     currentUserData = userSnap.val();
-    
+
     const name = currentUserData.name || currentUserData.username || "User";
     if (el.userName) el.userName.textContent = name;
     if (el.userAvatar) el.userAvatar.textContent = name.charAt(0).toUpperCase();
-    
+
     const refCode = currentUserData.referralCode || uid.substring(0, 8);
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
@@ -201,99 +234,100 @@ async function syncDiwaliData(uid) {
       if (uId === uid) continue;
       const referredBy = uData.referredBy || uData.referredByUid || uData.sponsorUid || uData.referrerUid || uData.referrer;
       if (String(referredBy) === String(refCode) || String(referredBy) === String(uid)) {
-        referredUsers.add(uId); 
+        referredUsers.add(uId);
       }
     }
 
-    // 2. Fetch existing Diwali data
-    const diwaliSnap = await get(ref(db, CAMPAIGN.id));
-    const diwaliData = diwaliSnap.val() || {};
-    const existingPurchases = diwaliData.purchases || {};
-    const userWithdrawals = diwaliData.withdrawals || {};
-    
-    const counts = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
-    const breakdown = { 50: 0, 100: 0, 200: 0, 500: 0, 1000: 0 };
+    // 2. Fetch existing offer data
+    const offerSnap = await get(ref(db, CAMPAIGN.id));
+    const offerData = offerSnap.val() || {};
+    const existingPurchases = offerData.purchases || {};
+    const userWithdrawals = offerData.withdrawals || {};
+
+    const counts = {}; const breakdown = {};
+    CAMPAIGN.tiers.forEach(t => { counts[t.key] = 0; breakdown[t.key] = 0; });
+
     let totalEarned = 0;
     const updates = {};
 
-    // 3. Calculate Total Earned
+    // 3. Calculate Total Earned (range-based tiering)
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       if (!referredUsers.has(refUserUid)) continue;
-      
+
       const packages = refUserData.packages || {};
-      
+
       for (const [pkgId, pkg] of Object.entries(packages)) {
         if (pkg.status !== "active" && pkg.status !== "completed") continue;
 
         const amt = Number(pkg.usdtAmount || 0);
-        if (!CAMPAIGN.rewards[amt]) continue; 
+        const tier = getTierForAmount(amt);
+        if (!tier) continue;
 
         const purchaseTime = pkg.purchaseDate || pkg.timestamp || 0;
         if (purchaseTime < CAMPAIGN.startDate.getTime()) continue;
+        if (purchaseTime > CAMPAIGN.endDate.getTime()) continue;
 
-        const rewardAmt = CAMPAIGN.rewards[amt];
-        
-        // 🔥 हर पैकेज के लिए स्थायी यूनिक ID
-        const purchaseId = `${refUserUid}_${pkgId}`; 
+        const rewardAmt = tier.reward;
+        const purchaseId = `${refUserUid}_${pkgId}`;
 
         if (!existingPurchases[purchaseId]) {
           updates[`purchases/${purchaseId}`] = {
-            purchaseId: purchaseId,
+            purchaseId,
             buyerUid: refUserUid,
             directReferrerUid: uid,
             packageAmount: amt,
+            tierKey: tier.key,
             rewardAmount: rewardAmt,
             status: "completed",
             timestamp: purchaseTime,
             campaignId: CAMPAIGN.id
           };
-          
+
           updates[`user_claims/${uid}/${purchaseId}`] = {
-            purchaseId: purchaseId,
+            purchaseId,
             amount: amt,
+            tierKey: tier.key,
             reward: rewardAmt,
             claimedAt: Date.now()
           };
         }
 
-        counts[amt]++;
-        breakdown[amt] += rewardAmt;
-        totalEarned += rewardAmt; 
+        counts[tier.key]++;
+        breakdown[tier.key] += rewardAmt;
+        totalEarned += rewardAmt;
       }
     }
 
     if (Object.keys(updates).length > 0) {
       await update(ref(db, CAMPAIGN.id), updates);
-      console.log("🔥 New Diwali data synced!");
+      console.log("🔥 New offer data synced!");
     }
 
-    // 4. Calculate Pending & Paid
+    // 4. Calculate Paid & Pending
     let latestWithdrawal = null;
     let totalPaid = 0;
     let totalPending = 0;
 
     for (const [wId, w] of Object.entries(userWithdrawals)) {
       if (w.userId !== uid) continue;
-      
+
       const amt = Number(w.amount || 0);
       if (w.status === 'paid' || w.status === 'approved') {
-        totalPaid += amt; 
+        totalPaid += amt;
       } else if (w.status === 'pending') {
         totalPending += amt;
       }
-      
+
       if (!latestWithdrawal || w.requestedAt > latestWithdrawal.requestedAt) {
         latestWithdrawal = w;
       }
     }
 
-    // 5. Final Withdrawable Balance Calculation
+    // 5. Final withdrawable
     const actualWithdrawable = Math.max(0, totalEarned - totalPaid - totalPending);
 
     calculatedRewards = {
-      totalEarned: totalEarned,
-      paidAmount: totalPaid,
-      pendingAmount: totalPending,
+      totalEarned, paidAmount: totalPaid, pendingAmount: totalPending,
       withdrawable: actualWithdrawable,
       counts, breakdown,
       currentStatus: latestWithdrawal ? latestWithdrawal.status : "available",
@@ -310,8 +344,8 @@ async function syncDiwaliData(uid) {
 
 function startAutoSync(uid) {
   if (syncInterval) clearInterval(syncInterval);
-  syncDiwaliData(uid); 
-  syncInterval = setInterval(() => syncDiwaliData(uid), 2000);
+  syncOfferData(uid);
+  syncInterval = setInterval(() => syncOfferData(uid), 2000);
 }
 
 function stopAutoSync() {
@@ -323,11 +357,11 @@ function stopAutoSync() {
 // ============================================================
 function updateUI() {
   const status = getCampaignStatus();
-  
+
   const startStr = CAMPAIGN.startDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   const endStr   = CAMPAIGN.endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  if (el.campaignDates) el.campaignDates.textContent = `${startStr} - ${endStr}`;
-  
+  if (el.campaignDates) el.campaignDates.textContent = `${startStr} – ${endStr}`;
+
   const badges = {
     UPCOMING: { cls: "upcoming", txt: `⏳ Upcoming` },
     ACTIVE:   { cls: "active",   txt: "🔥 ACTIVE" },
@@ -338,9 +372,9 @@ function updateUI() {
   const totalEarned = Number(calculatedRewards.totalEarned || 0);
   const totalPaid = Number(calculatedRewards.paidAmount || 0);
   const withdrawable = Number(calculatedRewards.withdrawable || 0);
-  const counts     = calculatedRewards.counts || {};
-  const breakdown  = calculatedRewards.breakdown || {};
-  const totalIds   = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+  const counts = calculatedRewards.counts || {};
+  const breakdown = calculatedRewards.breakdown || {};
+  const totalIds = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
 
   if (el.walletAmount) el.walletAmount.textContent = fmt(withdrawable);
   if (el.statEligibleIds) el.statEligibleIds.textContent = totalIds;
@@ -348,9 +382,11 @@ function updateUI() {
   if (el.statPaid) el.statPaid.textContent = `$${fmt(totalPaid)}`;
   if (el.statWithdrawable) el.statWithdrawable.textContent = `$${fmt(withdrawable)}`;
 
-  [50, 100, 200, 500, 1000].forEach(amt => {
-    if ($(`bdCount${amt}`))  $(`bdCount${amt}`).textContent  = counts[amt] || 0;
-    if ($(`bdReward${amt}`)) $(`bdReward${amt}`).textContent = (breakdown[amt] || 0).toLocaleString();
+  CAMPAIGN.tiers.forEach(t => {
+    const cEl = $(`bdCount${t.key}`);
+    const rEl = $(`bdReward${t.key}`);
+    if (cEl) cEl.textContent = counts[t.key] || 0;
+    if (rEl) rEl.textContent = (breakdown[t.key] || 0).toLocaleString();
   });
 
   updateWithdrawalUI(withdrawable, status);
@@ -358,19 +394,19 @@ function updateUI() {
 
 function updateWithdrawalUI(withdrawable, status) {
   const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
-  
-  // 🔥 7 नवंबर के बाद ही विड्रॉल खुलेगा
+
   const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
-  injectWithdrawalInput(); 
-  
+  injectWithdrawalInput();
+
   if (el.withdrawAmount) el.withdrawAmount.textContent = `$${fmt(withdrawable)} USDT`;
-  
   if (el.withdrawalInfoBox) el.withdrawalInfoBox.classList.add("visible");
-  
+
   if (el.withdrawalInfoText) {
     if (status === "ACTIVE") {
-      el.withdrawalInfoText.textContent = `🔒 Withdrawals are locked until offer ends on 7 Nov 2026.`;
+      el.withdrawalInfoText.textContent = `🔒 Withdrawals are locked until offer ends on 25 Nov 2026.`;
+    } else if (status === "UPCOMING") {
+      el.withdrawalInfoText.textContent = `⏳ Offer starts on 20 Nov 2026.`;
     } else if (status === "ENDED") {
       if (withdrawalStatus === "pending") el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
       else if (withdrawalStatus === "approved") el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved.`;
@@ -384,16 +420,16 @@ function updateWithdrawalUI(withdrawable, status) {
       if (withdrawalStatus === "pending") el.withdrawBtn.innerHTML = `<i class="bi bi-clock me-2"></i>Pending Approval`;
       else if (withdrawalStatus === "approved") el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle me-2"></i>Approved`;
       else if (withdrawalStatus === "paid") {
-         if (canWithdraw) {
-             el.withdrawBtn.disabled = false;
-             el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw New Rewards`;
-             el.withdrawBtn.className = "btn-withdraw";
-         } else {
-             el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
-         }
+        if (canWithdraw) {
+          el.withdrawBtn.disabled = false;
+          el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw New Rewards`;
+          el.withdrawBtn.className = "btn-withdraw";
+        } else {
+          el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
+        }
       }
     }
-    
+
     if (el.withdrawalStatus) {
       el.withdrawalStatus.classList.add("visible");
       el.withdrawalStatus.className = `withdrawal-status visible ${withdrawalStatus}`;
@@ -402,7 +438,7 @@ function updateWithdrawalUI(withdrawable, status) {
         withdrawalStatus === "approved" ? "✅ Your withdrawal has been approved and is being processed." :
         "✅ Payment has been sent to your wallet.";
     }
-    
+
     if (withdrawalStatus === "paid" && el.withdrawalDetails && calculatedRewards.currentWithdrawal) {
       el.withdrawalDetails.classList.add("visible");
       if (el.detailAmount) el.detailAmount.textContent = `$${fmt(calculatedRewards.currentWithdrawal.amount)} USDT`;
@@ -410,7 +446,7 @@ function updateWithdrawalUI(withdrawable, status) {
       if (el.detailPaidDate) el.detailPaidDate.textContent = calculatedRewards.currentWithdrawal.paidAt ? new Date(calculatedRewards.currentWithdrawal.paidAt).toLocaleString() : "---";
       if (el.detailTxHash) el.detailTxHash.textContent = calculatedRewards.currentWithdrawal.txHash || "---";
     }
-    
+
     if (el.walletFormGroup) el.walletFormGroup.style.display = canWithdraw ? "block" : "none";
     return;
   }
@@ -418,7 +454,7 @@ function updateWithdrawalUI(withdrawable, status) {
   if (canWithdraw) {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = false;
-      el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw Diwali Reward`;
+      el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw Offer Reward`;
       el.withdrawBtn.className = "btn-withdraw";
     }
     if (el.walletFormGroup) el.walletFormGroup.style.display = "block";
@@ -427,11 +463,8 @@ function updateWithdrawalUI(withdrawable, status) {
   } else {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = true;
-      if (status === "ACTIVE") {
-          el.withdrawBtn.innerHTML = `🔒 Locked Until Offer Ends`;
-      } else {
-          el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
-      }
+      if (status === "ACTIVE") el.withdrawBtn.innerHTML = `🔒 Locked Until Offer Ends`;
+      else el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
       el.withdrawBtn.className = "btn-withdraw withdrawal-locked";
     }
     if (el.walletFormGroup) el.walletFormGroup.style.display = "none";
@@ -466,7 +499,7 @@ function validateWallet() {
 function handleWithdrawClick() {
   const status = getCampaignStatus();
   if (status !== "ENDED") {
-    showToast("Withdrawals unlock after offer ends on 7 Nov 2026.", "warning");
+    showToast("Withdrawals unlock after offer ends on 25 Nov 2026.", "warning");
     return;
   }
 
@@ -503,7 +536,7 @@ async function submitWithdrawal() {
 
     if (amountVal <= 0 || amountVal > avail) { showToast("Invalid amount.", "error"); return; }
 
-    // 🔥 रनट्रांजैक्शन से डबल विड्रॉल रोकना
+    // 🔥 RunTransaction to prevent double withdraw
     const rewardsRoot = ref(db, `${CAMPAIGN.id}/rewards/${currentUserId}`);
     const withdrawalId = generateId("dw");
     const txId = generateId("tx");
@@ -513,30 +546,29 @@ async function submitWithdrawal() {
       if (current && (current.status === "pending" || current.status === "approved")) {
         return; // abort
       }
-      return { 
-        ...current, 
-        status: "pending", 
-        walletAddress: addr, 
-        withdrawalId, 
-        transactionId: txId, 
-        requestedAmount: amountVal, 
-        requestedAt: timestamp, 
-        updatedAt: timestamp 
+      return {
+        ...(current || {}),
+        status: "pending",
+        walletAddress: addr,
+        withdrawalId,
+        transactionId: txId,
+        requestedAmount: amountVal,
+        requestedAt: timestamp,
+        updatedAt: timestamp
       };
     });
 
     if (!lockResult.committed) { showToast("Withdrawal already submitted or nothing available.", "warning"); return; }
 
-    // रिकॉर्ड सेव करें
     const date = new Date(timestamp).toISOString().split("T")[0];
     const adminData = {
-      campaignName: CAMPAIGN.name, campaignId: CAMPAIGN.id, type: "diwali_offer_withdrawal",
+      campaignName: CAMPAIGN.name, campaignId: CAMPAIGN.id, type: "bumper_offer_withdrawal",
       asset: "USDT", network: "BEP-20 / BNB Smart Chain", amount: amountVal, status: "pending",
       userId: currentUserId, username: currentUserData?.username || currentUserData?.name || currentUserId,
       walletAddress: addr, requestedAt: timestamp, withdrawalId
     };
     const userTx = {
-      type: "diwali_offer_withdrawal", subtype: `${CAMPAIGN.name} Withdrawal`,
+      type: "bumper_offer_withdrawal", subtype: `${CAMPAIGN.name} Withdrawal`,
       amount: amountVal, currency: "USDT", network: "BEP-20 / BNB Smart Chain",
       status: "pending", walletAddress: addr, withdrawalId, timestamp, date,
       description: `${CAMPAIGN.name} Withdrawal of $${amountVal} USDT (BEP-20)`, txId, txHash: null
@@ -545,7 +577,7 @@ async function submitWithdrawal() {
 
     await update(ref(db), {
       [`${CAMPAIGN.id}/withdrawals/${withdrawalId}`]: adminData,
-      [`users/${currentUserId}/diwali_transactions/${txId}`]: userTx,
+      [`users/${currentUserId}/offer_transactions/${txId}`]: userTx,
       [`${CAMPAIGN.id}/transactions/${txId}`]: globalTx
     });
 
@@ -554,13 +586,12 @@ async function submitWithdrawal() {
     if (el.walletAddressInput) el.walletAddressInput.value = "";
     if (withdrawalAmountInput) withdrawalAmountInput.value = "";
 
-    // तुरंत बैलेंस काटें
     calculatedRewards.withdrawable = Math.max(0, calculatedRewards.withdrawable - amountVal);
     calculatedRewards.pendingAmount += amountVal;
     calculatedRewards.currentStatus = "pending";
-    
+
     updateUI();
-    syncDiwaliData(currentUserId); 
+    syncOfferData(currentUserId);
 
   } catch (err) {
     console.error(err);
@@ -572,7 +603,7 @@ async function submitWithdrawal() {
 }
 
 // ============================================================
-// 🖱️ EVENT LISTENERS & BOOT
+// 🖱️ EVENTS & BOOT
 // ============================================================
 async function copyReferralLink() {
   const link = el.referralLinkDisplay?.textContent || "";
@@ -588,12 +619,12 @@ async function copyReferralLink() {
   } catch { showToast("Copy failed — please copy manually.", "error"); }
 }
 
-async function handleLogout() { 
-  try { 
-    stopAutoSync(); 
-    await signOut(auth); 
-    window.location.href = "login.html"; 
-  } catch (e) { showToast("Logout error", "error"); } 
+async function handleLogout() {
+  try {
+    stopAutoSync();
+    await signOut(auth);
+    window.location.href = "login.html";
+  } catch (e) { showToast("Logout error", "error"); }
 }
 
 function setupListeners() {
@@ -620,14 +651,15 @@ const authTimeoutHandle = setTimeout(() => {
 onAuthStateChanged(auth, async (user) => {
   authResolved = true;
   clearTimeout(authTimeoutHandle);
-  
+
   if (!user) { window.location.href = "login.html"; return; }
   currentUserId = user.uid;
-  
+
+  renderRewardsTable();
   setupListeners();
-  startCountdown(); 
-  startAutoSync(user.uid); 
-  
+  startCountdown();
+  startAutoSync(user.uid);
+
   if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");
 });
 

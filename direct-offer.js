@@ -1,5 +1,9 @@
 // ============================================================
-// BUMPER REFERRAL OFFER 2026 (20 – 25 Nov)
+// BUMPER REFERRAL OFFER 2026
+// File: direct-offer.js
+// ============================================================
+// 🧪 TESTING MODE ACTIVE (dates: today → 30 Nov 2026)
+// 🔁 LIVE करने के लिए सिर्फ नीचे CAMPAIGN में 2 lines बदलें
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -25,26 +29,36 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CAMPAIGN CONFIG (20 Nov – 25 Nov 2026, IST)
+// 🎯 CAMPAIGN CONFIG
+// ============================================================
+// 🧪 अभी TESTING MODE चालू है (dates: 12 Nov → 30 Nov)
+// 🔁 LIVE करते वक्त नीचे दी 2 lines use करें:
+//    startDate: new Date("2026-11-20T00:00:00+05:30"),
+//    endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
 // ============================================================
 const CAMPAIGN = {
   id: "bumper_referral_offer_2026",
   name: "Bumper Referral Offer 2026",
-  startDate: new Date("2026-11-20T00:00:00+05:30"),
-  endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
 
-  // ✅ Range-based reward tiers
-  // { min, max (exclusive), reward, key }
+  // 🧪 TESTING DATES (अभी यही चालू है)
+  startDate: new Date("2026-11-12T00:00:00+05:30"),
+  endDate:   new Date("2026-11-30T23:59:59.999+05:30"),
+
+  // 🔁 LIVE DATES (testing के बाद यहाँ uncomment करके ऊपर वाली हटा दें)
+  // startDate: new Date("2026-11-20T00:00:00+05:30"),
+  // endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
+
+  // Reward tiers (range-based)
   tiers: [
-    { min: 50,   max: 100,   reward: 10,  key: "50",   label: "$50 – $99"     },
-    { min: 100,  max: 200,   reward: 15,  key: "100",  label: "$100 – $199"   },
-    { min: 200,  max: 500,   reward: 30,  key: "200",  label: "$200 – $499"   },
-    { min: 500,  max: 1000,  reward: 70,  key: "500",  label: "$500 – $999"   },
-    { min: 1000, max: Infinity, reward: 200, key: "1000", label: "$1,000+"     }
+    { min: 50,   max: 100,      reward: 10,  key: "50",   label: "$50 – $99"     },
+    { min: 100,  max: 200,      reward: 15,  key: "100",  label: "$100 – $199"   },
+    { min: 200,  max: 500,      reward: 30,  key: "200",  label: "$200 – $499"   },
+    { min: 500,  max: 1000,     reward: 70,  key: "500",  label: "$500 – $999"   },
+    { min: 1000, max: Infinity, reward: 200, key: "1000", label: "$1,000+"       }
   ]
 };
 
-// 🔎 Find reward for a purchase amount (returns tier or null)
+// 🔎 Find reward tier for a purchase amount
 function getTierForAmount(amount) {
   const amt = Number(amount || 0);
   if (!amt || amt < CAMPAIGN.tiers[0].min) return null;
@@ -170,7 +184,7 @@ function startCountdown() {
 }
 
 // ============================================================
-// 📋 RENDER REWARD TABLE (dynamic)
+// 📋 RENDER REWARD TABLE
 // ============================================================
 function renderRewardsTable() {
   if (!el.rewardsTableBody) return;
@@ -179,14 +193,14 @@ function renderRewardsTable() {
     return `
       <tr class="${isLast ? "highlight-row" : ""}">
         <td><strong>${t.label}</strong></td>
-        <td><span class="gold-text ${isLast ? "big" : ""}">$${t.reward}</span>${isLast ? '<span class="star">★</span>' : ""}</td>
+        <td><span class="gold-text ${isLast ? "big" : ""}">$${t.reward}</span>${isLast ? '<span class="star">★</span>' : ''}</td>
       </tr>
     `;
   }).join("");
 }
 
 // ============================================================
-// 🔥 WITHDRAWAL INPUT INJECTION
+// 🔥 WITHDRAWAL AMOUNT INPUT INJECTION
 // ============================================================
 function injectWithdrawalInput() {
   if (!document.getElementById('withdrawAmountInput')) {
@@ -206,7 +220,7 @@ function injectWithdrawalInput() {
 }
 
 // ============================================================
-// 🔥 AUTO-SYNC
+// 🔥 SYNC FUNCTION — Perfect Balance, Paid & Pending Logic
 // ============================================================
 async function syncOfferData(uid) {
   if (isSyncing) return;
@@ -225,7 +239,7 @@ async function syncOfferData(uid) {
     if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
     if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
 
-    // 1. Fetch all users
+    // -------- 1. Fetch all users --------
     const usersSnap = await get(ref(db, "users"));
     const allUsers = usersSnap.val() || {};
     const referredUsers = new Set();
@@ -238,7 +252,7 @@ async function syncOfferData(uid) {
       }
     }
 
-    // 2. Fetch existing offer data
+    // -------- 2. Fetch existing offer data --------
     const offerSnap = await get(ref(db, CAMPAIGN.id));
     const offerData = offerSnap.val() || {};
     const existingPurchases = offerData.purchases || {};
@@ -250,7 +264,7 @@ async function syncOfferData(uid) {
     let totalEarned = 0;
     const updates = {};
 
-    // 3. Calculate Total Earned (range-based tiering)
+    // -------- 3. Calculate Total Earned (range-based tiering) --------
     for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
       if (!referredUsers.has(refUserUid)) continue;
 
@@ -303,7 +317,10 @@ async function syncOfferData(uid) {
       console.log("🔥 New offer data synced!");
     }
 
-    // 4. Calculate Paid & Pending
+    // -------- 4. Calculate Paid & Pending (✅ FIXED) --------
+    // paid       → Already Paid
+    // pending / approved → Pending
+    // rejected   → कुछ नहीं (balance वापस withdrawable में)
     let latestWithdrawal = null;
     let totalPaid = 0;
     let totalPending = 0;
@@ -312,22 +329,26 @@ async function syncOfferData(uid) {
       if (w.userId !== uid) continue;
 
       const amt = Number(w.amount || 0);
-      if (w.status === 'paid' || w.status === 'approved') {
+
+      if (w.status === 'paid') {
         totalPaid += amt;
-      } else if (w.status === 'pending') {
+      } else if (w.status === 'pending' || w.status === 'approved') {
         totalPending += amt;
       }
 
-      if (!latestWithdrawal || w.requestedAt > latestWithdrawal.requestedAt) {
+      // Latest withdrawal = जो सबसे हाल में request हुई (status बताने के लिए)
+      if (!latestWithdrawal || (w.requestedAt || 0) > (latestWithdrawal.requestedAt || 0)) {
         latestWithdrawal = w;
       }
     }
 
-    // 5. Final withdrawable
+    // -------- 5. Final Withdrawable --------
     const actualWithdrawable = Math.max(0, totalEarned - totalPaid - totalPending);
 
     calculatedRewards = {
-      totalEarned, paidAmount: totalPaid, pendingAmount: totalPending,
+      totalEarned,
+      paidAmount: totalPaid,
+      pendingAmount: totalPending,
       withdrawable: actualWithdrawable,
       counts, breakdown,
       currentStatus: latestWithdrawal ? latestWithdrawal.status : "available",
@@ -362,6 +383,10 @@ function updateUI() {
   const endStr   = CAMPAIGN.endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   if (el.campaignDates) el.campaignDates.textContent = `${startStr} – ${endStr}`;
 
+  // Dynamic duration pill
+  const totalDays = Math.max(1, Math.round((CAMPAIGN.endDate - CAMPAIGN.startDate) / (1000 * 60 * 60 * 24)));
+  if (el.campaignDuration) el.campaignDuration.textContent = `${totalDays} Days Only`;
+
   const badges = {
     UPCOMING: { cls: "upcoming", txt: `⏳ Upcoming` },
     ACTIVE:   { cls: "active",   txt: "🔥 ACTIVE" },
@@ -379,8 +404,11 @@ function updateUI() {
   if (el.walletAmount) el.walletAmount.textContent = fmt(withdrawable);
   if (el.statEligibleIds) el.statEligibleIds.textContent = totalIds;
   if (el.statEligibleReward) el.statEligibleReward.textContent = `$${fmt(totalEarned)}`;
-  if (el.statPaid) el.statPaid.textContent = `$${fmt(totalPaid)}`;
+  if (el.statPaid) el.statPaid.textContent = `$${fmt(totalPaid)}`;   // ✅ अब सही दिखेगा
   if (el.statWithdrawable) el.statWithdrawable.textContent = `$${fmt(withdrawable)}`;
+
+  if (el.statRewardNote) el.statRewardNote.textContent = `${totalIds} eligible purchase${totalIds === 1 ? "" : "s"}`;
+  if (el.statWithdrawNote) el.statWithdrawNote.textContent = status === "ENDED" ? "Available to withdraw" : `Locked until ${endStr}`;
 
   CAMPAIGN.tiers.forEach(t => {
     const cEl = $(`bdCount${t.key}`);
@@ -394,7 +422,6 @@ function updateUI() {
 
 function updateWithdrawalUI(withdrawable, status) {
   const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
-
   const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
   injectWithdrawalInput();
@@ -404,9 +431,9 @@ function updateWithdrawalUI(withdrawable, status) {
 
   if (el.withdrawalInfoText) {
     if (status === "ACTIVE") {
-      el.withdrawalInfoText.textContent = `🔒 Withdrawals are locked until offer ends on 25 Nov 2026.`;
+      el.withdrawalInfoText.textContent = `🔒 Withdrawals are locked until offer ends.`;
     } else if (status === "UPCOMING") {
-      el.withdrawalInfoText.textContent = `⏳ Offer starts on 20 Nov 2026.`;
+      el.withdrawalInfoText.textContent = `⏳ Offer has not started yet.`;
     } else if (status === "ENDED") {
       if (withdrawalStatus === "pending") el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
       else if (withdrawalStatus === "approved") el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved.`;
@@ -499,7 +526,7 @@ function validateWallet() {
 function handleWithdrawClick() {
   const status = getCampaignStatus();
   if (status !== "ENDED") {
-    showToast("Withdrawals unlock after offer ends on 25 Nov 2026.", "warning");
+    showToast("Withdrawals unlock after offer ends.", "warning");
     return;
   }
 
@@ -536,7 +563,6 @@ async function submitWithdrawal() {
 
     if (amountVal <= 0 || amountVal > avail) { showToast("Invalid amount.", "error"); return; }
 
-    // 🔥 RunTransaction to prevent double withdraw
     const rewardsRoot = ref(db, `${CAMPAIGN.id}/rewards/${currentUserId}`);
     const withdrawalId = generateId("dw");
     const txId = generateId("tx");
@@ -544,7 +570,7 @@ async function submitWithdrawal() {
 
     const lockResult = await runTransaction(rewardsRoot, (current) => {
       if (current && (current.status === "pending" || current.status === "approved")) {
-        return; // abort
+        return;
       }
       return {
         ...(current || {}),

@@ -56,21 +56,8 @@
     }
     .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(46,204,113,0.3); color: #fff; }
     .btn-primary-custom:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
-    .btn-google {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #a0b8d0;
-      padding: 12px;
-      border-radius: 12px;
-      width: 100%;
-      transition: all 0.3s ease;
-      font-weight: 500;
-    }
-    .btn-google:hover { background: rgba(255,255,255,0.1); color: #fff; }
     .text-link { color: #2ecc71; text-decoration: none; font-weight: 600; }
     .text-link:hover { text-decoration: underline; }
-    .divider { display: flex; align-items: center; color: #556688; font-size: 0.85rem; gap: 15px; margin: 20px 0; }
-    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(46,204,113,0.15); }
     
     .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px; }
     .toast-custom {
@@ -119,12 +106,6 @@
       <button type="submit" class="btn-primary-custom" id="loginBtn">Sign In <i class="bi bi-arrow-right ms-2"></i></button>
     </form>
 
-    <div class="divider">or continue with</div>
-
-    <button id="googleLoginBtn" class="btn-google">
-      <i class="bi bi-google me-2"></i> Sign in with Google
-    </button>
-
     <p class="text-center mt-4 text-muted small">
       Don't have an account? <a href="register.html" class="text-link">Register</a>
     </p>
@@ -145,11 +126,8 @@
 }
 </script>
 <script type="module">
-// ============================================================
-// 🔥 NEW FIREBASE CONFIG (rwebsite-e031b)
-// ============================================================
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from "firebase/auth";
 import { getDatabase, ref, get } from "firebase/database";
 
 const firebaseConfig = {
@@ -163,12 +141,9 @@ const firebaseConfig = {
   measurementId: "G-0T1FREXHD3"
 };
 
-console.log('✅ Firebase initialized with NEW config (rwebsite-e031b)');
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const provider = new GoogleAuthProvider();
 
 function showToast(message, type = 'success') {
   const container = document.getElementById('toastContainer');
@@ -184,6 +159,7 @@ function showToast(message, type = 'success') {
   }, 5000);
 }
 
+// Check if already logged in
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     try {
@@ -214,30 +190,18 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
   try {
     await signInWithEmailAndPassword(auth, email, pass);
+    // Redirect is handled in onAuthStateChanged
   } catch (err) {
     console.error('Login error:', err);
     let msg = '❌ Invalid email or password. Please try again.';
-    if (err.code === 'auth/user-not-found') msg = '❌ No account found with this email.';
-    else if (err.code === 'auth/wrong-password') msg = '❌ Incorrect password. Please try again.';
-    else if (err.code === 'auth/too-many-requests') msg = '❌ Too many failed attempts. Please try again later.';
+    if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      msg = '❌ Invalid email or password.';
+    } else if (err.code === 'auth/too-many-requests') {
+      msg = '❌ Too many failed attempts. Please try again later.';
+    }
     showToast(msg, 'error');
-  }
-
-  btn.disabled = false;
-  btn.innerHTML = 'Sign In <i class="bi bi-arrow-right ms-2"></i>';
-});
-
-document.getElementById('googleLoginBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('googleLoginBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (err) {
-    console.error('Google login error:', err);
-    showToast('❌ ' + (err.message || 'Google sign in failed'), 'error');
     btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-google me-2"></i> Sign in with Google';
+    btn.innerHTML = 'Sign In <i class="bi bi-arrow-right ms-2"></i>';
   }
 });
 

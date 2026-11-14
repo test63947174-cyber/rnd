@@ -713,6 +713,11 @@ body.offer-body {
 .btn-withdraw:disabled {
   opacity: 0.55; cursor: not-allowed; box-shadow: none;
 }
+.btn-withdraw.withdrawal-locked {
+  background: rgba(100,116,139,0.2);
+  color: var(--dw-text-2);
+  box-shadow: none;
+}
 .withdrawal-status {
   margin-top: 20px; padding: 16px 20px;
   border-radius: 14px; font-size: 0.9rem;

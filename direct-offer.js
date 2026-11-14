@@ -31,29 +31,22 @@ const db   = getDatabase(app);
 // ============================================================
 // 🎯 CAMPAIGN CONFIG
 // ============================================================
-// 🧪 अभी TESTING MODE चालू है (dates: 12 Nov → 30 Nov)
-// 🔁 LIVE करते वक्त नीचे दी 2 lines use करें:
-//    startDate: new Date("2026-11-20T00:00:00+05:30"),
-//    endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
+// 🧪 अभी TESTING MODE चालू है (आज से 30 Nov तक)
 // ============================================================
 const CAMPAIGN = {
   id: "bumper_referral_offer_2026",
   name: "Bumper Referral Offer 2026",
 
-  // 🧪 TESTING DATES (अभी यही चालू है)
+  // 🧪 TESTING DATES (आज से चालू)
   startDate: new Date("2026-11-12T00:00:00+05:30"),
   endDate:   new Date("2026-11-30T23:59:59.999+05:30"),
 
-  // 🔁 LIVE DATES (testing के बाद यहाँ uncomment करके ऊपर वाली हटा दें)
-  // startDate: new Date("2026-11-20T00:00:00+05:30"),
-  // endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
-
-  // Reward tiers (range-based)
+  // Reward tiers (range-based) - UPDATED REWARDS
   tiers: [
     { min: 50,   max: 100,      reward: 10,  key: "50",   label: "$50 – $99"     },
-    { min: 100,  max: 200,      reward: 15,  key: "100",  label: "$100 – $199"   },
-    { min: 200,  max: 500,      reward: 30,  key: "200",  label: "$200 – $499"   },
-    { min: 500,  max: 1000,     reward: 70,  key: "500",  label: "$500 – $999"   },
+    { min: 100,  max: 200,      reward: 20,  key: "100",  label: "$100 – $199"   },
+    { min: 200,  max: 500,      reward: 40,  key: "200",  label: "$200 – $499"   },
+    { min: 500,  max: 1000,     reward: 80,  key: "500",  label: "$500 – $999"   },
     { min: 1000, max: Infinity, reward: 200, key: "1000", label: "$1,000+"       }
   ]
 };
@@ -404,7 +397,7 @@ function updateUI() {
   if (el.walletAmount) el.walletAmount.textContent = fmt(withdrawable);
   if (el.statEligibleIds) el.statEligibleIds.textContent = totalIds;
   if (el.statEligibleReward) el.statEligibleReward.textContent = `$${fmt(totalEarned)}`;
-  if (el.statPaid) el.statPaid.textContent = `$${fmt(totalPaid)}`;   // ✅ अब सही दिखेगा
+  if (el.statPaid) el.statPaid.textContent = `$${fmt(totalPaid)}`;
   if (el.statWithdrawable) el.statWithdrawable.textContent = `$${fmt(withdrawable)}`;
 
   if (el.statRewardNote) el.statRewardNote.textContent = `${totalIds} eligible purchase${totalIds === 1 ? "" : "s"}`;
@@ -422,7 +415,9 @@ function updateUI() {
 
 function updateWithdrawalUI(withdrawable, status) {
   const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
-  const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
+  
+  // ✅ TESTING FIX: Withdrawal चालू है अभी के लिए, चाहे ऑफर चल रहा हो या खत्म
+  const canWithdraw = withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
   injectWithdrawalInput();
 
@@ -430,14 +425,14 @@ function updateWithdrawalUI(withdrawable, status) {
   if (el.withdrawalInfoBox) el.withdrawalInfoBox.classList.add("visible");
 
   if (el.withdrawalInfoText) {
-    if (status === "ACTIVE") {
-      el.withdrawalInfoText.textContent = `🔒 Withdrawals are locked until offer ends.`;
-    } else if (status === "UPCOMING") {
-      el.withdrawalInfoText.textContent = `⏳ Offer has not started yet.`;
-    } else if (status === "ENDED") {
-      if (withdrawalStatus === "pending") el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
-      else if (withdrawalStatus === "approved") el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved.`;
-      else el.withdrawalInfoText.textContent = `🔓 Offer ended! You can withdraw your full balance now.`;
+    if (withdrawalStatus === "pending") {
+      el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
+    } else if (withdrawalStatus === "approved") {
+      el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved.`;
+    } else if (canWithdraw) {
+      el.withdrawalInfoText.textContent = `🔓 You can withdraw your balance now.`;
+    } else {
+      el.withdrawalInfoText.textContent = `Waiting for rewards...`;
     }
   }
 
@@ -490,8 +485,7 @@ function updateWithdrawalUI(withdrawable, status) {
   } else {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = true;
-      if (status === "ACTIVE") el.withdrawBtn.innerHTML = `🔒 Locked Until Offer Ends`;
-      else el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
+      el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
       el.withdrawBtn.className = "btn-withdraw withdrawal-locked";
     }
     if (el.walletFormGroup) el.walletFormGroup.style.display = "none";
@@ -524,12 +518,7 @@ function validateWallet() {
 }
 
 function handleWithdrawClick() {
-  const status = getCampaignStatus();
-  if (status !== "ENDED") {
-    showToast("Withdrawals unlock after offer ends.", "warning");
-    return;
-  }
-
+  // ✅ TESTING FIX: डेट चेक हटा दिया, अब कभी भी विदड्रॉल लग सकता है
   const avail = calculatedRewards.withdrawable;
   if (avail <= 0) { showToast("Nothing to withdraw.", "warning"); return; }
   if (!validateWallet()) { showToast("Enter a valid BEP-20 wallet address.", "error"); return; }

@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0a0414"/>
+<meta name="color-scheme" content="dark"/>
 <title>🎁 Bumper Referral Offer — RND Stake</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
@@ -12,11 +18,14 @@
 </head>
 <body class="offer-body">
 
-<div id="loadingOverlay"><div class="loader-spinner"></div></div>
-<div id="toastContainer"></div>
+<div id="loadingOverlay">
+  <div class="loader-spinner"></div>
+  <div class="loader-text">Loading your offer…</div>
+</div>
+<div id="toastContainer" role="status" aria-live="polite"></div>
 
 <!-- POPUP -->
-<div class="days-remaining-popup" id="daysPopup">
+<div class="days-remaining-popup" id="daysPopup" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
   <div class="popup-content">
     <span class="popup-icon" id="popupIcon">🎁</span>
     <div class="popup-title" id="popupTitle">Withdrawal Not Available Yet</div>
@@ -28,15 +37,15 @@
       <div class="popup-days" id="popupDaysRemaining">0</div>
       <span style="color:#64748b;font-size:0.85rem;">until withdrawal opens</span>
     </div>
-    <button class="popup-close-btn" id="popupCloseBtn">Got it!</button>
+    <button type="button" class="popup-close-btn" id="popupCloseBtn">Got it!</button>
   </div>
 </div>
 
 <!-- MODAL -->
-<div class="confirmation-overlay" id="confirmationModal">
+<div class="confirmation-overlay" id="confirmationModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
   <div class="modal-content">
     <span class="modal-icon">⚠️</span>
-    <div class="modal-title">Confirm Withdrawal</div>
+    <div class="modal-title" id="confirmTitle">Confirm Withdrawal</div>
     <div class="modal-details" id="confirmDetails">
       <div class="row"><span class="label">Network</span><span class="value">BEP-20 / BNB Smart Chain</span></div>
       <div class="row"><span class="label">Amount</span><span class="value warning" id="confirmAmount">$0.00 USDT</span></div>
@@ -47,26 +56,26 @@
       Verify your wallet address. BEP-20 transactions are irreversible.
     </div>
     <div class="modal-buttons">
-      <button class="btn-cancel" id="confirmCancel">Cancel</button>
-      <button class="btn-confirm" id="confirmSubmit"><i class="bi bi-check-circle me-1"></i>Confirm Withdrawal</button>
+      <button type="button" class="btn-cancel" id="confirmCancel">Cancel</button>
+      <button type="button" class="btn-confirm" id="confirmSubmit"><i class="bi bi-check-circle me-1"></i>Confirm Withdrawal</button>
     </div>
   </div>
 </div>
 
-<nav class="navbar-custom">
+<nav class="navbar-custom" aria-label="Main navigation">
   <div class="container">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div class="nav-inner">
       <a href="dashboard.html" class="brand">
         RND<span>Stake</span>
         <small>Bumper Referral Offer</small>
       </a>
-      <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="nav-right">
         <a href="dashboard.html" class="nav-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
-        <a href="direct-offer.html" class="nav-link active"><i class="bi bi-fire"></i>Direct Offer</a>
+        <a href="direct-offer.html" class="nav-link active" aria-current="page"><i class="bi bi-fire"></i>Direct Offer</a>
         <div class="user-badge" id="userBadge">
           <div class="avatar" id="userAvatar">U</div>
           <span class="name" id="userName">Loading...</span>
-          <button class="logout-btn" id="logoutBtn" title="Logout"><i class="bi bi-box-arrow-right"></i></button>
+          <button type="button" class="logout-btn" id="logoutBtn" title="Logout" aria-label="Logout"><i class="bi bi-box-arrow-right"></i></button>
         </div>
       </div>
     </div>
@@ -144,8 +153,8 @@
       <table class="rewards-table">
         <thead>
           <tr>
-            <th>Package Amount (USDT)</th>
-            <th>Reward Per Qualified ID</th>
+            <th scope="col">Package Amount (USDT)</th>
+            <th scope="col">Reward Per Qualified ID</th>
           </tr>
         </thead>
         <tbody id="rewardsTableBody">
@@ -218,11 +227,13 @@
     </div>
 
     <div class="form-group" id="walletFormGroup">
-      <label>
+      <label for="walletAddressInput">
         <i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address
         <span class="network-badge ms-2">BNB Smart Chain (BEP-20)</span>
       </label>
-      <input type="text" class="form-control-custom" id="walletAddressInput" placeholder="Enter your BEP-20 USDT wallet address (0x...)"/>
+      <input type="text" class="form-control-custom" id="walletAddressInput"
+             placeholder="Enter your BEP-20 USDT wallet address (0x...)"
+             autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="walletValidationMsg"/>
       <div class="wallet-validation-msg" id="walletValidationMsg"></div>
       <div class="warning-text">
         <i class="bi bi-exclamation-triangle me-1"></i>
@@ -230,7 +241,7 @@
       </div>
     </div>
 
-    <button class="btn-withdraw" id="withdrawBtn" disabled><i class="bi bi-arrow-up-right me-2"></i>Withdraw Offer Reward</button>
+    <button type="button" class="btn-withdraw" id="withdrawBtn" disabled><i class="bi bi-arrow-up-right me-2"></i>Withdraw Offer Reward</button>
     <div class="withdrawal-status" id="withdrawalStatus"></div>
   </section>
 

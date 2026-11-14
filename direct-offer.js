@@ -2,8 +2,7 @@
 // BUMPER REFERRAL OFFER 2026
 // File: direct-offer.js
 // ============================================================
-// 🧪 TESTING MODE ACTIVE (dates: today → 30 Nov 2026)
-// 🔁 LIVE करने के लिए सिर्फ नीचे CAMPAIGN में 2 lines बदलें
+// 🔴 LIVE MODE ACTIVE (dates: 20 Nov → 25 Nov 2026)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -31,17 +30,17 @@ const db   = getDatabase(app);
 // ============================================================
 // 🎯 CAMPAIGN CONFIG
 // ============================================================
-// 🧪 अभी TESTING MODE चालू है (आज से 30 Nov तक)
+// 🔴 LIVE DATES (20 Nov 2026 → 25 Nov 2026)
 // ============================================================
 const CAMPAIGN = {
   id: "bumper_referral_offer_2026",
   name: "Bumper Referral Offer 2026",
 
-  // 🧪 TESTING DATES (आज से चालू)
-  startDate: new Date("2026-11-12T00:00:00+05:30"),
-  endDate:   new Date("2026-11-30T23:59:59.999+05:30"),
+  // 🔴 LIVE DATES (अब यही चालू है)
+  startDate: new Date("2026-11-20T00:00:00+05:30"),
+  endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
 
-  // Reward tiers (range-based) - UPDATED REWARDS
+  // Reward tiers (range-based)
   tiers: [
     { min: 50,   max: 100,      reward: 10,  key: "50",   label: "$50 – $99"     },
     { min: 100,  max: 200,      reward: 20,  key: "100",  label: "$100 – $199"   },
@@ -155,6 +154,8 @@ function startCountdown() {
       if (el.countdownWrapper) el.countdownWrapper.style.display = "none";
       if (el.campaignEndedMessage) el.campaignEndedMessage.style.display = "block";
       if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+      // ऑफर खत्म होते ही UI रिफ्रेश करें ताकि विदड्रॉल बटन तुरंत चालू हो जाए
+      updateUI();
       return;
     }
 
@@ -416,8 +417,8 @@ function updateUI() {
 function updateWithdrawalUI(withdrawable, status) {
   const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
   
-  // ✅ TESTING FIX: Withdrawal चालू है अभी के लिए, चाहे ऑफर चल रहा हो या खत्म
-  const canWithdraw = withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
+  // ✅ LIVE LOGIC: विदड्रॉल सिर्फ तब चालू जब ऑफर खत्म (ENDED) हो जाए
+  const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
 
   injectWithdrawalInput();
 
@@ -425,14 +426,14 @@ function updateWithdrawalUI(withdrawable, status) {
   if (el.withdrawalInfoBox) el.withdrawalInfoBox.classList.add("visible");
 
   if (el.withdrawalInfoText) {
-    if (withdrawalStatus === "pending") {
-      el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
-    } else if (withdrawalStatus === "approved") {
-      el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved.`;
-    } else if (canWithdraw) {
-      el.withdrawalInfoText.textContent = `🔓 You can withdraw your balance now.`;
-    } else {
-      el.withdrawalInfoText.textContent = `Waiting for rewards...`;
+    if (status === "ACTIVE") {
+      el.withdrawalInfoText.textContent = `🔒 Withdrawals are locked until offer ends.`;
+    } else if (status === "UPCOMING") {
+      el.withdrawalInfoText.textContent = `⏳ Offer has not started yet.`;
+    } else if (status === "ENDED") {
+      if (withdrawalStatus === "pending") el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
+      else if (withdrawalStatus === "approved") el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved.`;
+      else el.withdrawalInfoText.textContent = `🔓 Offer ended! You can withdraw your full balance now.`;
     }
   }
 
@@ -485,7 +486,8 @@ function updateWithdrawalUI(withdrawable, status) {
   } else {
     if (el.withdrawBtn) {
       el.withdrawBtn.disabled = true;
-      el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
+      if (status === "ACTIVE" || status === "UPCOMING") el.withdrawBtn.innerHTML = `🔒 Locked Until Offer Ends`;
+      else el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
       el.withdrawBtn.className = "btn-withdraw withdrawal-locked";
     }
     if (el.walletFormGroup) el.walletFormGroup.style.display = "none";
@@ -518,7 +520,12 @@ function validateWallet() {
 }
 
 function handleWithdrawClick() {
-  // ✅ TESTING FIX: डेट चेक हटा दिया, अब कभी भी विदड्रॉल लग सकता है
+  const status = getCampaignStatus();
+  if (status !== "ENDED") {
+    showToast("Withdrawals unlock after offer ends on 25 Nov.", "warning");
+    return;
+  }
+
   const avail = calculatedRewards.withdrawable;
   if (avail <= 0) { showToast("Nothing to withdraw.", "warning"); return; }
   if (!validateWallet()) { showToast("Enter a valid BEP-20 wallet address.", "error"); return; }

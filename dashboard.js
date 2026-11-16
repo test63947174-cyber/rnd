@@ -1,5 +1,5 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (v11 - REFERRAL CHAIN FIX)
+// RND STAKING PLATFORM - DASHBOARD.JS (v12 - UID = REFERRAL CODE)
 // ============================================================
 // ✅ Daily release (unchanged, working)
 // ✅ Referral chain FIXED:
@@ -10,6 +10,11 @@
 //    5. एक साथ कई packages होने पर बाकी skip हो जाते थे - अब एक-एक करके process होते हैं
 //    6. Double-claim (दो tab) से बचाव - proper claim token
 //    7. Duplicate payment से बचाव - पहले से मिली commission दोबारा नहीं दी जाएगी
+// ✅ v12: Firebase UID ही User ID + Referral Code है (register.html के हिसाब से)
+//    8. Referrer lookup अब सबसे पहले सीधे UID से (तेज़ और सटीक)
+//    9. Recovery में भी username = referralCode = UID बनता है (पहले email-prefix / 8-letter code बनता था)
+//   10. Dashboard पर User ID और Referral link में पूरा UID आता है; Copy पूरा UID कॉपी करता है
+//   11. Name / ID / error text अब escape होकर दिखता है (XSS से बचाव)
 // ⚠️ Firebase config / database structure में कोई बदलाव नहीं
 // ============================================================
 
@@ -90,7 +95,13 @@ function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast-custom ${type}`;
     const icon = type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger';
-    toast.innerHTML = `<i class="bi ${icon}"></i><span class="toast-msg">${message}</span>`;
+    const iconEl = document.createElement('i');
+    iconEl.className = 'bi ' + icon;
+    const msgEl = document.createElement('span');
+    msgEl.className = 'toast-msg';
+    msgEl.textContent = message;
+    toast.appendChild(iconEl);
+    toast.appendChild(msgEl);
     container.appendChild(toast);
     setTimeout(() => {
         toast.style.opacity = '0';
@@ -168,6 +179,16 @@ function normalizeTransferHistory(raw) {
 // Firebase key में ये characters allowed नहीं हैं
 function isValidFirebaseKey(key) {
     return typeof key === 'string' && key.length > 0 && !/[.#$\[\]\/]/.test(key);
+}
+
+// HTML में डालने से पहले text को सुरक्षित करता है
+function escapeHtml(value) {
+    return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // ============================================================
@@ -269,18 +290,28 @@ async function getUserByIdentifier(identifier) {
 
 // ============================================================
 // ✅ NEW: STRICT REFERRER RESOLVER (commission chain के लिए)
-// - referralCode को पहले देखता है (क्योंकि referral link में वही जाता है)
-// - फिर uid, फिर username
+// - सबसे पहले सीधे UID से (referralCode = Firebase UID, इसलिए यही सबसे तेज़ और सटीक है)
+// - फिर पुराने यूज़र्स के short referralCode से, फिर username से
 // - "नहीं मिला" => null लौटाता है
 // - network / permission error => THROW करता है (ताकि chain चुपचाप न टूटे)
 // ============================================================
 async function resolveReferrer(identifier) {
     if (!identifier || typeof identifier !== 'string') return null;
+    const id = identifier.trim();
+    if (!id) return null;
     const usersRef = ref(db, 'users');
 
-    // 1) referralCode (exact + uppercase)
-    const codeCandidates = [identifier];
-    if (identifier.toUpperCase() !== identifier) codeCandidates.push(identifier.toUpperCase());
+    // 1) UID (referralCode = UID) - सीधा और तेज़
+    if (isValidFirebaseKey(id)) {
+        const uidSnap = await get(ref(db, 'users/' + id));
+        if (uidSnap.exists()) {
+            return { uid: id, data: uidSnap.val(), source: 'uid' };
+        }
+    }
+
+    // 2) referralCode (पुराने यूज़र्स के short codes के लिए)
+    const codeCandidates = [id];
+    if (id.toUpperCase() !== id) codeCandidates.push(id.toUpperCase());
     for (const code of codeCandidates) {
         const snap = await get(query(usersRef, orderByChild('referralCode'), equalTo(code)));
         if (snap.exists()) {
@@ -291,20 +322,12 @@ async function resolveReferrer(identifier) {
         }
     }
 
-    // 2) uid
-    if (isValidFirebaseKey(identifier)) {
-        const uidSnap = await get(ref(db, 'users/' + identifier));
-        if (uidSnap.exists()) {
-            return { uid: identifier, data: uidSnap.val(), source: 'uid' };
-        }
-    }
-
     // 3) username
-    const unameSnap = await get(query(usersRef, orderByChild('username'), equalTo(identifier)));
+    const unameSnap = await get(query(usersRef, orderByChild('username'), equalTo(id)));
     if (unameSnap.exists()) {
         const data = unameSnap.val();
         const uids = Object.keys(data);
-        if (uids.length > 1) console.warn('⚠️ Duplicate username found:', identifier, uids);
+        if (uids.length > 1) console.warn('⚠️ Duplicate username found:', id, uids);
         return { uid: uids[0], data: data[uids[0]], source: 'username' };
     }
 
@@ -419,14 +442,8 @@ async function recoverUserData(userId, authUser) {
             const updates = {};
             if (!existingData.uid) updates.uid = userId;
             if (!existingData.email) updates.email = authUser.email || '';
-            if (!existingData.username) {
-                updates.username = authUser.email 
-                    ? authUser.email.split('@')[0] 
-                    : 'user_' + userId.substring(0, 8);
-            }
-            if (!existingData.referralCode) {
-                updates.referralCode = userId.substring(0, 8).toUpperCase();
-            }
+            if (!existingData.username) updates.username = userId;
+            if (!existingData.referralCode) updates.referralCode = userId;
             if (!existingData.name) updates.name = authUser.displayName || 'User';
             if (!existingData.createdAt) updates.createdAt = Date.now();
             if (!existingData.teamStructure) {
@@ -447,8 +464,8 @@ async function recoverUserData(userId, authUser) {
         const newUserData = {
             uid: userId,
             email: authUser.email || '',
-            username: authUser.email ? authUser.email.split('@')[0] : 'user_' + userId.substring(0, 8),
-            referralCode: userId.substring(0, 8).toUpperCase(),
+            username: userId,
+            referralCode: userId,
             name: authUser.displayName || 'User',
             createdAt: Date.now(),
             lastLogin: Date.now(),
@@ -477,7 +494,7 @@ async function recoverUserData(userId, authUser) {
         if (refCode) {
             const refResult = await getUserByIdentifier(refCode);
             if (refResult && refResult.uid !== userId) {
-                newUserData.referredBy = refCode;
+                newUserData.referredBy = (refResult.data && refResult.data.referralCode) || refResult.uid;
                 await runTransaction(ref(db, 'users/' + refResult.uid), (currentData) => {
                     if (!currentData) return currentData;
                     currentData.totalReferrals = (currentData.totalReferrals || 0) + 1;
@@ -1185,8 +1202,11 @@ function updateDashboardUI(u, stats) {
 // RENDER DASHBOARD
 // ============================================================
 function renderDashboard(u) {
-    const username = u.username || u.referralCode || 'USER';
+    // Firebase UID ही User ID और Referral Code है
+    const userUid = currentUserId || u.uid || u.referralCode || u.username || 'USER';
+    const referralCodeValue = u.referralCode || userUid;
     const name = u.name || 'User';
+    const safeName = escapeHtml(name);
     
     const teamBusinessForRank = u.teamBusiness || 0;
     let rank = 'Member';
@@ -1241,13 +1261,13 @@ function renderDashboard(u) {
     }
     
     document.getElementById('sidebarName').textContent = name;
-    document.getElementById('sidebarUserId').textContent = 'ID: ' + username.substring(0, 20) + '...';
+    document.getElementById('sidebarUserId').textContent = 'ID: ' + userUid.substring(0, 20) + '...';
     document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
     
     const badge = document.getElementById('referralBadge');
     if (badge) badge.textContent = directReferrals;
     
-    const referralLink = `${REGISTER_URL}?ref=${u.referralCode}`;
+    const referralLink = `${REGISTER_URL}?ref=${encodeURIComponent(referralCodeValue)}`;
     const rankClass = isMember ? 'rank-badge member' : 'rank-badge';
 
     document.getElementById('dashboardContent').innerHTML = `
@@ -1256,11 +1276,11 @@ function renderDashboard(u) {
                 <div class="welcome-section">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                         <div>
-                            <h2>Good ${getGreeting()}, <span>${name}</span></h2>
+                            <h2>Good ${getGreeting()}, <span>${safeName}</span></h2>
                             <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
                                 <span class="user-id-badge">
-                                    <i class="bi bi-person-badge me-1"></i>User ID: <strong style="font-size:0.7rem;">${username.substring(0, 20)}...</strong>
-                                    <button class="copy-btn-small" onclick="window.copyUserId('${username}')"><i class="bi bi-clipboard"></i> Copy</button>
+                                    <i class="bi bi-person-badge me-1"></i>User ID: <strong style="font-size:0.7rem;">${escapeHtml(userUid.substring(0, 20))}...</strong>
+                                    <button class="copy-btn-small" data-copy-id="${escapeHtml(userUid)}"><i class="bi bi-clipboard"></i> Copy</button>
                                 </span>
                                 <span class="${rankClass}"><i class="bi bi-award me-1"></i>${rank}</span>
                                 <span class="rnd-price-badge">
@@ -1430,7 +1450,7 @@ function renderDashboard(u) {
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
                         <span class="text-muted small"><i class="bi bi-people me-1"></i>Total Referrals: <strong style="color:#2ecc71;">${totalReferrals}</strong></span>
-                        <span class="text-muted small"><i class="bi bi-box-arrow-up-right me-1"></i>Referral Code: <strong style="color:#2ecc71;font-size:0.7rem;">${u.referralCode}</strong></span>
+                        <span class="text-muted small"><i class="bi bi-box-arrow-up-right me-1"></i>Referral Code: <strong style="color:#2ecc71;font-size:0.7rem;">${escapeHtml(referralCodeValue)}</strong></span>
                     </div>
                 </div>
             </div>
@@ -1451,6 +1471,10 @@ function renderDashboard(u) {
         </div>
     `;
     
+    document.querySelectorAll('.copy-btn-small').forEach(btn => {
+        btn.addEventListener('click', () => window.copyUserId(btn.dataset.copyId));
+    });
+
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             navigator.clipboard.writeText(btn.dataset.copy).then(() => {
@@ -1654,7 +1678,7 @@ async function loadDashboardData(userId) {
                 <div class="text-center py-5">
                     <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
                     <h4>Error Loading Dashboard</h4>
-                    <p class="text-muted">${error.message || 'Please check connection.'}</p>
+                    <p class="text-muted">${escapeHtml(error.message || 'Please check connection.')}</p>
                     <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
                 </div>
             `;
@@ -1762,7 +1786,7 @@ onAuthStateChanged(auth, async (user) => {
                 <div class="text-center py-5">
                     <i class="bi bi-exclamation-triangle text-danger fs-1 d-block mb-3"></i>
                     <h4>Authentication Error</h4>
-                    <p class="text-muted">${error.message || 'Please try again.'}</p>
+                    <p class="text-muted">${escapeHtml(error.message || 'Please try again.')}</p>
                     <button class="btn btn-primary-custom mt-3" onclick="location.reload()">Refresh</button>
                 </div>
             `;

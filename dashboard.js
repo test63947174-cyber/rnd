@@ -1,12 +1,16 @@
 // ============================================================
-// RND STAKING PLATFORM - DASHBOARD.JS (v10 - FIXED RELEASE)
+// RND STAKING PLATFORM - DASHBOARD.JS (v11 - REFERRAL CHAIN FIX)
 // ============================================================
-// ✅ Daily release calculation FIXED
-// ✅ Pending release calculation FIXED
-// ✅ First-time login release FIXED
-// ✅ Same-day login release FIXED
-// ✅ Multiple days pending release FIXED
-// ✅ Live release wallet calculation FIXED
+// ✅ Daily release (unchanged, working)
+// ✅ Referral chain FIXED:
+//    1. Chain अब user के referredBy (upline) से शुरू होती है (पहले अपने ही code से शुरू होती थी)
+//    2. Username में "." जैसे characters होने पर lookup टूटता था - FIXED
+//    3. Network/lookup error पर chain चुपचाप टूट कर "processed" हो जाती थी - अब retry होगा
+//    4. commissionProcessing अटक जाने (stuck) की समस्या - FIXED (stale lock 2 मिनट बाद खुल जाता है)
+//    5. एक साथ कई packages होने पर बाकी skip हो जाते थे - अब एक-एक करके process होते हैं
+//    6. Double-claim (दो tab) से बचाव - proper claim token
+//    7. Duplicate payment से बचाव - पहले से मिली commission दोबारा नहीं दी जाएगी
+// ⚠️ Firebase config / database structure में कोई बदलाव नहीं
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -66,6 +70,17 @@ const WALLET_PRECISION = {
     rndWallet: 8
 };
 
+// Commission settings
+const COMMISSION_LEVELS = [
+    { level: 1, percent: 0.08 },
+    { level: 2, percent: 0.04 },
+    { level: 3, percent: 0.02 },
+    { level: 4, percent: 0.01 },
+    { level: 5, percent: 0.01 }
+];
+// अगर "processing" flag इतने समय से अटका है तो उसे stale मानकर दोबारा try करेंगे
+const COMMISSION_STALE_MS = 2 * 60 * 1000;
+
 // ============================================================
 // UTILITY FUNCTIONS
 // ============================================================
@@ -108,7 +123,6 @@ function getTodayDate() {
     return `${yyyy}-${mm}-${dd}`;
 }
 
-// ✅ FIXED: Proper date difference in days
 function getDaysBetween(dateStr1, dateStr2) {
     if (!dateStr1 || !dateStr2) return 0;
     const d1 = new Date(dateStr1 + 'T00:00:00');
@@ -149,6 +163,11 @@ function normalizeTransferHistory(raw) {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
     return Object.values(raw).filter(Boolean);
+}
+
+// Firebase key में ये characters allowed नहीं हैं
+function isValidFirebaseKey(key) {
+    return typeof key === 'string' && key.length > 0 && !/[.#$\[\]\/]/.test(key);
 }
 
 // ============================================================
@@ -208,7 +227,8 @@ async function fetchLiveRate() {
 }
 
 // ============================================================
-// GET USER BY IDENTIFIER
+// GET USER BY IDENTIFIER (transfer / recovery के लिए)
+// ✅ FIXED: username में "." आदि होने पर uid-lookup crash नहीं करेगा
 // ============================================================
 async function getUserByIdentifier(identifier) {
     try {
@@ -216,10 +236,12 @@ async function getUserByIdentifier(identifier) {
         
         const usersRef = ref(db, 'users');
         
-        const uidSnap = await get(ref(db, 'users/' + identifier));
-        if (uidSnap.exists()) {
-            const data = uidSnap.val();
-            return { uid: identifier, data: data, source: 'uid' };
+        if (isValidFirebaseKey(identifier)) {
+            const uidSnap = await get(ref(db, 'users/' + identifier));
+            if (uidSnap.exists()) {
+                const data = uidSnap.val();
+                return { uid: identifier, data: data, source: 'uid' };
+            }
         }
         
         const usernameQuery = query(usersRef, orderByChild('username'), equalTo(identifier));
@@ -243,6 +265,50 @@ async function getUserByIdentifier(identifier) {
         console.error('Error getting user by identifier:', error);
         return null;
     }
+}
+
+// ============================================================
+// ✅ NEW: STRICT REFERRER RESOLVER (commission chain के लिए)
+// - referralCode को पहले देखता है (क्योंकि referral link में वही जाता है)
+// - फिर uid, फिर username
+// - "नहीं मिला" => null लौटाता है
+// - network / permission error => THROW करता है (ताकि chain चुपचाप न टूटे)
+// ============================================================
+async function resolveReferrer(identifier) {
+    if (!identifier || typeof identifier !== 'string') return null;
+    const usersRef = ref(db, 'users');
+
+    // 1) referralCode (exact + uppercase)
+    const codeCandidates = [identifier];
+    if (identifier.toUpperCase() !== identifier) codeCandidates.push(identifier.toUpperCase());
+    for (const code of codeCandidates) {
+        const snap = await get(query(usersRef, orderByChild('referralCode'), equalTo(code)));
+        if (snap.exists()) {
+            const data = snap.val();
+            const uids = Object.keys(data);
+            if (uids.length > 1) console.warn('⚠️ Duplicate referralCode found:', code, uids);
+            return { uid: uids[0], data: data[uids[0]], source: 'referralCode' };
+        }
+    }
+
+    // 2) uid
+    if (isValidFirebaseKey(identifier)) {
+        const uidSnap = await get(ref(db, 'users/' + identifier));
+        if (uidSnap.exists()) {
+            return { uid: identifier, data: uidSnap.val(), source: 'uid' };
+        }
+    }
+
+    // 3) username
+    const unameSnap = await get(query(usersRef, orderByChild('username'), equalTo(identifier)));
+    if (unameSnap.exists()) {
+        const data = unameSnap.val();
+        const uids = Object.keys(data);
+        if (uids.length > 1) console.warn('⚠️ Duplicate username found:', identifier, uids);
+        return { uid: uids[0], data: data[uids[0]], source: 'username' };
+    }
+
+    return null;
 }
 
 // ============================================================
@@ -432,19 +498,7 @@ async function recoverUserData(userId, authUser) {
 }
 
 // ============================================================
-// ✅ FIXED: SAFE DAILY RELEASE
-// ============================================================
-// पिछली गलतियाँ:
-// 1. Same-day login पर release skip हो जाता था
-// 2. first-time login पर release नहीं होता था
-// 3. Timezone issues थे
-// 4. Pending transaction amounts गलत record होते थे
-//
-// नया logic:
-// - lastReleaseDate खाली है → आज ही से count शुरू करें
-// - lastReleaseDate == today → कुछ न करें
-// - lastReleaseDate < today → missing days + today सब process करें
-// - हर package का अपना dailyRelease और remainingRND का ध्यान रखें
+// SAFE DAILY RELEASE (unchanged - working perfectly)
 // ============================================================
 async function processDailyRelease(userId) {
     if (releaseInProgress) {
@@ -458,7 +512,6 @@ async function processDailyRelease(userId) {
     try {
         const userRef = ref(db, 'users/' + userId);
         
-        // First check current state
         const preSnap = await get(userRef);
         if (!preSnap.exists()) {
             releaseInProgress = false;
@@ -468,33 +521,25 @@ async function processDailyRelease(userId) {
         const preData = preSnap.val();
         const lastReleaseDate = preData.lastReleaseDate || '';
         
-        // ✅ Case 1: आज ही release हो चुका है
         if (lastReleaseDate === today) {
             console.log('✅ Release already processed today');
             releaseInProgress = false;
             return preData;
         }
         
-        // ✅ Case 2: Calculate कितने दिन pending हैं
-        let daysToProcess = 1; // Default: आज का ही
+        let daysToProcess = 1;
         if (lastReleaseDate) {
             const daysDiff = getDaysBetween(lastReleaseDate, today);
-            // daysDiff = today - lastRelease = कितने दिन का gap
-            // e.g., lastReleaseDate = 15 Sept, today = 20 Sept → daysDiff = 5
-            // तो 16, 17, 18, 19, 20 → 5 दिन का release pending है
             if (daysDiff > 0) {
                 daysToProcess = daysDiff;
             } else if (daysDiff === 0) {
-                // Same day, skip
                 releaseInProgress = false;
                 return preData;
             }
         }
-        // अगर lastReleaseDate खाली है (नया user), तो सिर्फ आज का 1 दिन
         
         console.log(`📅 Processing ${daysToProcess} day(s) of release`);
         
-        // ✅ NOW RUN THE TRANSACTION
         const result = await runTransaction(userRef, (currentData) => {
             if (!currentData) return currentData;
             
@@ -514,7 +559,6 @@ async function processDailyRelease(userId) {
                 const remainingRND = pkg.remainingRND || 0;
                 const dailyRelease = pkg.dailyRelease || 0;
                 
-                // Skip if no daily release or no remaining
                 if (dailyRelease <= 0 || remainingRND <= 0) {
                     if (remainingRND <= 0) {
                         pkg.status = 'completed';
@@ -524,13 +568,11 @@ async function processDailyRelease(userId) {
                     continue;
                 }
                 
-                // ✅ Calculate total release for all pending days
                 const totalPossibleRelease = dailyRelease * daysToProcess;
                 const totalReleaseAmount = Math.min(totalPossibleRelease, remainingRND);
                 const todayReleaseAmount = Math.min(dailyRelease, remainingRND);
                 const pendingReleaseAmount = totalReleaseAmount - todayReleaseAmount;
                 
-                // Update package
                 pkg.remainingRND = remainingRND - totalReleaseAmount;
                 pkg.releasedRND = (pkg.releasedRND || 0) + totalReleaseAmount;
                 
@@ -542,7 +584,6 @@ async function processDailyRelease(userId) {
                 updatedPackages[pkgKey] = pkg;
                 totalReleaseAmountAll += totalReleaseAmount;
                 
-                // ✅ Today's release transaction
                 releaseTransactions.push({
                     type: 'daily_release',
                     amount: todayReleaseAmount,
@@ -555,7 +596,6 @@ async function processDailyRelease(userId) {
                     description: `Daily release of ${todayReleaseAmount.toFixed(4)} RND`
                 });
                 
-                // ✅ Pending releases transaction (if any)
                 if (pendingReleaseAmount > 0) {
                     releaseTransactions.push({
                         type: 'pending_release',
@@ -572,22 +612,18 @@ async function processDailyRelease(userId) {
                 }
             }
             
-            // ✅ Always update lastReleaseDate even if no active packages
             currentData.lastReleaseDate = today;
             
             if (!hasActivePackages || totalReleaseAmountAll === 0) {
-                // No release amount, but still update the date
                 currentData.packages = updatedPackages;
                 return currentData;
             }
             
-            // ✅ Update wallets
             currentData.rndWallet = (currentData.rndWallet || 0) + totalReleaseAmountAll;
             currentData.lockedRND = Math.max(0, (currentData.lockedRND || 0) - totalReleaseAmountAll);
             currentData.totalReleased = (currentData.totalReleased || 0) + totalReleaseAmountAll;
             currentData.packages = updatedPackages;
             
-            // ✅ Add transactions
             const transactions = currentData.transactions || {};
             releaseTransactions.forEach(tx => {
                 transactions[generateTxId()] = tx;
@@ -615,89 +651,119 @@ async function processDailyRelease(userId) {
 }
 
 // ============================================================
-// ATOMIC COMMISSION PROCESSING
+// ✅ FIXED: ATOMIC COMMISSION PROCESSING
 // ============================================================
-async function processReferralCommission(userId, packageId, packageData) {
-    if (commissionInProgress) {
-        console.log('⏳ Commission in progress, skipping...');
-        return null;
-    }
-    
-    commissionInProgress = true;
-    
+// पुरानी गलतियाँ:
+// 1. Chain user के अपने referralCode से शुरू होती थी -> level 1 पर खुद मिल जाता था और loop break
+// 2. Lookup fail होने पर loop चुपचाप रुक जाता था, फिर भी package "processed" हो जाता था
+// 3. "processing" flag अटक जाए तो package हमेशा के लिए छूट जाता था
+// 4. Lock transaction में "already processing" पर भी committed=true आता था (double-run संभव)
+// 5. कई packages होने पर बाकी skip हो जाते थे (global flag)
+//
+// नया logic:
+// - Claim token के साथ lock लो (stale lock 2 मिनट बाद टूट जाएगा)
+// - user.referredBy से upline चलाओ, हर level पर strict lookup
+// - Lookup error आए तो throw -> lock छोड़ दो -> अगली बार retry (भुगतान idempotent है)
+// - हर level की commission सिर्फ एक बार मिलेगी (txId + पुरानी entries दोनों check)
+// ============================================================
+async function processReferralCommission(userId, packageId) {
+    const pkgRef = ref(db, `users/${userId}/packages/${packageId}`);
+    const claimToken = generateTxId();
+    let claimed = false;
+
     try {
-        if (packageData.commissionProcessed === true) {
-            return null;
-        }
-        if (packageData.status !== 'active' && packageData.status !== 'completed') {
-            return null;
-        }
-        
-        const userSnapshot = await get(ref(db, 'users/' + userId));
-        if (!userSnapshot.exists()) return null;
-        
-        const userData = userSnapshot.val();
-        const referralCode = userData.referralCode;
-        const packageAmount = packageData.usdtAmount || 0;
-        
-        if (packageAmount <= 0) return null;
-        
-        const commissionLevels = [
-            { level: 1, percent: 0.08 },
-            { level: 2, percent: 0.04 },
-            { level: 3, percent: 0.02 },
-            { level: 4, percent: 0.01 },
-            { level: 5, percent: 0.01 }
-        ];
-        
-        const pkgRef = ref(db, `users/${userId}/packages/${packageId}`);
-        const markResult = await runTransaction(pkgRef, (pkg) => {
-            if (!pkg) return pkg;
-            if (pkg.commissionProcessed === true) return pkg;
-            if (pkg.commissionProcessing === true) return pkg;
+        // ---------- STEP 1: Claim (lock) ----------
+        const claimResult = await runTransaction(pkgRef, (pkg) => {
+            if (!pkg) return pkg;                       // first run (cache खाली) - server से retry होगा
+            if (pkg.commissionProcessed === true) return;   // abort
+            if (pkg.status !== 'active' && pkg.status !== 'completed') return; // abort
+            if (pkg.commissionProcessing === true) {
+                const age = Date.now() - (pkg.commissionProcessingAt || 0);
+                if (age < COMMISSION_STALE_MS) return;  // कोई और चला रहा है - abort
+            }
             pkg.commissionProcessing = true;
             pkg.commissionProcessingAt = Date.now();
+            pkg.commissionClaimToken = claimToken;
             return pkg;
         });
-        
-        if (!markResult.committed) {
-            console.log('⚠️ Commission already processed or processing');
+
+        if (!claimResult.committed) {
+            return null; // पहले से processed / कोई और कर रहा है
+        }
+        const claimedPkg = claimResult.snapshot.val();
+        if (!claimedPkg || claimedPkg.commissionClaimToken !== claimToken) {
+            return null; // lock हमें नहीं मिला
+        }
+        claimed = true;
+
+        const packageAmount = claimedPkg.usdtAmount || 0;
+        if (packageAmount <= 0) {
+            await releaseClaim(pkgRef, claimToken);
             return null;
         }
-        
-        const checkPkg = await get(pkgRef);
-        if (!checkPkg.exists() || checkPkg.val().commissionProcessed === true) {
+
+        // ---------- STEP 2: Buyer का data ----------
+        const userSnapshot = await get(ref(db, 'users/' + userId));
+        if (!userSnapshot.exists()) {
+            await releaseClaim(pkgRef, claimToken);
             return null;
         }
-        
-        let currentRefCode = referralCode;
+        const userData = userSnapshot.val();
+        const fromUserName = userData.username || userData.referralCode || userId;
+
+        // ---------- STEP 3: Upline chain (referredBy से शुरू) ----------
+        let currentRefCode = userData.referredBy || null;
         let level = 1;
+        const visited = new Set([userId]);
         const processedTxIds = [];
-        
+        let chainNote = '';
+
         while (currentRefCode && level <= 5) {
-            const refResult = await getUserByIdentifier(currentRefCode);
-            if (!refResult || refResult.uid === userId) break;
-            
-            const referrerData = refResult.data;
+            const refResult = await resolveReferrer(currentRefCode); // error आए तो throw
+            if (!refResult) {
+                chainNote = `Referrer not found at level ${level}: ${currentRefCode}`;
+                console.warn('⚠️', chainNote);
+                break;
+            }
+
             const uid = refResult.uid;
-            
-            const commissionPercent = commissionLevels.find(l => l.level === level)?.percent || 0;
-            const commissionAmount = roundToPrecision(packageAmount * commissionPercent, 8);
-            
+            if (visited.has(uid)) {
+                chainNote = `Loop detected at level ${level}`;
+                console.warn('⚠️', chainNote);
+                break;
+            }
+            visited.add(uid);
+
+            const commissionPercent = COMMISSION_LEVELS.find(l => l.level === level)?.percent || 0;
+            const commissionAmount = roundToPrecision(packageAmount * commissionPercent, 2);
+            const commissionTxId = `comm_${packageId}_L${level}`;
+
             if (commissionAmount > 0) {
-                const commissionTxId = `comm_${packageId}_L${level}`;
-                
-                await runTransaction(ref(db, 'users/' + uid), (currentData) => {
+                const lvl = level;
+                const txResult = await runTransaction(ref(db, 'users/' + uid), (currentData) => {
                     if (!currentData) return currentData;
-                    
-                    const commissionHistory = currentData.commissionHistory || [];
-                    const existing = commissionHistory.find(h => h.txId === commissionTxId);
-                    if (existing) return currentData;
-                    
+
+                    const commissionHistory = Array.isArray(currentData.commissionHistory)
+                        ? currentData.commissionHistory
+                        : normalizeTransferHistory(currentData.commissionHistory);
+                    const transactions = currentData.transactions || {};
+
+                    // ✅ Duplicate check: हमारी txId, या इसी package + level की कोई भी पुरानी entry
+                    const alreadyPaid =
+                        transactions[commissionTxId] ||
+                        commissionHistory.some(h => h && (
+                            h.txId === commissionTxId ||
+                            (h.type === 'referral_commission' &&
+                             h.fromUid === userId &&
+                             h.packageId === packageId &&
+                             h.level === lvl)
+                        ));
+                    if (alreadyPaid) return currentData;
+
                     currentData.referralWallet = roundToPrecision(
                         (currentData.referralWallet || 0) + commissionAmount, 2
                     );
-                    const levelKey = `level${level}Earnings`;
+                    const levelKey = `level${lvl}Earnings`;
                     currentData[levelKey] = roundToPrecision(
                         (currentData[levelKey] || 0) + commissionAmount, 2
                     );
@@ -707,75 +773,125 @@ async function processReferralCommission(userId, packageId, packageData) {
                     currentData.teamBusiness = roundToPrecision(
                         (currentData.teamBusiness || 0) + packageAmount, 2
                     );
-                    
+
                     commissionHistory.push({
                         type: 'referral_commission',
-                        level: level,
+                        level: lvl,
                         percent: commissionPercent * 100,
                         amount: commissionAmount,
-                        fromUser: userData.username || userData.referralCode || userId,
+                        fromUser: fromUserName,
                         fromUid: userId,
                         packageId: packageId,
                         txId: commissionTxId,
                         timestamp: Date.now(),
                         date: getTodayDate(),
-                        description: `${commissionPercent * 100}% from Level ${level}`
+                        description: `${commissionPercent * 100}% from Level ${lvl}`
                     });
                     currentData.commissionHistory = commissionHistory;
-                    
-                    const transactions = currentData.transactions || {};
+
                     transactions[commissionTxId] = {
                         type: 'referral_commission',
                         amount: commissionAmount,
                         currency: 'USDT',
-                        level: level,
+                        level: lvl,
                         percent: commissionPercent * 100,
-                        fromUser: userData.username || userData.referralCode || userId,
+                        fromUser: fromUserName,
                         fromUid: userId,
+                        packageId: packageId,
                         timestamp: Date.now(),
                         date: getTodayDate(),
                         status: 'completed',
                         txId: commissionTxId
                     };
                     currentData.transactions = transactions;
-                    
+
                     return currentData;
                 });
-                
+
+                // ✅ Verify: commission सच में लिखी गई? (नहीं तो error -> retry)
+                const after = txResult.snapshot && txResult.snapshot.exists() ? txResult.snapshot.val() : null;
+                const written = !!(txResult.committed && after && after.transactions && after.transactions[commissionTxId]);
+                const paidEarlierOtherId = !!(after && Array.isArray(after.commissionHistory) &&
+                    after.commissionHistory.some(h => h && h.type === 'referral_commission' &&
+                        h.fromUid === userId && h.packageId === packageId && h.level === lvl));
+                if (!written && !paidEarlierOtherId) {
+                    throw new Error(`Commission write not confirmed for level ${lvl} (${uid})`);
+                }
+
                 processedTxIds.push(commissionTxId);
             }
-            
-            currentRefCode = referrerData.referredBy || null;
+
+            currentRefCode = refResult.data.referredBy || null;
             level++;
         }
-        
-        await runTransaction(pkgRef, (pkg) => {
+
+        // ---------- STEP 4: Package को processed mark करो ----------
+        const finalizeResult = await runTransaction(pkgRef, (pkg) => {
             if (!pkg) return pkg;
+            if (pkg.commissionClaimToken && pkg.commissionClaimToken !== claimToken) return; // किसी और ने lock ले लिया
             pkg.commissionProcessed = true;
             pkg.commissionProcessedAt = Date.now();
             pkg.commissionProcessing = false;
             pkg.commissionTxIds = processedTxIds;
+            pkg.commissionClaimToken = null;
+            if (chainNote) pkg.commissionNote = chainNote;
             return pkg;
         });
-        
-        console.log('✅ Commission processed for:', packageId);
+        if (!finalizeResult.committed) {
+            console.warn('⚠️ Finalize not committed for', packageId);
+        }
+
+        console.log('✅ Commission processed for:', packageId, '| levels paid:', processedTxIds.length);
         return true;
-        
+
     } catch (error) {
-        console.error('❌ Commission error:', error);
-        try {
-            await update(ref(db, `users/${userId}/packages/${packageId}`), {
-                commissionProcessing: false
-            });
-        } catch (_) {}
+        console.error('❌ Commission error (will retry on next load):', error);
+        if (claimed) {
+            try { await releaseClaim(pkgRef, claimToken); } catch (_) {}
+        }
         return null;
+    }
+}
+
+async function releaseClaim(pkgRef, claimToken) {
+    await runTransaction(pkgRef, (pkg) => {
+        if (!pkg) return pkg;
+        if (pkg.commissionClaimToken !== claimToken) return; // हमारा lock नहीं है - छेड़ो मत
+        pkg.commissionProcessing = false;
+        pkg.commissionClaimToken = null;
+        return pkg;
+    });
+}
+
+// ✅ NEW: Pending packages को एक-एक करके (sequentially) process करता है
+async function runPendingCommissions(userId, packages) {
+    if (commissionInProgress) return;
+    commissionInProgress = true;
+    try {
+        const now = Date.now();
+        const pendingKeys = Object.entries(packages || {})
+            .filter(([, pkg]) => {
+                if (!pkg) return false;
+                if (pkg.status !== 'active' && pkg.status !== 'completed') return false;
+                if (pkg.commissionProcessed === true) return false;
+                if (pkg.commissionProcessing === true &&
+                    (now - (pkg.commissionProcessingAt || 0)) < COMMISSION_STALE_MS) return false;
+                return true;
+            })
+            .map(([key]) => key);
+
+        for (const key of pendingKeys) {
+            await processReferralCommission(userId, key);
+        }
+    } catch (err) {
+        console.warn('Background commission queue failed:', err);
     } finally {
         commissionInProgress = false;
     }
 }
 
 // ============================================================
-// ✅ FIXED: CALCULATE USER STATS
+// CALCULATE USER STATS
 // ============================================================
 function calculateUserStats(userData) {
     const packages = userData.packages || {};
@@ -808,7 +924,7 @@ function calculateUserStats(userData) {
 }
 
 // ============================================================
-// ATOMIC TRANSFER (rakha hai — transfer.html se call hoga)
+// ATOMIC TRANSFER (transfer.html से call होगा)
 // ============================================================
 async function atomicTransfer(senderUid, recipientUid, recipientData, amount, walletType, currency, requestId) {
     if (!senderUid || !recipientUid) {
@@ -1029,7 +1145,7 @@ function setupRealtimeListener(userId) {
 }
 
 // ============================================================
-// ✅ FIXED: UPDATE DASHBOARD UI — live release wallet
+// UPDATE DASHBOARD UI — live release wallet
 // ============================================================
 function updateDashboardUI(u, stats) {
     const elements = {
@@ -1047,7 +1163,6 @@ function updateDashboardUI(u, stats) {
         lockedRNDInfo: document.getElementById('lockedRNDInfo')
     };
     
-    // ✅ FIXED: Live calculate daily release from packages
     const dailyReleaseValue = stats?.totalDailyRelease || 0;
     const lockedRNDValue = stats?.totalLockedRND || u.lockedRND || 0;
     
@@ -1102,7 +1217,6 @@ function renderDashboard(u) {
     const totalStake = u.totalStake || 0;
     const teamBusiness = u.teamBusiness || 0;
     
-    // ✅ FIXED: Live calculate daily release
     const stats = calculateUserStats(u);
     const releaseWallet = stats.totalDailyRelease;
     
@@ -1475,9 +1589,7 @@ async function handleTransfer() {
 }
 
 // ============================================================
-// ✅ FIXED: LOAD DASHBOARD DATA
-// ============================================================
-// अब हर dashboard load पर पहले daily release process होगा
+// LOAD DASHBOARD DATA
 // ============================================================
 async function loadDashboardData(userId) {
     if (isDashboardLoading) return;
@@ -1510,24 +1622,20 @@ async function loadDashboardData(userId) {
             return;
         }
         
-        // Step 3: ✅ PROCESS DAILY RELEASE (यह पहले missing था!)
+        // Step 3: Process daily release
         console.log('🔄 Processing daily release...');
         await processDailyRelease(userId);
         
-        // Step 4: Process pending commissions in background
+        // Step 4: ✅ Pending commissions (background, एक-एक करके)
         const freshSnap = await get(ref(db, 'users/' + userId));
         const u = freshSnap.val();
         
-        const packages = u.packages || {};
-        for (let [key, pkg] of Object.entries(packages)) {
-            if (pkg.status === 'active' && !pkg.commissionProcessed && !pkg.commissionProcessing) {
-                processReferralCommission(userId, key, pkg).catch(err => 
-                    console.warn('Background commission failed:', err)
-                );
-            }
-        }
+        // Background में चलेगा, dashboard load को block नहीं करेगा
+        runPendingCommissions(userId, u.packages || {}).catch(err =>
+            console.warn('Background commission failed:', err)
+        );
         
-        // Step 5: Re-fetch data after release & commission
+        // Step 5: Re-fetch data after release
         const updatedSnap = await get(ref(db, 'users/' + userId));
         const updatedData = updatedSnap.exists() ? updatedSnap.val() : u;
         

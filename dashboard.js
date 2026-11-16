@@ -787,6 +787,9 @@ async function processReferralCommission(userId, packageId) {
                     currentData.referralEarnings = roundToPrecision(
                         (currentData.referralEarnings || 0) + commissionAmount, 2
                     );
+                    currentData.totalReferralCommission = roundToPrecision(
+                        (currentData.totalReferralCommission || 0) + commissionAmount, 2
+                    );
                     currentData.teamBusiness = roundToPrecision(
                         (currentData.teamBusiness || 0) + packageAmount, 2
                     );

@@ -1,22 +1,16 @@
 // ============================================================
-// RND STAKING - REGISTER.JS (v2 - REFERRAL CHAIN FIX)
+// RND STAKING - REGISTER.JS (v3 - low Firebase usage)
 // ============================================================
-// ✅ पूरे "users" node को डाउनलोड करना बंद (पहले हर रजिस्ट्रेशन पर सारे यूज़र लोड होते थे)
-// ✅ Referrer को पहले सीधे UID से ढूँढता है (तेज़), फिर referralCode, फिर username से
-// ✅ गलत / अधूरा referral code अब चुपचाप नज़रअंदाज़ नहीं होगा - साफ error दिखेगा
-// ✅ Counts अब increment() से बढ़ते हैं (एक साथ कई signup होने पर भी गिनती नहीं खोएगी)
-// ✅ directReferrals पूरा overwrite नहीं होता, सिर्फ़ नया entry जुड़ता है
-// ✅ नया यूज़र + सभी upline के counts = एक ही atomic update (या सब होगा, या कुछ नहीं)
-// ✅ Update fail हो तो बना हुआ Auth account वापस हटा दिया जाता है (अधूरा account नहीं बचेगा)
-// ✅ referredBy में referrer का सही referralCode सेव होता है (dashboard के commission के लिए)
-// ✅ Name से < > हटाए जाते हैं और toast में innerHTML नहीं (XSS से बचाव)
-// ✅ पूरा referral link paste करने पर भी code अपने आप निकल आता है
-// ⚠️ Firebase config / database structure / पुराने यूज़र का data - कुछ नहीं बदला
+// v2 की सारी खूबियाँ वैसी ही हैं। v3 में सिर्फ़ ये बदला:
+// ✅ Referrer / upline ढूँढते समय पूरा user node डाउनलोड नहीं होता,
+//    सिर्फ़ referralCode, referredBy, email (3 छोटे fields) पढ़े जाते हैं
+// ✅ पुराने short code / username वाली query में limitToFirst(1)
+// ⚠️ Firebase Rules में "usernames" नोड ज़रूरी है (इसी की वजह से permission_denied आ रहा था)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, updateProfile, deleteUser } from "firebase/auth";
-import { getDatabase, ref, get, update, query, orderByChild, equalTo, increment } from "firebase/database";
+import { getDatabase, ref, get, update, query, orderByChild, equalTo, limitToFirst, increment } from "firebase/database";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -76,12 +70,10 @@ function sanitizeName(raw) {
         .slice(0, 60);
 }
 
-// Firebase key में ये characters allowed नहीं हैं
 function isValidFirebaseKey(key) {
     return typeof key === 'string' && key.length > 0 && !/[.#$\[\]\/]/.test(key);
 }
 
-// पूरा link paste हो तो उसमें से ?ref= निकाल लेता है
 function extractRefCode(raw) {
     let value = (raw || '').trim();
     if (!value) return '';
@@ -129,52 +121,50 @@ document.getElementById('regRef').addEventListener('input', function () {
 });
 
 // ============================================================
-// REFERRER LOOKUP
-// - मिल गया      => { uid, data }
-// - नहीं मिला    => null
-// - network/permission error => THROW (ताकि चेन चुपचाप न टूटे)
-// क्रम: UID (सबसे तेज़) -> referralCode -> username
+// REFERRER LOOKUP (हल्का: पूरा node नहीं, सिर्फ़ ज़रूरी fields)
+// - मिल गया   => { uid, data: { referralCode, referredBy } }
+// - नहीं मिला => null
+// - network/permission error => THROW
 // ============================================================
 async function resolveUser(identifier) {
     const id = (identifier || '').trim();
     if (!id) return null;
 
-    // 1) सीधे UID से (नए यूज़र्स में referralCode = UID होता है)
+    // 1) सीधे UID से — सिर्फ़ 3 छोटे fields
     if (isValidFirebaseKey(id)) {
-        const snap = await get(ref(db, 'users/' + id));
-        if (snap.exists()) {
-            return { uid: id, data: snap.val() };
+        const [codeS, byS, emailS] = await Promise.all([
+            get(ref(db, `users/${id}/referralCode`)),
+            get(ref(db, `users/${id}/referredBy`)),
+            get(ref(db, `users/${id}/email`))
+        ]);
+        if (codeS.exists() || byS.exists() || emailS.exists()) {
+            return { uid: id, data: { referralCode: codeS.val() || '', referredBy: byS.val() || '' } };
         }
     }
 
     const usersRef = ref(db, 'users');
 
-    // 2) referralCode (पुराने यूज़र्स के short codes के लिए)
+    // 2) referralCode (पुराने short codes)
     const codeCandidates = [id];
     if (id.toUpperCase() !== id) codeCandidates.push(id.toUpperCase());
     for (const code of codeCandidates) {
-        const snap = await get(query(usersRef, orderByChild('referralCode'), equalTo(code)));
+        const snap = await get(query(usersRef, orderByChild('referralCode'), equalTo(code), limitToFirst(1)));
         if (snap.exists()) {
-            const found = snap.val();
-            const uids = Object.keys(found);
-            if (uids.length > 1) console.warn('⚠️ Duplicate referralCode:', code, uids);
-            return { uid: uids[0], data: found[uids[0]] };
+            const [uid, node] = Object.entries(snap.val())[0];
+            return { uid, data: { referralCode: node.referralCode || '', referredBy: node.referredBy || '' } };
         }
     }
 
     // 3) username
-    const unameSnap = await get(query(usersRef, orderByChild('username'), equalTo(id)));
+    const unameSnap = await get(query(usersRef, orderByChild('username'), equalTo(id), limitToFirst(1)));
     if (unameSnap.exists()) {
-        const found = unameSnap.val();
-        const uids = Object.keys(found);
-        if (uids.length > 1) console.warn('⚠️ Duplicate username:', id, uids);
-        return { uid: uids[0], data: found[uids[0]] };
+        const [uid, node] = Object.entries(unameSnap.val())[0];
+        return { uid, data: { referralCode: node.referralCode || '', referredBy: node.referredBy || '' } };
     }
 
     return null;
 }
 
-// Direct referrer से ऊपर की चेन बनाता है (अधिकतम 5 level)
 async function buildUplineChain(firstReferrer, newUid) {
     const chain = [firstReferrer];
     const visited = new Set([newUid, firstReferrer.uid]);
@@ -184,7 +174,7 @@ async function buildUplineChain(firstReferrer, newUid) {
         const nextId = current.data && current.data.referredBy;
         if (!nextId) break;
 
-        const next = await resolveUser(nextId); // error आए तो throw -> registration rollback
+        const next = await resolveUser(nextId);
         if (!next) {
             console.warn('⚠️ Upline not found, chain stops at level', chain.length, '| id:', nextId);
             break;
@@ -226,7 +216,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     let createdUser = null;
 
     try {
-        // 1. Firebase Auth में account बनाओ
+        // 1. Firebase Auth में account
         const cred = await createUserWithEmailAndPassword(auth, email, pass);
         createdUser = cred.user;
         const uid = cred.user.uid;
@@ -237,7 +227,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             console.warn('updateProfile failed (non-fatal):', profileErr);
         }
 
-        // 2. Referrer और उसकी upline चेन तैयार करो
+        // 2. Referrer और upline चेन
         const finalRefCode = typedRef || referralCodeFromURL || '';
         let chain = [];
         let referredByValue = '';
@@ -252,11 +242,10 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                 throw appError('app/invalid-referral', '❌ You cannot refer yourself.');
             }
             chain = await buildUplineChain(referrer, uid);
-            // dashboard / commission के लिए referrer का सही code सेव करो
             referredByValue = referrer.data.referralCode || referrer.uid;
         }
 
-        // 3. नया यूज़र (structure पहले जैसा ही)
+        // 3. नया यूज़र (structure पहले जैसा)
         const userData = {
             uid: uid,
             username: uid,
@@ -294,7 +283,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             transferHistory: []
         };
 
-        // 4. ✅ एक ही atomic update: नया यूज़र + usernames + सभी upline के counts
+        // 4. एक ही atomic update
         const updates = {};
         updates[`users/${uid}`] = userData;
         updates[`usernames/${uid}`] = uid;
@@ -309,7 +298,6 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             updates[`${base}/teamStructure/level${level}`] = increment(1);
 
             if (level === 1) {
-                // पूरा directReferrals overwrite नहीं - सिर्फ़ नया child जुड़ता है
                 updates[`${base}/directReferrals/${uid}`] = {
                     uid: uid,
                     name: name,
@@ -332,7 +320,6 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     } catch (err) {
         console.error('❌ Registration Error:', err);
 
-        // अधूरा account न बचे - बना हुआ Auth user हटा दो ताकि दोबारा कोशिश हो सके
         let rollbackFailed = false;
         if (createdUser) {
             try {

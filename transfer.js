@@ -1,15 +1,18 @@
 // ============================================================
-// TRANSFER.JS — v6 (Forgot Password Added)
+// TRANSFER.JS — v7 (bug-fixed, low Firebase usage)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
-import { 
-    getAuth, 
+import {
+    getAuth,
     onAuthStateChanged,
     EmailAuthProvider,
     reauthenticateWithCredential
 } from "firebase/auth";
-import { getDatabase, ref, get, runTransaction, set, onValue } from "firebase/database";
+import {
+    getDatabase, ref, get, runTransaction, set, update, onValue,
+    query, orderByChild, equalTo, limitToFirst
+} from "firebase/database";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
@@ -29,6 +32,12 @@ const db = getDatabase(app);
 const WALLET_CURRENCY = { depositWallet: 'USDT', referralWallet: 'USDT', rndWallet: 'RND' };
 const WALLET_PRECISION = { depositWallet: 2, referralWallet: 2, rndWallet: 8 };
 
+const ACTIVE_KEY = 'activeTransferV2';
+const MAX_PW_FAILS = 5;
+const PW_LOCK_MS = 5 * 60 * 1000;
+const MAX_AUTO_RETRIES = 8;
+const RETRY_MS = 10000;
+
 let currentUserData = null;
 let currentUserId = null;
 let transferLock = false;
@@ -36,63 +45,107 @@ let balanceListenerOff = null;
 let currentBalances = { depositWallet: 0, referralWallet: 0, rndWallet: 0 };
 let pendingTransfer = null;
 let modalOpen = false;
+let initDone = false;
+let firstSnapshotDone = false;
+
+const $ = id => document.getElementById(id);
+const on = (id, evt, fn) => { const e = $(id); if (e) e.addEventListener(evt, fn); };
+
+// ============================================================
+// 🛡️ Escape (XSS से बचाव — user के नाम HTML में जाते हैं)
+// ============================================================
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 // ============================================================
 // 👁️ Eye toggle
 // ============================================================
-window.togglePassword = function(inputId, btn) {
-    const input = document.getElementById(inputId);
+window.togglePassword = function (inputId, btn) {
+    const input = $(inputId);
     if (!input) return;
     const icon = btn.querySelector('i');
     if (input.type === 'password') {
         input.type = 'text';
-        icon.className = 'bi bi-eye-slash';
+        if (icon) icon.className = 'bi bi-eye-slash';
     } else {
         input.type = 'password';
-        icon.className = 'bi bi-eye';
+        if (icon) icon.className = 'bi bi-eye';
     }
 };
 
 // ============================================================
-// 🔐 Hash
+// 🔐 Password hashing
+//  v2  = PBKDF2 (salted with uid)   |  पुराना = plain SHA-256 (अब भी चलेगा, सही password पर अपने-आप v2 बन जाएगा)
 // ============================================================
-async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+const toHex = buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+async function hashLegacy(password) {
+    const data = new TextEncoder().encode(password);
+    return toHex(await crypto.subtle.digest('SHA-256', data));
 }
 
+async function hashV2(password, uid) {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt: enc.encode('rnd-transfer:' + uid), iterations: 150000, hash: 'SHA-256' },
+        key, 256
+    );
+    return 'v2:' + toHex(bits);
+}
+
+// ---- wrong-password lockout (इसी device पर) ----
+function pwState(uid) {
+    try {
+        const s = JSON.parse(localStorage.getItem('tpf_' + uid) || '{}');
+        return { count: s.count || 0, until: s.until || 0 };
+    } catch { return { count: 0, until: 0 }; }
+}
+function pwFail(uid) {
+    const s = pwState(uid);
+    s.count += 1;
+    if (s.count >= MAX_PW_FAILS) { s.until = Date.now() + PW_LOCK_MS; s.count = 0; }
+    try { localStorage.setItem('tpf_' + uid, JSON.stringify(s)); } catch { }
+}
+function pwClear(uid) { try { localStorage.removeItem('tpf_' + uid); } catch { } }
+
 // ============================================================
-// 🔑 Idempotency
+// 📦 Active transfer (अधूरे transfer को दोबारा पूरा करने के लिए)
 // ============================================================
-function getOrCreateRequestId() {
-    let existing = localStorage.getItem('activeTransferRequestId');
-    if (existing) return existing;
-    let newId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+function newRequestId() {
+    return (typeof crypto !== 'undefined' && crypto.randomUUID)
         ? crypto.randomUUID()
         : 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
-    localStorage.setItem('activeTransferRequestId', newId);
-    return newId;
 }
-function clearActiveRequestId() {
-    localStorage.removeItem('activeTransferRequestId');
+function saveActive(d) { try { localStorage.setItem(ACTIVE_KEY, JSON.stringify(d)); } catch { } }
+function loadActive() {
+    try { return JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null'); } catch { return null; }
+}
+function clearActive() {
+    localStorage.removeItem(ACTIVE_KEY);
+    localStorage.removeItem('activeTransferRequestId');   // पुरानी keys
     localStorage.removeItem('activeTransferDetails');
 }
 
 // ============================================================
-// Toast
+// Toast (innerHTML नहीं — XSS safe)
 // ============================================================
 function showToast(message, type = 'success') {
-    const container = document.getElementById('toastContainer');
+    const container = $('toastContainer');
     if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast-custom ${type}`;
-    const icon = type === 'success' 
-        ? 'bi-check-circle-fill text-success' 
-        : 'bi-exclamation-triangle-fill text-danger';
-    toast.innerHTML = `<i class="bi ${icon}"></i><span class="toast-msg">${message}</span>`;
+    const i = document.createElement('i');
+    i.className = 'bi ' + (type === 'success'
+        ? 'bi-check-circle-fill text-success'
+        : 'bi-exclamation-triangle-fill text-danger');
+    const span = document.createElement('span');
+    span.className = 'toast-msg';
+    span.textContent = message;
+    toast.append(i, span);
     container.appendChild(toast);
     setTimeout(() => {
         toast.style.opacity = '0';
@@ -117,23 +170,32 @@ function validateAmount(amount, walletType) {
     return { valid: true, value: rounded };
 }
 
-function getTodayDate() { return new Date().toISOString().split('T')[0]; }
+function getTodayDate() { return new Date().toLocaleDateString('en-CA'); } // YYYY-MM-DD (local)
+
+function getWalletLabel(w) {
+    if (w === 'depositWallet') return '💰 Deposit Wallet';
+    if (w === 'referralWallet') return '💳 Referral Wallet';
+    if (w === 'rndWallet') return '📊 RND Wallet';
+    return w;
+}
 
 // ============================================================
-// Lookup
+// 🔎 Recipient lookup — पूरा users डाउनलोड नहीं, सिर्फ query
 // ============================================================
 async function getUserByIdentifier(identifier) {
     try {
         if (!identifier) return null;
-        const uidSnap = await get(ref(db, 'users/' + identifier));
-        if (uidSnap.exists()) return { uid: identifier, data: uidSnap.val(), source: 'uid' };
-        const usersSnap = await get(ref(db, 'users'));
-        if (usersSnap.exists()) {
-            const users = usersSnap.val();
-            for (const uid in users) {
-                const u = users[uid];
-                if (u.username === identifier || u.referralCode === identifier)
-                    return { uid: uid, data: u, source: 'match' };
+
+        // UID जैसा दिखे तभी सीधे UID से (. # $ [ ] वाले नाम पर Firebase error देता है)
+        if (/^[A-Za-z0-9_-]{20,40}$/.test(identifier)) {
+            const uidSnap = await get(ref(db, 'users/' + identifier));
+            if (uidSnap.exists()) return { uid: identifier, data: uidSnap.val(), source: 'uid' };
+        }
+        for (const field of ['username', 'referralCode']) {
+            const s = await get(query(ref(db, 'users'), orderByChild(field), equalTo(identifier), limitToFirst(1)));
+            if (s.exists()) {
+                const [uid, data] = Object.entries(s.val())[0];
+                return { uid, data, source: 'match' };
             }
         }
         return null;
@@ -150,37 +212,53 @@ function getUserDisplayName(userData, fallbackUid) {
 }
 
 // ============================================================
-// 🔐 Password management
+// 🔐 Transfer password (listener के local डेटा से — अलग read नहीं)
 // ============================================================
-async function hasTransferPassword(uid) {
-    try {
-        const snap = await get(ref(db, `users/${uid}/transferPasswordHash`));
-        return snap.exists() && !!snap.val();
-    } catch (err) { return false; }
+function hasTransferPassword() {
+    return !!(currentUserData && currentUserData.transferPasswordHash);
 }
 
 async function saveTransferPassword(uid, password) {
-    const hash = await hashPassword(password);
-    await set(ref(db, `users/${uid}/transferPasswordHash`), hash);
-    await set(ref(db, `users/${uid}/transferPasswordSetAt`), Date.now());
+    const hash = await hashV2(password, uid);
+    await update(ref(db, `users/${uid}`), { transferPasswordHash: hash, transferPasswordSetAt: Date.now() });
 }
 
+// returns true/false
 async function verifyTransferPassword(uid, password) {
-    try {
-        const snap = await get(ref(db, `users/${uid}/transferPasswordHash`));
-        if (!snap.exists()) return false;
-        return snap.val() === await hashPassword(password);
-    } catch (err) { return false; }
+    const stored = currentUserData && currentUserData.transferPasswordHash;
+    if (!stored) return false;
+
+    if (String(stored).startsWith('v2:')) {
+        return stored === await hashV2(password, uid);
+    }
+    // पुराना SHA-256 hash
+    if (stored === await hashLegacy(password)) {
+        try { await update(ref(db, `users/${uid}`), { transferPasswordHash: await hashV2(password, uid) }); } catch { }
+        return true;
+    }
+    return false;
 }
 
 // ============================================================
-// ATOMIC TRANSFER
+// ⚛️ ATOMIC TRANSFER (दोनों तरफ idempotent — दोबारा चलाना सुरक्षित है)
 // ============================================================
-async function atomicTransfer(senderUid, recipientUid, amount, walletType, currency, requestId, senderName, recipientName) {
+function ensureHistoryObject(currentData) {
+    if (!currentData.transferHistory || Array.isArray(currentData.transferHistory)) {
+        const arr = currentData.transferHistory || [];
+        const obj = {};
+        arr.forEach((item, i) => { if (item) obj[item.txId || `legacy_${i}`] = item; });
+        currentData.transferHistory = obj;
+    }
+    if (!currentData.transactions) currentData.transactions = {};
+}
+
+async function atomicTransfer(d) {
+    const { senderUid, recipientUid, amount, walletType, currency, requestId, senderName, recipientName } = d;
+
     if (!senderUid || !recipientUid) return { status: 'failed', error: 'Missing IDs' };
     if (senderUid === recipientUid) return { status: 'failed', error: 'Cannot send to yourself' };
     if (!WALLET_CURRENCY[walletType]) return { status: 'failed', error: 'Invalid wallet' };
-    
+
     const amountCheck = validateAmount(amount, walletType);
     if (!amountCheck.valid) return { status: 'failed', error: amountCheck.error };
     const safeAmount = amountCheck.value;
@@ -188,122 +266,111 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
 
     const requestRef = ref(db, `transferRequests/${requestId}`);
     const txId = 'TX_' + requestId.replace(/-/g, '').slice(0, 20);
-    const now = Date.now();
+    const now = d.startedAt || Date.now();
+    const today = d.date || getTodayDate();
 
+    // ---------- 1. Sender debit ----------
     const senderRef = ref(db, `users/${senderUid}`);
-    let senderBalanceBefore = 0;
-    let alreadyInSender = false;
+    const sf = { already: false, reversed: false, balance: 0 };
 
     try {
-        const senderResult = await runTransaction(senderRef, (currentData) => {
-            if (!currentData) return currentData;
-            const history = currentData.transferHistory || {};
-            if (history[txId]) { alreadyInSender = true; return; }
-            const balance = roundToPrecision(currentData[walletType] || 0, precision);
-            senderBalanceBefore = balance;
-            if (balance < safeAmount) return;
-            currentData[walletType] = roundToPrecision(balance - safeAmount, precision);
+        const r = await runTransaction(senderRef, (cur) => {
+            sf.already = false; sf.reversed = false;
+            if (!cur) return cur;                       // cache खाली → server से दोबारा बुलाएगा
 
-            if (!currentData.transferHistory || Array.isArray(currentData.transferHistory)) {
-                const arr = currentData.transferHistory || [];
-                const obj = {};
-                arr.forEach((item, i) => { obj[item.txId || `legacy_${i}`] = item; });
-                currentData.transferHistory = obj;
+            const hist = cur.transferHistory;
+            const existing = (hist && !Array.isArray(hist)) ? hist[txId] : null;
+            if (existing) {
+                if (existing.status === 'reversed') sf.reversed = true; else sf.already = true;
+                return;                                  // abort (दोबारा debit नहीं)
             }
-            currentData.transferHistory[txId] = {
+
+            const balance = roundToPrecision(Number(cur[walletType]) || 0, precision);
+            sf.balance = balance;
+            if (balance < safeAmount) return;            // abort: balance कम
+
+            cur[walletType] = roundToPrecision(balance - safeAmount, precision);
+            ensureHistoryObject(cur);
+            cur.transferHistory[txId] = {
                 type: 'sent', to: recipientName, toUid: recipientUid, toUsername: recipientName,
                 amount: safeAmount, currency, walletType,
                 from: senderName, fromUid: senderUid, fromUsername: senderName,
                 timestamp: now, txId, requestId, status: 'completed'
             };
-            if (!currentData.transactions) currentData.transactions = {};
-            currentData.transactions[txId] = {
+            cur.transactions[txId] = {
                 type: 'transfer_sent', amount: safeAmount, currency, walletType,
                 to: recipientName, toUid: recipientUid, toUsername: recipientName,
                 from: senderName, fromUid: senderUid,
-                timestamp: now, date: getTodayDate(), txId, requestId, status: 'completed'
+                timestamp: now, date: today, txId, requestId, status: 'completed'
             };
-            return currentData;
+            return cur;
         });
 
-        if (alreadyInSender) return { status: 'success', txId, recipientName, duplicate: true };
-        if (!senderResult.committed) {
-            return { status: 'failed', error: `Insufficient balance. Available: ${senderBalanceBefore} ${currency}` };
+        if (sf.reversed) return { status: 'failed', error: 'This transfer was reversed earlier' };
+        if (!sf.already) {
+            if (!r.committed) {
+                return { status: 'failed', error: `Insufficient balance. Available: ${sf.balance} ${currency}` };
+            }
+            if (!r.snapshot.exists()) return { status: 'failed', error: 'Sender account not found' };
         }
+        // sf.already == true → debit पहले हो चुका, सीधे recipient step पर जाओ (पुराने code का बग: यहीं success लौटा देता था)
     } catch (err) {
         console.error('Sender error:', err);
-        return { status: 'unknown', error: 'Network error on sender' };
+        return { status: 'unknown', txId, error: 'Network error' };
     }
 
+    // ---------- 2. Recipient credit ----------
     const recipientRef = ref(db, `users/${recipientUid}`);
     let alreadyInRecipient = false;
 
     try {
-        const recipientResult = await runTransaction(recipientRef, (currentData) => {
-            if (!currentData) return currentData;
-            const history = currentData.transferHistory || {};
-            if (history[txId]) { alreadyInRecipient = true; return; }
-            const balance = roundToPrecision(currentData[walletType] || 0, precision);
-            currentData[walletType] = roundToPrecision(balance + safeAmount, precision);
+        const rr = await runTransaction(recipientRef, (cur) => {
+            alreadyInRecipient = false;
+            if (!cur) return cur;
 
-            if (!currentData.transferHistory || Array.isArray(currentData.transferHistory)) {
-                const arr = currentData.transferHistory || [];
-                const obj = {};
-                arr.forEach((item, i) => { obj[item.txId || `legacy_${i}`] = item; });
-                currentData.transferHistory = obj;
-            }
-            currentData.transferHistory[txId] = {
+            const hist = cur.transferHistory;
+            if (hist && !Array.isArray(hist) && hist[txId]) { alreadyInRecipient = true; return; }
+
+            const balance = roundToPrecision(Number(cur[walletType]) || 0, precision);
+            cur[walletType] = roundToPrecision(balance + safeAmount, precision);
+            ensureHistoryObject(cur);
+            cur.transferHistory[txId] = {
                 type: 'received', from: senderName, fromUid: senderUid, fromUsername: senderName,
                 to: recipientName, toUid: recipientUid, toUsername: recipientName,
                 amount: safeAmount, currency, walletType,
                 timestamp: now, txId, requestId, status: 'completed'
             };
-            if (!currentData.transactions) currentData.transactions = {};
-            currentData.transactions[txId] = {
+            cur.transactions[txId] = {
                 type: 'transfer_received', amount: safeAmount, currency, walletType,
                 from: senderName, fromUid: senderUid,
                 to: recipientName, toUid: recipientUid,
-                timestamp: now, date: getTodayDate(), txId, requestId, status: 'completed'
+                timestamp: now, date: today, txId, requestId, status: 'completed'
             };
-            return currentData;
+            return cur;
         });
 
-        if (alreadyInRecipient) {
-            // Already processed
-        } else if (!recipientResult.committed) {
-            await runTransaction(senderRef, (currentData) => {
-                if (!currentData) return currentData;
-                const hist = currentData.transferHistory || {};
-                if (hist[txId] && hist[txId].status === 'reversed') return;
-                currentData[walletType] = roundToPrecision((currentData[walletType] || 0) + safeAmount, precision);
-                if (currentData.transferHistory && currentData.transferHistory[txId])
-                    currentData.transferHistory[txId].status = 'reversed';
-                if (currentData.transactions && currentData.transactions[txId])
-                    currentData.transactions[txId].status = 'reversed';
-                return currentData;
+        const credited = alreadyInRecipient || (rr.committed && rr.snapshot.exists());
+        if (!credited) {
+            // recipient में नहीं पहुँचा → sender को पैसे वापस
+            await runTransaction(senderRef, (cur) => {
+                if (!cur) return cur;
+                const h = cur.transferHistory;
+                if (h && !Array.isArray(h) && h[txId] && h[txId].status === 'reversed') return;
+                cur[walletType] = roundToPrecision((Number(cur[walletType]) || 0) + safeAmount, precision);
+                if (h && !Array.isArray(h) && h[txId]) h[txId].status = 'reversed';
+                if (cur.transactions && cur.transactions[txId]) cur.transactions[txId].status = 'reversed';
+                return cur;
             });
+            update(requestRef, { status: 'failed', error: 'Recipient failed — returned', completedAt: Date.now() }).catch(() => { });
             return { status: 'failed', error: 'Recipient failed — amount returned' };
         }
     } catch (err) {
         console.error('Recipient error:', err);
-        try {
-            await set(requestRef, {
-                requestId, txId, senderUid, recipientUid,
-                amount: safeAmount, currency, walletType,
-                status: 'unknown', createdAt: now, error: 'Network ambiguity'
-            });
-        } catch (_) {}
+        update(requestRef, { status: 'unknown', error: 'Network ambiguity' }).catch(() => { });
         return { status: 'unknown', txId, error: 'Status could not be confirmed.' };
     }
 
-    try {
-        await set(requestRef, {
-            requestId, txId, senderUid, recipientUid,
-            amount: safeAmount, currency, walletType,
-            status: 'success', createdAt: now, completedAt: Date.now()
-        });
-    } catch (err) { console.warn('Record write failed:', err); }
-
+    update(requestRef, { status: 'success', completedAt: Date.now() }).catch(err => console.warn('Record write failed:', err));
     return { status: 'success', txId, recipientName };
 }
 
@@ -311,39 +378,42 @@ async function atomicTransfer(senderUid, recipientUid, amount, walletType, curre
 // Modal Controls
 // ============================================================
 function openModal(id) {
-    const m = document.getElementById(id);
+    const m = $(id);
     if (m) m.classList.add('active');
     modalOpen = true;
 }
+
+function resetPwInputs(ids, modalSel) {
+    ids.forEach(i => { const el = $(i); if (el) { el.value = ''; el.type = 'password'; } });
+    document.querySelectorAll(`${modalSel} .password-eye i`).forEach(i => i.className = 'bi bi-eye');
+}
+
 function closeModal(id) {
-    const m = document.getElementById(id);
+    const m = $(id);
     if (m) m.classList.remove('active');
     modalOpen = false;
     if (id === 'setupModal') {
-        ['setupPassword', 'setupPasswordConfirm'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) { el.value = ''; el.type = 'password'; }
-        });
-        document.querySelectorAll('#setupModal .password-eye i').forEach(i => i.className = 'bi bi-eye');
-        document.getElementById('setupError').classList.remove('show');
+        resetPwInputs(['setupPassword', 'setupPasswordConfirm'], '#setupModal');
+        $('setupError')?.classList.remove('show');
     }
     if (id === 'verifyModal') {
-        const el = document.getElementById('verifyPassword');
-        if (el) { el.value = ''; el.type = 'password'; }
-        document.querySelectorAll('#verifyModal .password-eye i').forEach(i => i.className = 'bi bi-eye');
-        document.getElementById('verifyError').classList.remove('show');
+        resetPwInputs(['verifyPassword'], '#verifyModal');
+        $('verifyError')?.classList.remove('show');
     }
     if (id === 'forgotModal') {
-        ['forgotAccountPassword', 'forgotNewPassword', 'forgotNewPasswordConfirm'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) { el.value = ''; el.type = 'password'; }
-        });
-        document.querySelectorAll('#forgotModal .password-eye i').forEach(i => i.className = 'bi bi-eye');
-        document.getElementById('forgotError1').classList.remove('show');
-        document.getElementById('forgotError2').classList.remove('show');
-        document.getElementById('forgotStep1').classList.add('active');
-        document.getElementById('forgotStep2').classList.remove('active');
+        resetPwInputs(['forgotAccountPassword', 'forgotNewPassword', 'forgotNewPasswordConfirm'], '#forgotModal');
+        $('forgotError1')?.classList.remove('show');
+        $('forgotError2')?.classList.remove('show');
+        $('forgotStep1')?.classList.add('active');
+        $('forgotStep2')?.classList.remove('active');
     }
+}
+
+function showErr(id, msg) {
+    const e = $(id);
+    if (!e) return;
+    e.textContent = msg;
+    e.classList.add('show');
 }
 
 // ============================================================
@@ -351,39 +421,29 @@ function closeModal(id) {
 // ============================================================
 function openPasswordSetup() {
     openModal('setupModal');
-    setTimeout(() => document.getElementById('setupPassword').focus(), 200);
+    setTimeout(() => $('setupPassword')?.focus(), 200);
 }
 
 async function handlePasswordSetup() {
-    const pwd = document.getElementById('setupPassword').value;
-    const confirm = document.getElementById('setupPasswordConfirm').value;
-    const errorEl = document.getElementById('setupError');
-    const btn = document.getElementById('setupBtn');
-    errorEl.classList.remove('show');
+    const pwd = $('setupPassword').value;
+    const confirm = $('setupPasswordConfirm').value;
+    const btn = $('setupBtn');
+    $('setupError')?.classList.remove('show');
 
-    if (!pwd || pwd.length < 6) {
-        errorEl.textContent = 'Password कम से कम 6 characters का हो';
-        errorEl.classList.add('show');
-        return;
-    }
-    if (pwd !== confirm) {
-        errorEl.textContent = 'दोनों passwords match नहीं कर रहे';
-        errorEl.classList.add('show');
-        return;
-    }
+    if (!pwd || pwd.length < 6) return showErr('setupError', 'Password कम से कम 6 characters का हो');
+    if (pwd !== confirm) return showErr('setupError', 'दोनों passwords match नहीं कर रहे');
 
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-spinner me-2"></span>Setting...';
-
     try {
         await saveTransferPassword(currentUserId, pwd);
+        pwClear(currentUserId);
         showToast('✅ Password set! अब फिर Send दबाओ।', 'success');
         closeModal('setupModal');
         pendingTransfer = null;
     } catch (err) {
         console.error('Save error:', err);
-        errorEl.textContent = 'Password save नहीं हुआ।';
-        errorEl.classList.add('show');
+        showErr('setupError', 'Password save नहीं हुआ।');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Set Password';
@@ -395,116 +455,136 @@ async function handlePasswordSetup() {
 // ============================================================
 function openPasswordVerify(details) {
     pendingTransfer = details;
-    const detailsEl = document.getElementById('verifyDetails');
-    detailsEl.innerHTML = `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-            <span>Amount:</span>
-            <strong style="color: #2ecc71;">${details.amount} ${details.currency}</strong>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-            <span>To:</span>
-            <strong style="color: #60a5fa;">${details.recipientName}</strong>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-            <span>Wallet:</span>
-            <strong>${details.walletLabel}</strong>
-        </div>
-    `;
+    const row = (label, value, style = '') =>
+        `<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span>${label}</span><strong style="${style}">${esc(value)}</strong></div>`;
+    $('verifyDetails').innerHTML =
+        row('Amount:', `${details.amount} ${details.currency}`, 'color:#2ecc71;') +
+        row('To:', details.recipientName, 'color:#60a5fa;') +
+        row('Wallet:', details.walletLabel);
     openModal('verifyModal');
-    setTimeout(() => document.getElementById('verifyPassword').focus(), 200);
+    setTimeout(() => $('verifyPassword')?.focus(), 200);
 }
 
 async function handlePasswordVerify() {
-    const password = document.getElementById('verifyPassword').value;
-    const errorEl = document.getElementById('verifyError');
-    const btn = document.getElementById('verifyBtn');
-    errorEl.classList.remove('show');
+    const password = $('verifyPassword').value;
+    const btn = $('verifyBtn');
+    const resetBtn = () => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify & Send'; };
+    $('verifyError')?.classList.remove('show');
 
-    if (!password) {
-        errorEl.textContent = 'Password डालें';
-        errorEl.classList.add('show');
-        return;
-    }
-    if (!pendingTransfer) {
-        errorEl.textContent = 'Transfer details missing. दोबारा Send दबाओ।';
-        errorEl.classList.add('show');
-        return;
+    if (!password) return showErr('verifyError', 'Password डालें');
+    if (!pendingTransfer) return showErr('verifyError', 'Transfer details missing. दोबारा Send दबाओ।');
+
+    const st = pwState(currentUserId);
+    if (st.until > Date.now()) {
+        const mins = Math.ceil((st.until - Date.now()) / 60000);
+        return showErr('verifyError', `बहुत ज़्यादा गलत प्रयास। ${mins} मिनट बाद try करें।`);
     }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-spinner me-2"></span>Verifying...';
 
     try {
-        const isValid = await verifyTransferPassword(currentUserId, password);
-        if (!isValid) {
-            errorEl.textContent = '❌ Password गलत है';
-            errorEl.classList.add('show');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify & Send';
+        const ok = await verifyTransferPassword(currentUserId, password);
+        if (!ok) {
+            pwFail(currentUserId);
+            showErr('verifyError', '❌ Password गलत है');
+            resetBtn();
             return;
         }
+        pwClear(currentUserId);
 
         const details = pendingTransfer;
+        transferLock = true;            // modal बंद होने से पहले ही lock
         closeModal('verifyModal');
-
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify & Send';
-
-        await executeTransfer(details);
-
+        resetBtn();
+        await executeTransfer(details, false);
     } catch (err) {
         console.error('Verify error:', err);
-        errorEl.textContent = 'Error आया।';
-        errorEl.classList.add('show');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify & Send';
+        showErr('verifyError', 'Error आया।');
+        resetBtn();
     }
 }
 
 // ============================================================
 // 🚀 EXECUTE TRANSFER
 // ============================================================
-async function executeTransfer(details) {
+function setSendButton(state) {
+    const btn = $('sendBtn');
+    if (!btn) return;
+    if (state === 'sending') {
+        btn.disabled = true; btn.className = 'btn-send sending';
+        btn.innerHTML = '<span class="loading-spinner me-2"></span>Sending...';
+    } else if (state === 'verifying') {
+        btn.disabled = true; btn.className = 'btn-send verifying';
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Completing...';
+    } else {
+        btn.disabled = false; btn.className = 'btn-send';
+        btn.innerHTML = '<i class="bi bi-send me-2"></i> Send Money';
+    }
+}
+
+function resetButton() {
+    setSendButton('idle');
+    transferLock = false;
+    pendingTransfer = null;
+}
+
+async function executeTransfer(details, resume, attempt = 0) {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) { resetButton(); return; }
 
     transferLock = true;
-    const btn = document.getElementById('sendBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.className = 'btn-send sending';
-        btn.innerHTML = '<span class="loading-spinner me-2"></span>Sending...';
-    }
+    setSendButton('sending');
 
     try {
-        const result = await atomicTransfer(
-            user.uid, details.recipient.uid, details.amount,
-            details.walletType, details.currency, details.requestId,
-            details.senderName, details.recipientName
-        );
+        if (!resume) {
+            details.requestId = newRequestId();
+            details.startedAt = Date.now();
+            details.date = getTodayDate();
+            details.senderUid = user.uid;
+            saveActive(details);
+            // पहले record बनाओ — बाद में network टूटे तो भी transfer दोबारा पूरा हो सकेगा
+            try {
+                await set(ref(db, `transferRequests/${details.requestId}`), {
+                    requestId: details.requestId, senderUid: user.uid, recipientUid: details.recipientUid,
+                    amount: details.amount, currency: details.currency, walletType: details.walletType,
+                    status: 'processing', createdAt: details.startedAt
+                });
+            } catch (e) {
+                console.error('Request create failed:', e);
+                clearActive();
+                showToast('❌ Network error. पैसा नहीं कटा, दोबारा try करें।', 'error');
+                resetButton();
+                return;
+            }
+        }
+
+        const result = await atomicTransfer(details);
 
         if (result.status === 'success') {
-            if (result.duplicate) {
-                showToast('✅ Transfer already completed (duplicate ignored)', 'success');
-            } else {
-                showToast(`✅ ${details.amount} ${details.currency} sent to ${details.recipientName}!`, 'success');
+            showToast(resume
+                ? `✅ Transfer to ${details.recipientName} पूरा हो गया!`
+                : `✅ ${details.amount} ${details.currency} sent to ${details.recipientName}!`, 'success');
+            if (!resume) {
+                const r = $('recipientInput'); if (r) r.value = '';
+                const a = $('amountInput'); if (a) a.value = '';
             }
-            document.getElementById('recipientInput').value = '';
-            document.getElementById('amountInput').value = '';
-            clearActiveRequestId();
-            setTimeout(() => loadUserData(user.uid), 500);
+            clearActive();
             resetButton();
         } else if (result.status === 'unknown') {
-            showToast('⚠️ Status could not be confirmed. Please wait...', 'error');
-            if (btn) {
-                btn.className = 'btn-send verifying';
-                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Verifying...';
+            if (attempt === 0) showToast('⚠️ Network issue — transfer अपने-आप पूरा किया जा रहा है...', 'error');
+            setSendButton('verifying');
+            if (attempt < MAX_AUTO_RETRIES) {
+                setTimeout(() => executeTransfer(details, true, attempt + 1), RETRY_MS);
+            } else {
+                showToast('⚠️ अभी पूरा नहीं हुआ। Page दोबारा खोलने पर अपने-आप पूरा होगा।', 'error');
             }
-            startReconciliationLoop(details.requestId, user.uid);
             return;
         } else {
             showToast('❌ ' + (result.error || 'Transfer failed'), 'error');
-            clearActiveRequestId();
+            update(ref(db, `transferRequests/${details.requestId}`),
+                { status: 'failed', error: result.error || 'failed', completedAt: Date.now() }).catch(() => { });
+            clearActive();
             resetButton();
         }
     } catch (err) {
@@ -514,105 +594,60 @@ async function executeTransfer(details) {
     }
 }
 
-function resetButton() {
-    const btn = document.getElementById('sendBtn');
-    if (btn) {
-        btn.disabled = false;
-        btn.className = 'btn-send';
-        btn.innerHTML = '<i class="bi bi-send me-2"></i> Send Money';
-    }
-    transferLock = false;
-    pendingTransfer = null;
-}
-
 // ============================================================
-// 🆕 FORGOT PASSWORD — Step 1: Verify account password
+// 🔑 FORGOT PASSWORD
 // ============================================================
 async function handleForgotVerify() {
-    const password = document.getElementById('forgotAccountPassword').value;
-    const errorEl = document.getElementById('forgotError1');
-    const btn = document.getElementById('forgotVerifyBtn');
-    errorEl.classList.remove('show');
+    const password = $('forgotAccountPassword').value;
+    const btn = $('forgotVerifyBtn');
+    $('forgotError1')?.classList.remove('show');
 
-    if (!password) {
-        errorEl.textContent = 'Account password डालें';
-        errorEl.classList.add('show');
-        return;
-    }
+    if (!password) return showErr('forgotError1', 'Account password डालें');
 
     const user = auth.currentUser;
-    if (!user || !user.email) {
-        errorEl.textContent = 'User email नहीं मिला। Support से संपर्क करें।';
-        errorEl.classList.add('show');
-        return;
-    }
+    if (!user || !user.email) return showErr('forgotError1', 'User email नहीं मिला। Support से संपर्क करें।');
 
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-spinner me-2"></span>Verifying...';
 
     try {
-        // 🔑 Firebase से verify करो — असली तरीका
-        const credential = EmailAuthProvider.credential(user.email, password);
-        await reauthenticateWithCredential(user, credential);
-
-        // ✅ Password सही — step 2 दिखाओ
-        document.getElementById('forgotStep1').classList.remove('active');
-        document.getElementById('forgotStep2').classList.add('active');
-        document.getElementById('forgotAccountPassword').value = '';
-        setTimeout(() => document.getElementById('forgotNewPassword').focus(), 200);
-
+        await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+        $('forgotStep1').classList.remove('active');
+        $('forgotStep2').classList.add('active');
+        $('forgotAccountPassword').value = '';
+        setTimeout(() => $('forgotNewPassword')?.focus(), 200);
     } catch (err) {
         console.error('Forgot verify error:', err);
         let msg = '❌ Account password गलत है';
-        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-            msg = '❌ Account password गलत है';
-        } else if (err.code === 'auth/too-many-requests') {
-            msg = 'बहुत बार try किया। थोड़ी देर बाद try करें।';
-        } else if (err.code === 'auth/network-request-failed') {
-            msg = 'Network error। Internet check करें।';
-        }
-        errorEl.textContent = msg;
-        errorEl.classList.add('show');
+        if (err.code === 'auth/too-many-requests') msg = 'बहुत बार try किया। थोड़ी देर बाद try करें।';
+        else if (err.code === 'auth/network-request-failed') msg = 'Network error। Internet check करें।';
+        showErr('forgotError1', msg);
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verify';
     }
 }
 
-// ============================================================
-// 🆕 FORGOT PASSWORD — Step 2: Set new password
-// ============================================================
 async function handleForgotReset() {
-    const pwd = document.getElementById('forgotNewPassword').value;
-    const confirm = document.getElementById('forgotNewPasswordConfirm').value;
-    const errorEl = document.getElementById('forgotError2');
-    const btn = document.getElementById('forgotResetBtn');
-    errorEl.classList.remove('show');
+    const pwd = $('forgotNewPassword').value;
+    const confirm = $('forgotNewPasswordConfirm').value;
+    const btn = $('forgotResetBtn');
+    $('forgotError2')?.classList.remove('show');
 
-    if (!pwd || pwd.length < 6) {
-        errorEl.textContent = 'Password कम से कम 6 characters का हो';
-        errorEl.classList.add('show');
-        return;
-    }
-    if (pwd !== confirm) {
-        errorEl.textContent = 'दोनों passwords match नहीं कर रहे';
-        errorEl.classList.add('show');
-        return;
-    }
+    if (!pwd || pwd.length < 6) return showErr('forgotError2', 'Password कम से कम 6 characters का हो');
+    if (pwd !== confirm) return showErr('forgotError2', 'दोनों passwords match नहीं कर रहे');
 
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-spinner me-2"></span>Saving...';
-
     try {
         await saveTransferPassword(currentUserId, pwd);
+        pwClear(currentUserId);
         showToast('✅ Transfer password reset successfully!', 'success');
         closeModal('forgotModal');
-        pendingTransfer = null;
-        // 🔑 User को फिर Send दबाना पड़ेगा
+        resetButton();
     } catch (err) {
         console.error('Reset error:', err);
-        errorEl.textContent = 'Password save नहीं हुआ।';
-        errorEl.classList.add('show');
+        showErr('forgotError2', 'Password save नहीं हुआ।');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Set New Password';
@@ -625,22 +660,15 @@ async function handleForgotReset() {
 async function handleTransferSubmit(e) {
     e.preventDefault();
     if (modalOpen) return;
-    if (transferLock) {
-        showToast('⏳ Transfer in progress...', 'error');
-        return;
-    }
+    if (transferLock) { showToast('⏳ Transfer in progress...', 'error'); return; }
     transferLock = true;
-
-    const btn = document.getElementById('sendBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="loading-spinner me-2"></span>Checking...';
-    }
+    setSendButton('sending');
+    $('sendBtn') && ($('sendBtn').innerHTML = '<span class="loading-spinner me-2"></span>Checking...');
 
     try {
-        const recipientInput = document.getElementById('recipientInput').value.trim();
-        const walletType = document.getElementById('walletSelect').value;
-        const amountRaw = document.getElementById('amountInput').value;
+        const recipientInput = $('recipientInput').value.trim();
+        const walletType = $('walletSelect').value;
+        const amountRaw = $('amountInput').value;
 
         if (!recipientInput) { showToast('❌ Enter recipient', 'error'); resetButton(); return; }
         const amount = parseFloat(amountRaw);
@@ -653,6 +681,16 @@ async function handleTransferSubmit(e) {
         const user = auth.currentUser;
         if (!user) { showToast('❌ Please login', 'error'); resetButton(); return; }
 
+        // पिछला अधूरा transfer हो तो नया शुरू नहीं होगा
+        const active = loadActive();
+        if (active && active.senderUid === user.uid) {
+            showToast('⚠️ पिछला transfer पूरा हो रहा है। थोड़ा रुकें।', 'error');
+            resetButton();
+            setSendButton('verifying');
+            transferLock = true;
+            return;
+        }
+
         const currentBalance = currentBalances[walletType] || 0;
         if (currentBalance < amountCheck.value) {
             showToast(`❌ Insufficient balance. Available: ${currentBalance} ${WALLET_CURRENCY[walletType]}`, 'error');
@@ -663,52 +701,22 @@ async function handleTransferSubmit(e) {
         if (!recipient) { showToast('❌ User not found!', 'error'); resetButton(); return; }
         if (recipient.uid === user.uid) { showToast('❌ Cannot send to yourself!', 'error'); resetButton(); return; }
 
-        const existingRequestId = localStorage.getItem('activeTransferRequestId');
-        if (existingRequestId) {
-            const pendingSnap = await get(ref(db, `transferRequests/${existingRequestId}`));
-            if (pendingSnap.exists()) {
-                const pData = pendingSnap.val();
-                if (pData.status === 'success') {
-                    showToast('✅ Previous transfer completed. Refreshing...', 'success');
-                    clearActiveRequestId();
-                    setTimeout(() => loadUserData(user.uid), 500);
-                    resetButton(); return;
-                } else if (pData.status === 'unknown') {
-                    showToast('⚠️ Previous transfer still verifying. Wait.', 'error');
-                    resetButton(); return;
-                } else if (pData.status === 'failed') {
-                    clearActiveRequestId();
-                }
-            } else {
-                clearActiveRequestId();
-            }
-        }
-
-        const requestId = getOrCreateRequestId();
-        const senderName = getUserDisplayName(currentUserData, user.uid);
-        const recipientName = getUserDisplayName(recipient.data, recipient.uid);
-
         const details = {
-            recipient, recipientName, senderName,
-            amount: amountCheck.value, walletType, requestId,
+            recipientUid: recipient.uid,
+            recipientName: getUserDisplayName(recipient.data, recipient.uid),
+            senderName: getUserDisplayName(currentUserData, user.uid),
+            senderUid: user.uid,
+            amount: amountCheck.value, walletType,
             currency: WALLET_CURRENCY[walletType],
             walletLabel: getWalletLabel(walletType)
         };
 
-        const hasPwd = await hasTransferPassword(user.uid);
-
+        const hasPwd = hasTransferPassword();
         transferLock = false;
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-send me-2"></i> Send Money';
-        }
+        setSendButton('idle');
 
-        if (!hasPwd) {
-            openPasswordSetup();
-            return;
-        }
+        if (!hasPwd) { openPasswordSetup(); return; }
         openPasswordVerify(details);
-
     } catch (err) {
         console.error('Submit error:', err);
         showToast('❌ Unexpected error', 'error');
@@ -716,136 +724,89 @@ async function handleTransferSubmit(e) {
     }
 }
 
-function getWalletLabel(w) {
-    if (w === 'depositWallet') return '💰 Deposit Wallet';
-    if (w === 'referralWallet') return '💳 Referral Wallet';
-    if (w === 'rndWallet') return '📊 RND Wallet';
-    return w;
-}
-
 // ============================================================
-// Reconciliation
+// अधूरा transfer फिर से पूरा करना (page खुलते समय, सिर्फ 1 read)
 // ============================================================
-function startReconciliationLoop(requestId, userId) {
-    let attempts = 0;
-    const maxAttempts = 30;
-    const check = async () => {
-        attempts++;
-        try {
-            const snap = await get(ref(db, `transferRequests/${requestId}`));
-            if (snap.exists()) {
-                const data = snap.val();
-                if (data.status === 'success') {
-                    showToast('✅ Transfer confirmed!', 'success');
-                    clearActiveRequestId();
-                    loadUserData(userId);
-                    resetButton();
-                    return;
-                } else if (data.status === 'failed') {
-                    showToast('❌ Transfer failed.', 'error');
-                    clearActiveRequestId();
-                    loadUserData(userId);
-                    resetButton();
-                    return;
-                }
-            }
-            if (attempts >= maxAttempts) {
-                showToast('⚠️ Still verifying. Refresh later.', 'error');
-                return;
-            }
-            setTimeout(check, 10000);
-        } catch (err) {
-            if (attempts < maxAttempts) setTimeout(check, 10000);
-        }
-    };
-    setTimeout(check, 3000);
-}
-
 async function reconcilePending() {
-    const requestId = localStorage.getItem('activeTransferRequestId');
-    if (!requestId) return;
+    // पुरानी version की keys हटाओ
+    localStorage.removeItem('activeTransferRequestId');
+    localStorage.removeItem('activeTransferDetails');
+
+    const d = loadActive();
+    if (!d || d.senderUid !== currentUserId) return;
     try {
-        const snap = await get(ref(db, `transferRequests/${requestId}`));
-        if (snap.exists()) {
-            const data = snap.val();
-            if (data.status === 'success') {
-                showToast('✅ Previous transfer confirmed!', 'success');
-                clearActiveRequestId();
-                if (currentUserId) loadUserData(currentUserId);
-            } else if (data.status === 'failed') {
-                showToast('❌ Previous transfer failed.', 'error');
-                clearActiveRequestId();
-            } else {
-                showToast('⚠️ Previous transfer still verifying.', 'error');
-                const btn = document.getElementById('sendBtn');
-                if (btn) {
-                    btn.disabled = true;
-                    btn.className = 'btn-send verifying';
-                    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Verifying...';
-                }
-                transferLock = true;
-                startReconciliationLoop(requestId, currentUserId);
-            }
-        } else {
-            clearActiveRequestId();
-        }
+        const snap = await get(ref(db, `transferRequests/${d.requestId}`));
+        if (!snap.exists()) { clearActive(); return; }
+        const st = snap.val().status;
+        if (st === 'success') { showToast('✅ पिछला transfer पूरा हो चुका है।', 'success'); clearActive(); return; }
+        if (st === 'failed') { showToast('❌ पिछला transfer fail हुआ था।', 'error'); clearActive(); return; }
+        showToast('⏳ पिछला transfer पूरा किया जा रहा है...', 'error');
+        executeTransfer(d, true);
     } catch (err) { console.warn('Reconcile error:', err); }
 }
 
 // ============================================================
-// Balance
+// Balance + Recent transfers — एक ही listener (पहले 3 बार डाउनलोड होता था)
 // ============================================================
 function setupBalanceListener(uid) {
     if (balanceListenerOff) { balanceListenerOff(); balanceListenerOff = null; }
     balanceListenerOff = onValue(ref(db, 'users/' + uid), (snapshot) => {
-        if (!snapshot.exists()) return;
+        if (!snapshot.exists()) {
+            if (!firstSnapshotDone) {
+                showToast('❌ User not found', 'error');
+                setTimeout(() => window.location.href = 'dashboard.html', 2000);
+            }
+            return;
+        }
         const u = snapshot.val();
         currentUserData = u;
-        currentBalances.depositWallet = u.depositWallet || 0;
-        currentBalances.referralWallet = u.referralWallet || 0;
-        currentBalances.rndWallet = u.rndWallet || 0;
+        currentBalances.depositWallet = Number(u.depositWallet) || 0;
+        currentBalances.referralWallet = Number(u.referralWallet) || 0;
+        currentBalances.rndWallet = Number(u.rndWallet) || 0;
         updateBalanceUI();
+        renderRecentTransfers(u);
+
+        if (!firstSnapshotDone) {
+            firstSnapshotDone = true;
+            reconcilePending();
+        }
     }, (error) => console.error('Balance error:', error));
 }
 
 function updateBalanceUI() {
-    const dep = document.getElementById('balanceDeposit');
-    const refEl = document.getElementById('balanceReferral');
-    const rnd = document.getElementById('balanceRND');
-    if (dep) dep.textContent = '$' + (currentBalances.depositWallet || 0).toFixed(2);
-    if (refEl) refEl.textContent = '$' + (currentBalances.referralWallet || 0).toFixed(2);
-    if (rnd) rnd.textContent = (currentBalances.rndWallet || 0).toFixed(4) + ' RND';
+    const dep = $('balanceDeposit'), refEl = $('balanceReferral'), rnd = $('balanceRND');
+    if (dep) dep.textContent = '$' + currentBalances.depositWallet.toFixed(2);
+    if (refEl) refEl.textContent = '$' + currentBalances.referralWallet.toFixed(2);
+    if (rnd) rnd.textContent = currentBalances.rndWallet.toFixed(4) + ' RND';
     updateAvailableText();
 }
 
 function updateAvailableText() {
-    const select = document.getElementById('walletSelect');
+    const select = $('walletSelect');
     if (!select) return;
     const walletType = select.value;
     const balance = currentBalances[walletType] || 0;
-    const availText = document.getElementById('availableText');
+    const availText = $('availableText');
     if (availText)
         availText.textContent = balance.toFixed(WALLET_PRECISION[walletType]) + ' ' + WALLET_CURRENCY[walletType];
 }
 
-window.setMaxAmount = function() {
-    const walletType = document.getElementById('walletSelect').value;
+window.setMaxAmount = function () {
+    const walletType = $('walletSelect').value;
     const balance = currentBalances[walletType] || 0;
-    document.getElementById('amountInput').value = balance.toFixed(WALLET_PRECISION[walletType]);
+    $('amountInput').value = balance.toFixed(WALLET_PRECISION[walletType]);
 };
 
-// ============================================================
-// Recent transfers
-// ============================================================
 function renderRecentTransfers(u) {
-    const container = document.getElementById('recentTransfers');
+    const container = $('recentTransfers');
     if (!container) return;
-    let rawHistory = u.transferHistory || [];
-    let arr = Array.isArray(rawHistory) ? rawHistory : Object.values(rawHistory).filter(Boolean);
+    const rawHistory = u.transferHistory || [];
+    const arr = Array.isArray(rawHistory) ? rawHistory.filter(Boolean) : Object.values(rawHistory).filter(Boolean);
     arr.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const recent = arr.slice(0, 5);
+
     if (recent.length === 0) {
-        container.innerHTML = `<div style="text-align: center; color: #64748b; padding: 20px; font-size: 0.85rem;"><i class="bi bi-clock"></i> No transfers yet</div>`;
+        container.innerHTML = `<div style="text-align:center;color:#64748b;padding:20px;font-size:0.85rem;"><i class="bi bi-clock"></i> No transfers yet</div>`;
         return;
     }
     container.innerHTML = recent.map(t => {
@@ -855,115 +816,69 @@ function renderRecentTransfers(u) {
         const sign = isSent ? '-' : '+';
         const cls = isSent ? 'transfer-sent' : 'transfer-received';
         const date = t.timestamp ? new Date(t.timestamp).toLocaleString('hi-IN') : '';
+        const reversed = t.status === 'reversed' ? ' <small style="color:#f59e0b;">(returned)</small>' : '';
         return `
             <div class="transfer-item">
                 <div>
-                    <div class="${cls}" style="font-size: 0.85rem;">
+                    <div class="${cls}" style="font-size:0.85rem;">
                         <i class="bi bi-arrow-${isSent ? 'up-right' : 'down-left'}"></i>
-                        ${isSent ? 'Sent to' : 'Received from'} 
-                        <span class="transfer-name">${name}</span>
+                        ${isSent ? 'Sent to' : 'Received from'}
+                        <span class="transfer-name">${esc(name)}</span>${reversed}
                     </div>
-                    ${uid ? `<div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">ID: ${uid.slice(0, 12)}...</div>` : ''}
-                    <div class="transfer-date">${date}</div>
+                    ${uid ? `<div style="font-size:0.7rem;color:#64748b;margin-top:2px;">ID: ${esc(uid.slice(0, 12))}...</div>` : ''}
+                    <div class="transfer-date">${esc(date)}</div>
                 </div>
-                <div class="transfer-amount ${cls}">${sign}${t.amount} ${t.currency || 'RND'}</div>
-            </div>
-        `;
+                <div class="transfer-amount ${cls}">${sign}${esc(t.amount)} ${esc(t.currency || 'RND')}</div>
+            </div>`;
     }).join('');
-}
-
-// ============================================================
-// Load user data
-// ============================================================
-async function loadUserData(uid) {
-    try {
-        const snap = await get(ref(db, 'users/' + uid));
-        if (!snap.exists()) { showToast('❌ User not found', 'error'); return; }
-        const u = snap.val();
-        currentUserData = u;
-        currentBalances.depositWallet = u.depositWallet || 0;
-        currentBalances.referralWallet = u.referralWallet || 0;
-        currentBalances.rndWallet = u.rndWallet || 0;
-        updateBalanceUI();
-        renderRecentTransfers(u);
-    } catch (err) { console.error('Load error:', err); }
 }
 
 // ============================================================
 // Init
 // ============================================================
-onAuthStateChanged(auth, async (user) => {
-    if (!user) { window.location.href = 'login.html'; return; }
-    currentUserId = user.uid;
+function bindUI() {
+    on('transferForm', 'submit', handleTransferSubmit);
 
-    const snap = await get(ref(db, 'users/' + user.uid));
-    if (!snap.exists()) {
-        showToast('❌ User not found', 'error');
-        setTimeout(() => window.location.href = 'dashboard.html', 2000);
-        return;
-    }
+    on('setupBtn', 'click', handlePasswordSetup);
+    on('setupPasswordConfirm', 'keypress', e => { if (e.key === 'Enter') handlePasswordSetup(); });
 
-    await reconcilePending();
-    await loadUserData(user.uid);
-    setupBalanceListener(user.uid);
+    on('verifyBtn', 'click', handlePasswordVerify);
+    on('verifyPassword', 'keypress', e => { if (e.key === 'Enter') handlePasswordVerify(); });
+    on('verifyCancelBtn', 'click', () => { closeModal('verifyModal'); resetButton(); });
 
-    const form = document.getElementById('transferForm');
-    if (form) form.addEventListener('submit', handleTransferSubmit);
-
-    // Setup
-    document.getElementById('setupBtn').addEventListener('click', handlePasswordSetup);
-    document.getElementById('setupPasswordConfirm').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handlePasswordSetup();
-    });
-
-    // Verify
-    document.getElementById('verifyBtn').addEventListener('click', handlePasswordVerify);
-    document.getElementById('verifyPassword').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handlePasswordVerify();
-    });
-    document.getElementById('verifyCancelBtn').addEventListener('click', () => {
-        closeModal('verifyModal');
-        pendingTransfer = null;
-        resetButton();
-    });
-
-    // 🆕 Forgot Password
-    document.getElementById('forgotPasswordBtn').addEventListener('click', () => {
-        // Verify modal बंद करके forgot modal खोलो
+    on('forgotPasswordBtn', 'click', () => {
         closeModal('verifyModal');
         openModal('forgotModal');
-        setTimeout(() => document.getElementById('forgotAccountPassword').focus(), 200);
+        setTimeout(() => $('forgotAccountPassword')?.focus(), 200);
     });
-    document.getElementById('forgotVerifyBtn').addEventListener('click', handleForgotVerify);
-    document.getElementById('forgotAccountPassword').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleForgotVerify();
-    });
-    document.getElementById('forgotResetBtn').addEventListener('click', handleForgotReset);
-    document.getElementById('forgotNewPasswordConfirm').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleForgotReset();
-    });
-    document.getElementById('forgotCancelBtn1').addEventListener('click', () => {
-        closeModal('forgotModal');
-        pendingTransfer = null;
-        resetButton();
-    });
+    on('forgotVerifyBtn', 'click', handleForgotVerify);
+    on('forgotAccountPassword', 'keypress', e => { if (e.key === 'Enter') handleForgotVerify(); });
+    on('forgotResetBtn', 'click', handleForgotReset);
+    on('forgotNewPasswordConfirm', 'keypress', e => { if (e.key === 'Enter') handleForgotReset(); });
+    on('forgotCancelBtn1', 'click', () => { closeModal('forgotModal'); resetButton(); });
+    on('forgotCancelBtn2', 'click', () => { closeModal('forgotModal'); resetButton(); });
 
-    // Wallet change
-    const select = document.getElementById('walletSelect');
+    const select = $('walletSelect');
     if (select) {
-        select.addEventListener('change', () => {
+        const applyStep = () => {
             updateAvailableText();
-            const walletType = select.value;
-            const amountInput = document.getElementById('amountInput');
-            if (walletType === 'rndWallet') {
-                amountInput.step = '0.00000001';
-                amountInput.min = '0.00000001';
-            } else {
-                amountInput.step = '0.01';
-                amountInput.min = '0.01';
-            }
-        });
+            const a = $('amountInput');
+            if (!a) return;
+            if (select.value === 'rndWallet') { a.step = '0.00000001'; a.min = '0.00000001'; }
+            else { a.step = '0.01'; a.min = '0.01'; }
+        };
+        select.addEventListener('change', applyStep);
+        applyStep();
     }
+}
+
+onAuthStateChanged(auth, (user) => {
+    if (!user) { window.location.href = 'login.html'; return; }
+    currentUserId = user.uid;
+    if (initDone) return;          // listeners दुगने न हों
+    initDone = true;
+    bindUI();
+    setupBalanceListener(user.uid);
 });
 
 window.addEventListener('beforeunload', () => {

@@ -1,17 +1,16 @@
 // ============================================================
-// BUMPER REFERRAL OFFER 2026
+// BUMPER REFERRAL OFFER 2026  (v2 - fixed & cost optimised)
 // File: direct-offer.js
-// ============================================================
-// 🔴 LIVE MODE ACTIVE (dates: 20 Nov → 25 Nov 2026)
+// 🔴 LIVE DATES: 20 Nov → 25 Nov 2026 (IST)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase, ref, get, update, runTransaction } from "firebase/database";
+import {
+  getDatabase, ref, get, update, runTransaction,
+  query, orderByChild, equalTo, onValue
+} from "firebase/database";
 
-// ============================================================
-// 🔥 LIVE FIREBASE CONFIG
-// ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
   authDomain: "rwebsite-e031b.firebaseapp.com",
@@ -28,35 +27,36 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CAMPAIGN CONFIG
-// ============================================================
-// 🔴 LIVE DATES (20 Nov 2026 → 25 Nov 2026)
+// 🎯 CONFIG
 // ============================================================
 const CAMPAIGN = {
   id: "bumper_referral_offer_2026",
   name: "Bumper Referral Offer 2026",
-
-  // 🔴 LIVE DATES (अब यही चालू है)
   startDate: new Date("2026-11-20T00:00:00+05:30"),
   endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
-
-  // Reward tiers (range-based)
   tiers: [
-    { min: 50,   max: 100,      reward: 10,  key: "50",   label: "$50 – $99"     },
-    { min: 100,  max: 200,      reward: 20,  key: "100",  label: "$100 – $199"   },
-    { min: 200,  max: 500,      reward: 40,  key: "200",  label: "$200 – $499"   },
-    { min: 500,  max: 1000,     reward: 80,  key: "500",  label: "$500 – $999"   },
-    { min: 1000, max: Infinity, reward: 200, key: "1000", label: "$1,000+"       }
+    { min: 50,   max: 100,      reward: 10,  key: "50",   label: "$50 – $99"   },
+    { min: 100,  max: 200,      reward: 20,  key: "100",  label: "$100 – $199" },
+    { min: 200,  max: 500,      reward: 40,  key: "200",  label: "$200 – $499" },
+    { min: 500,  max: 1000,     reward: 80,  key: "500",  label: "$500 – $999" },
+    { min: 1000, max: Infinity, reward: 200, key: "1000", label: "$1,000+"     }
   ]
 };
 
-// 🔎 Find reward tier for a purchase amount
+// ⚠️ users में referrer किस field में सेव होता है? (register.html में चेक करें)
+// हर field के लिए Firebase Rules में  "users": { ".indexOn": ["referredBy"] }  जोड़ना ज़रूरी है,
+// वरना पूरा users नोड डाउनलोड होगा।
+const REFERRER_FIELDS = ["referredBy"];
+
+const MIN_WITHDRAW = 1;            // न्यूनतम withdrawal (USDT)
+const REWARD_SYNC_MS = 60 * 1000;  // reward दोबारा गिनने का अंतराल (सिर्फ ACTIVE में)
+
+const P = CAMPAIGN.id; // short alias for DB path
+
 function getTierForAmount(amount) {
   const amt = Number(amount || 0);
   if (!amt || amt < CAMPAIGN.tiers[0].min) return null;
-  for (const t of CAMPAIGN.tiers) {
-    if (amt >= t.min && amt < t.max) return t;
-  }
+  for (const t of CAMPAIGN.tiers) if (amt >= t.min && amt < t.max) return t;
   return null;
 }
 
@@ -77,10 +77,6 @@ const el = {
   statEligibleIds: $("statEligibleIds"), statEligibleReward: $("statEligibleReward"),
   statRewardNote: $("statRewardNote"), statWithdrawable: $("statWithdrawable"),
   statWithdrawNote: $("statWithdrawNote"), statPaid: $("statPaid"),
-  bdCount50: $("bdCount50"), bdCount100: $("bdCount100"), bdCount200: $("bdCount200"),
-  bdCount500: $("bdCount500"), bdCount1000: $("bdCount1000"),
-  bdReward50: $("bdReward50"), bdReward100: $("bdReward100"), bdReward200: $("bdReward200"),
-  bdReward500: $("bdReward500"), bdReward1000: $("bdReward1000"),
   referralLinkDisplay: $("referralLinkDisplay"), referralCodeDisplay: $("referralCodeDisplay"),
   copyReferralBtn: $("copyReferralBtn"),
   withdrawAmount: $("withdrawAmount"), withdrawalInfoBox: $("withdrawalInfoBox"),
@@ -90,9 +86,7 @@ const el = {
   walletFormGroup: $("walletFormGroup"), walletAddressInput: $("walletAddressInput"),
   walletValidationMsg: $("walletValidationMsg"), withdrawBtn: $("withdrawBtn"),
   withdrawalStatus: $("withdrawalStatus"),
-  daysPopup: $("daysPopup"), popupRewardAmount: $("popupRewardAmount"),
-  popupDaysRemaining: $("popupDaysRemaining"), popupTitle: $("popupTitle"),
-  popupCloseBtn: $("popupCloseBtn"),
+  daysPopup: $("daysPopup"), popupCloseBtn: $("popupCloseBtn"),
   confirmationModal: $("confirmationModal"), confirmAmount: $("confirmAmount"),
   confirmWallet: $("confirmWallet"), confirmCancel: $("confirmCancel"),
   confirmSubmit: $("confirmSubmit"),
@@ -101,32 +95,66 @@ const el = {
 
 let currentUserId = null;
 let currentUserData = null;
-let calculatedRewards = {
-  totalEarned: 0, paidAmount: 0, pendingAmount: 0, withdrawable: 0,
-  counts: {}, breakdown: {}, currentStatus: "available", currentWithdrawal: null
-};
+let calculatedRewards = emptyRewards();
+let earnedState = { totalEarned: 0, counts: {}, breakdown: {} };
+let withdrawalsData = {};
 let countdownInterval = null;
 let isProcessingWithdrawal = false;
 let isSyncing = false;
 let syncInterval = null;
+let unsubWithdrawals = null;
 let withdrawalAmountInput = null;
+let lastStatus = null;
+let booted = false;
+let amountPrefilled = false;
+
+function emptyRewards() {
+  return {
+    totalEarned: 0, paidAmount: 0, pendingAmount: 0, withdrawable: 0,
+    counts: {}, breakdown: {}, currentStatus: "available", currentWithdrawal: null
+  };
+}
+
+// ============================================================
+// ⏱️ SERVER TIME (device की घड़ी बदलकर withdraw unlock नहीं हो सकेगा)
+// ============================================================
+let serverOffset = 0;
+function getNow() { return new Date(Date.now() + serverOffset); }
+
+function initServerTime() {
+  return new Promise(resolve => {
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; resolve(); } }, 3000);
+    onValue(ref(db, ".info/serverTimeOffset"), snap => {
+      serverOffset = Number(snap.val() || 0);
+      if (!done) { done = true; clearTimeout(t); resolve(); }
+    });
+  });
+}
+
+function getCampaignStatus() {
+  const now = getNow().getTime();
+  if (now < CAMPAIGN.startDate.getTime()) return "UPCOMING";
+  if (now <= CAMPAIGN.endDate.getTime()) return "ACTIVE";
+  return "ENDED";
+}
 
 // ============================================================
 // UTILS
 // ============================================================
-function getNow() { return new Date(); }
-
-function getCampaignStatus() {
-  const now = getNow().getTime();
-  const start = CAMPAIGN.startDate.getTime();
-  const end = CAMPAIGN.endDate.getTime();
-  if (now < start) return "UPCOMING";
-  if (now <= end) return "ACTIVE";
-  return "ENDED";
-}
-
+const round2 = n => Math.round(Number(n || 0) * 100) / 100;
 function fmt(n) { return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function validateBEP20Wallet(address) { return typeof address === "string" && /^0x[a-fA-F0-9]{40}$/.test(address.trim()); }
+function validateBEP20Wallet(a) { return typeof a === "string" && /^0x[a-fA-F0-9]{40}$/.test(a.trim()); }
+
+// हर तरह की date (ms / seconds / ISO string) को milliseconds में बदलता है
+function toMillis(v) {
+  if (v == null || v === "") return NaN;
+  if (typeof v === "number") return v < 1e12 ? v * 1000 : v;
+  if (typeof v === "object" && typeof v.seconds === "number") return v.seconds * 1000;
+  const n = Number(v);
+  if (!isNaN(n)) return n < 1e12 ? n * 1000 : n;
+  return Date.parse(v);
+}
 
 function showToast(message, type = "success") {
   const container = el.toastContainer;
@@ -134,9 +162,18 @@ function showToast(message, type = "success") {
   const toast = document.createElement("div");
   toast.className = `toast-custom ${type}`;
   const iconMap = { success: "bi-check-circle-fill", error: "bi-exclamation-triangle-fill", warning: "bi-exclamation-triangle-fill", info: "bi-info-circle-fill" };
-  toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i><span class="toast-msg">${message}</span>`;
+  const icon = document.createElement("i");
+  icon.className = `bi ${iconMap[type] || iconMap.success}`;
+  const span = document.createElement("span");
+  span.className = "toast-msg";
+  span.textContent = message;               // innerHTML नहीं → XSS safe
+  toast.append(icon, span);
   container.appendChild(toast);
   setTimeout(() => { toast.style.opacity = "0"; toast.style.transform = "translateX(100%)"; setTimeout(() => toast.remove(), 300); }, 5000);
+}
+
+function generateId(prefix) {
+  return prefix + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
 }
 
 // ============================================================
@@ -145,27 +182,34 @@ function showToast(message, type = "success") {
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);
 
-  const update = () => {
+  const tick = () => {
     const now = getNow().getTime();
     const start = CAMPAIGN.startDate.getTime();
     const end = CAMPAIGN.endDate.getTime();
+
+    // status बदलते ही UI refresh + (ACTIVE/ENDED में) reward दोबारा गिनो
+    const s = getCampaignStatus();
+    if (s !== lastStatus) {
+      const prev = lastStatus;
+      lastStatus = s;
+      updateUI();
+      if (prev !== null && currentUserId && s !== "UPCOMING") syncRewards(currentUserId);
+    }
 
     if (now > end) {
       if (el.countdownWrapper) el.countdownWrapper.style.display = "none";
       if (el.campaignEndedMessage) el.campaignEndedMessage.style.display = "block";
       if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-      // ऑफर खत्म होते ही UI रिफ्रेश करें ताकि विदड्रॉल बटन तुरंत चालू हो जाए
-      updateUI();
       return;
     }
+    if (el.countdownWrapper) el.countdownWrapper.style.display = "";
+    if (el.campaignEndedMessage) el.campaignEndedMessage.style.display = "none";
 
-    const targetTime = now < start ? start : end;
-    const diff = targetTime - now;
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    const diff = (now < start ? start : end) - now;
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
 
     if (el.countdownDays) el.countdownDays.textContent = String(days).padStart(2, "0");
     if (el.countdownHours) el.countdownHours.textContent = String(hours).padStart(2, "0");
@@ -173,12 +217,12 @@ function startCountdown() {
     if (el.countdownSeconds) el.countdownSeconds.textContent = String(seconds).padStart(2, "0");
   };
 
-  update();
-  countdownInterval = setInterval(update, 1000);
+  tick();
+  countdownInterval = setInterval(tick, 1000);
 }
 
 // ============================================================
-// 📋 RENDER REWARD TABLE
+// 📋 REWARD TABLE
 // ============================================================
 function renderRewardsTable() {
   if (!el.rewardsTableBody) return;
@@ -187,168 +231,115 @@ function renderRewardsTable() {
     return `
       <tr class="${isLast ? "highlight-row" : ""}">
         <td><strong>${t.label}</strong></td>
-        <td><span class="gold-text ${isLast ? "big" : ""}">$${t.reward}</span>${isLast ? '<span class="star">★</span>' : ''}</td>
-      </tr>
-    `;
+        <td><span class="gold-text ${isLast ? "big" : ""}">$${t.reward}</span>${isLast ? '<span class="star">★</span>' : ""}</td>
+      </tr>`;
   }).join("");
 }
 
 // ============================================================
-// 🔥 WITHDRAWAL AMOUNT INPUT INJECTION
+// 💵 WITHDRAWAL AMOUNT INPUT
 // ============================================================
 function injectWithdrawalInput() {
-  if (!document.getElementById('withdrawAmountInput')) {
-    const formGroup = el.walletFormGroup;
-    if (formGroup) {
-      const amountDiv = document.createElement('div');
-      amountDiv.className = 'form-group mt-3';
-      amountDiv.innerHTML = `
-        <label><i class="bi bi-cash me-1"></i> Withdrawal Amount (USDT)</label>
-        <input type="number" id="withdrawAmountInput" class="form-control-custom" placeholder="Enter amount" min="1" step="0.01"/>
-        <div id="amountValidationMsg" class="wallet-validation-msg"></div>
-      `;
-      formGroup.parentNode.insertBefore(amountDiv, formGroup);
-      withdrawalAmountInput = document.getElementById('withdrawAmountInput');
-    }
-  }
+  if (document.getElementById("withdrawAmountInput")) return;
+  const formGroup = el.walletFormGroup;
+  if (!formGroup) return;
+  const amountDiv = document.createElement("div");
+  amountDiv.className = "form-group mt-3";
+  amountDiv.innerHTML = `
+    <label><i class="bi bi-cash me-1"></i> Withdrawal Amount (USDT)</label>
+    <input type="number" id="withdrawAmountInput" class="form-control-custom" placeholder="Enter amount" min="${MIN_WITHDRAW}" step="0.01"/>
+    <div id="amountValidationMsg" class="wallet-validation-msg"></div>`;
+  formGroup.parentNode.insertBefore(amountDiv, formGroup);
+  withdrawalAmountInput = document.getElementById("withdrawAmountInput");
 }
 
 // ============================================================
-// 🔥 SYNC FUNCTION — Perfect Balance, Paid & Pending Logic
+// 👤 PROFILE (सिर्फ एक बार)
 // ============================================================
-async function syncOfferData(uid) {
-  if (isSyncing) return;
+async function loadProfile(uid) {
+  const snap = await get(ref(db, `users/${uid}`));
+  if (!snap.exists()) return;
+  currentUserData = snap.val();
+  const name = currentUserData.name || currentUserData.username || "User";
+  if (el.userName) el.userName.textContent = name;
+  if (el.userAvatar) el.userAvatar.textContent = name.charAt(0).toUpperCase();
+  const refCode = currentUserData.referralCode || uid.substring(0, 8);
+  currentUserData._refCode = refCode;
+  if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
+  if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
+}
+
+// ============================================================
+// 🔥 REWARD CALCULATION (सिर्फ अपने referred users — query से)
+// ============================================================
+async function fetchReferredUsers(uid, refCode) {
+  const values = [...new Set([refCode, uid].filter(Boolean))];
+  const jobs = [];
+  for (const f of REFERRER_FIELDS)
+    for (const v of values)
+      jobs.push(get(query(ref(db, "users"), orderByChild(f), equalTo(v))));
+  const snaps = await Promise.all(jobs);
+  const out = {};
+  snaps.forEach(s => s.forEach(c => { if (c.key !== uid) out[c.key] = c.val(); }));
+  return out;
+}
+
+function computeFromReferred(referred) {
+  const counts = {}, breakdown = {};
+  CAMPAIGN.tiers.forEach(t => { counts[t.key] = 0; breakdown[t.key] = 0; });
+  const purchases = [];
+  let totalEarned = 0;
+  const start = CAMPAIGN.startDate.getTime();
+  const end = CAMPAIGN.endDate.getTime();
+
+  for (const [buyerUid, data] of Object.entries(referred)) {
+    for (const [pkgId, pkg] of Object.entries(data.packages || {})) {
+      if (pkg.status !== "active" && pkg.status !== "completed") continue;
+      const amt = Number(pkg.usdtAmount || 0);
+      const tier = getTierForAmount(amt);
+      if (!tier) continue;
+      const t = toMillis(pkg.purchaseDate || pkg.timestamp || pkg.createdAt);
+      if (isNaN(t) || t < start || t > end) continue;   // ✅ अवैध/गायब date → गिनती नहीं
+
+      counts[tier.key]++;
+      breakdown[tier.key] += tier.reward;
+      totalEarned += tier.reward;
+      purchases.push({ purchaseId: `${buyerUid}_${pkgId}`, buyerUid, amt, tier, time: t });
+    }
+  }
+  return { counts, breakdown, totalEarned, purchases };
+}
+
+async function syncRewards(uid) {
+  if (isSyncing || !currentUserData) return;
   isSyncing = true;
-
   try {
-    const userSnap = await get(ref(db, `users/${uid}`));
-    if (!userSnap.exists()) return;
-    currentUserData = userSnap.val();
+    const refCode = currentUserData._refCode;
+    const referred = await fetchReferredUsers(uid, refCode);
+    const res = computeFromReferred(referred);
+    earnedState = { totalEarned: res.totalEarned, counts: res.counts, breakdown: res.breakdown };
 
-    const name = currentUserData.name || currentUserData.username || "User";
-    if (el.userName) el.userName.textContent = name;
-    if (el.userAvatar) el.userAvatar.textContent = name.charAt(0).toUpperCase();
-
-    const refCode = currentUserData.referralCode || uid.substring(0, 8);
-    if (el.referralCodeDisplay) el.referralCodeDisplay.textContent = refCode;
-    if (el.referralLinkDisplay) el.referralLinkDisplay.textContent = `https://staking.randigital.in/register.html?ref=${refCode}`;
-
-    // -------- 1. Fetch all users --------
-    const usersSnap = await get(ref(db, "users"));
-    const allUsers = usersSnap.val() || {};
-    const referredUsers = new Set();
-
-    for (const [uId, uData] of Object.entries(allUsers)) {
-      if (uId === uid) continue;
-      const referredBy = uData.referredBy || uData.referredByUid || uData.sponsorUid || uData.referrerUid || uData.referrer;
-      if (String(referredBy) === String(refCode) || String(referredBy) === String(uid)) {
-        referredUsers.add(uId);
+    // Audit trail लिखना (fail हो तो भी UI नहीं रुकेगा)
+    try {
+      const claimsSnap = await get(ref(db, `${P}/user_claims/${uid}`));
+      const existing = claimsSnap.val() || {};
+      const updates = {};
+      for (const p of res.purchases) {
+        if (existing[p.purchaseId]) continue;
+        updates[`purchases/${p.purchaseId}`] = {
+          purchaseId: p.purchaseId, buyerUid: p.buyerUid, directReferrerUid: uid,
+          packageAmount: p.amt, tierKey: p.tier.key, rewardAmount: p.tier.reward,
+          status: "completed", timestamp: p.time, campaignId: P
+        };
+        updates[`user_claims/${uid}/${p.purchaseId}`] = {
+          purchaseId: p.purchaseId, amount: p.amt, tierKey: p.tier.key,
+          reward: p.tier.reward, claimedAt: Date.now()
+        };
       }
-    }
+      if (Object.keys(updates).length) await update(ref(db, P), updates);
+    } catch (e) { console.warn("Audit write skipped:", e.message); }
 
-    // -------- 2. Fetch existing offer data --------
-    const offerSnap = await get(ref(db, CAMPAIGN.id));
-    const offerData = offerSnap.val() || {};
-    const existingPurchases = offerData.purchases || {};
-    const userWithdrawals = offerData.withdrawals || {};
-
-    const counts = {}; const breakdown = {};
-    CAMPAIGN.tiers.forEach(t => { counts[t.key] = 0; breakdown[t.key] = 0; });
-
-    let totalEarned = 0;
-    const updates = {};
-
-    // -------- 3. Calculate Total Earned (range-based tiering) --------
-    for (const [refUserUid, refUserData] of Object.entries(allUsers)) {
-      if (!referredUsers.has(refUserUid)) continue;
-
-      const packages = refUserData.packages || {};
-
-      for (const [pkgId, pkg] of Object.entries(packages)) {
-        if (pkg.status !== "active" && pkg.status !== "completed") continue;
-
-        const amt = Number(pkg.usdtAmount || 0);
-        const tier = getTierForAmount(amt);
-        if (!tier) continue;
-
-        const purchaseTime = pkg.purchaseDate || pkg.timestamp || 0;
-        if (purchaseTime < CAMPAIGN.startDate.getTime()) continue;
-        if (purchaseTime > CAMPAIGN.endDate.getTime()) continue;
-
-        const rewardAmt = tier.reward;
-        const purchaseId = `${refUserUid}_${pkgId}`;
-
-        if (!existingPurchases[purchaseId]) {
-          updates[`purchases/${purchaseId}`] = {
-            purchaseId,
-            buyerUid: refUserUid,
-            directReferrerUid: uid,
-            packageAmount: amt,
-            tierKey: tier.key,
-            rewardAmount: rewardAmt,
-            status: "completed",
-            timestamp: purchaseTime,
-            campaignId: CAMPAIGN.id
-          };
-
-          updates[`user_claims/${uid}/${purchaseId}`] = {
-            purchaseId,
-            amount: amt,
-            tierKey: tier.key,
-            reward: rewardAmt,
-            claimedAt: Date.now()
-          };
-        }
-
-        counts[tier.key]++;
-        breakdown[tier.key] += rewardAmt;
-        totalEarned += rewardAmt;
-      }
-    }
-
-    if (Object.keys(updates).length > 0) {
-      await update(ref(db, CAMPAIGN.id), updates);
-      console.log("🔥 New offer data synced!");
-    }
-
-    // -------- 4. Calculate Paid & Pending (✅ FIXED) --------
-    // paid       → Already Paid
-    // pending / approved → Pending
-    // rejected   → कुछ नहीं (balance वापस withdrawable में)
-    let latestWithdrawal = null;
-    let totalPaid = 0;
-    let totalPending = 0;
-
-    for (const [wId, w] of Object.entries(userWithdrawals)) {
-      if (w.userId !== uid) continue;
-
-      const amt = Number(w.amount || 0);
-
-      if (w.status === 'paid') {
-        totalPaid += amt;
-      } else if (w.status === 'pending' || w.status === 'approved') {
-        totalPending += amt;
-      }
-
-      // Latest withdrawal = जो सबसे हाल में request हुई (status बताने के लिए)
-      if (!latestWithdrawal || (w.requestedAt || 0) > (latestWithdrawal.requestedAt || 0)) {
-        latestWithdrawal = w;
-      }
-    }
-
-    // -------- 5. Final Withdrawable --------
-    const actualWithdrawable = Math.max(0, totalEarned - totalPaid - totalPending);
-
-    calculatedRewards = {
-      totalEarned,
-      paidAmount: totalPaid,
-      pendingAmount: totalPending,
-      withdrawable: actualWithdrawable,
-      counts, breakdown,
-      currentStatus: latestWithdrawal ? latestWithdrawal.status : "available",
-      currentWithdrawal: latestWithdrawal
-    };
-
+    recomputeBalances();
     updateUI();
   } catch (err) {
     console.error("Sync error:", err);
@@ -357,14 +348,56 @@ async function syncOfferData(uid) {
   }
 }
 
+// ============================================================
+// 🏦 WITHDRAWALS (realtime listener — सिर्फ अपना डेटा, सिर्फ बदलाव डाउनलोड)
+// ============================================================
+function listenWithdrawals(uid) {
+  if (unsubWithdrawals) unsubWithdrawals();
+  unsubWithdrawals = onValue(ref(db, `${P}/user_withdrawals/${uid}`), snap => {
+    withdrawalsData = snap.val() || {};
+    recomputeBalances();
+    updateUI();
+  }, err => console.error("Withdrawal listener error:", err));
+}
+
+function recomputeBalances() {
+  let paid = 0, pending = 0, hasPending = false, hasApproved = false;
+  let latest = null;
+
+  for (const w of Object.values(withdrawalsData)) {
+    const amt = Number(w.amount || 0);
+    if (w.status === "paid") paid += amt;
+    else if (w.status === "pending") { pending += amt; hasPending = true; }
+    else if (w.status === "approved") { pending += amt; hasApproved = true; }
+    if (!latest || (w.requestedAt || 0) > (latest.requestedAt || 0)) latest = w;
+  }
+
+  const currentStatus = hasPending ? "pending" : hasApproved ? "approved" : (latest ? latest.status : "available");
+  calculatedRewards = {
+    totalEarned: earnedState.totalEarned,
+    paidAmount: round2(paid),
+    pendingAmount: round2(pending),
+    withdrawable: Math.max(0, round2(earnedState.totalEarned - paid - pending)),
+    counts: earnedState.counts, breakdown: earnedState.breakdown,
+    currentStatus, currentWithdrawal: latest
+  };
+}
+
 function startAutoSync(uid) {
-  if (syncInterval) clearInterval(syncInterval);
-  syncOfferData(uid);
-  syncInterval = setInterval(() => syncOfferData(uid), 2000);
+  stopAutoSync();
+  if (getCampaignStatus() !== "UPCOMING") syncRewards(uid);
+  listenWithdrawals(uid);
+  // सिर्फ तब दोबारा गिनो जब ऑफर चल रहा हो और tab खुला/दिख रहा हो
+  syncInterval = setInterval(() => {
+    if (document.hidden) return;
+    if (getCampaignStatus() !== "ACTIVE") return;
+    syncRewards(uid);
+  }, REWARD_SYNC_MS);
 }
 
 function stopAutoSync() {
   if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+  if (unsubWithdrawals) { unsubWithdrawals(); unsubWithdrawals = null; }
 }
 
 // ============================================================
@@ -372,130 +405,128 @@ function stopAutoSync() {
 // ============================================================
 function updateUI() {
   const status = getCampaignStatus();
-
-  const startStr = CAMPAIGN.startDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  const endStr   = CAMPAIGN.endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const dOpt = { day: "numeric", month: "short", timeZone: "Asia/Kolkata" };
+  const startStr = CAMPAIGN.startDate.toLocaleDateString("en-IN", dOpt);
+  const endStr = CAMPAIGN.endDate.toLocaleDateString("en-IN", dOpt);
   if (el.campaignDates) el.campaignDates.textContent = `${startStr} – ${endStr}`;
 
-  // Dynamic duration pill
-  const totalDays = Math.max(1, Math.round((CAMPAIGN.endDate - CAMPAIGN.startDate) / (1000 * 60 * 60 * 24)));
+  const totalDays = Math.max(1, Math.round((CAMPAIGN.endDate - CAMPAIGN.startDate) / 86400000));
   if (el.campaignDuration) el.campaignDuration.textContent = `${totalDays} Days Only`;
 
   const badges = {
-    UPCOMING: { cls: "upcoming", txt: `⏳ Upcoming` },
+    UPCOMING: { cls: "upcoming", txt: "⏳ Upcoming" },
     ACTIVE:   { cls: "active",   txt: "🔥 ACTIVE" },
     ENDED:    { cls: "ended",    txt: "🏁 ENDED" }
   };
   if (el.campaignStatusBadge) el.campaignStatusBadge.innerHTML = `<span class="campaign-status-badge ${badges[status].cls}">${badges[status].txt}</span>`;
 
-  const totalEarned = Number(calculatedRewards.totalEarned || 0);
-  const totalPaid = Number(calculatedRewards.paidAmount || 0);
-  const withdrawable = Number(calculatedRewards.withdrawable || 0);
-  const counts = calculatedRewards.counts || {};
-  const breakdown = calculatedRewards.breakdown || {};
-  const totalIds = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+  const { totalEarned, paidAmount, withdrawable, counts, breakdown } = calculatedRewards;
+  const totalIds = Object.values(counts || {}).reduce((a, b) => a + Number(b || 0), 0);
 
   if (el.walletAmount) el.walletAmount.textContent = fmt(withdrawable);
   if (el.statEligibleIds) el.statEligibleIds.textContent = totalIds;
   if (el.statEligibleReward) el.statEligibleReward.textContent = `$${fmt(totalEarned)}`;
-  if (el.statPaid) el.statPaid.textContent = `$${fmt(totalPaid)}`;
+  if (el.statPaid) el.statPaid.textContent = `$${fmt(paidAmount)}`;
   if (el.statWithdrawable) el.statWithdrawable.textContent = `$${fmt(withdrawable)}`;
-
   if (el.statRewardNote) el.statRewardNote.textContent = `${totalIds} eligible purchase${totalIds === 1 ? "" : "s"}`;
   if (el.statWithdrawNote) el.statWithdrawNote.textContent = status === "ENDED" ? "Available to withdraw" : `Locked until ${endStr}`;
 
   CAMPAIGN.tiers.forEach(t => {
-    const cEl = $(`bdCount${t.key}`);
-    const rEl = $(`bdReward${t.key}`);
-    if (cEl) cEl.textContent = counts[t.key] || 0;
-    if (rEl) rEl.textContent = (breakdown[t.key] || 0).toLocaleString();
+    const cEl = $(`bdCount${t.key}`), rEl = $(`bdReward${t.key}`);
+    if (cEl) cEl.textContent = (counts || {})[t.key] || 0;
+    if (rEl) rEl.textContent = ((breakdown || {})[t.key] || 0).toLocaleString();
   });
 
   updateWithdrawalUI(withdrawable, status);
 }
 
 function updateWithdrawalUI(withdrawable, status) {
-  const withdrawalStatus = String(calculatedRewards.currentStatus || "").toLowerCase();
-  
-  // ✅ LIVE LOGIC: विदड्रॉल सिर्फ तब चालू जब ऑफर खत्म (ENDED) हो जाए
-  const canWithdraw = status === "ENDED" && withdrawable > 0 && withdrawalStatus !== "pending" && withdrawalStatus !== "approved";
+  const ws = String(calculatedRewards.currentStatus || "available").toLowerCase();
+  const cw = calculatedRewards.currentWithdrawal;
+  const blocked = ws === "pending" || ws === "approved";
+  const canWithdraw = status === "ENDED" && withdrawable >= MIN_WITHDRAW && !blocked;
 
   injectWithdrawalInput();
 
   if (el.withdrawAmount) el.withdrawAmount.textContent = `$${fmt(withdrawable)} USDT`;
   if (el.withdrawalInfoBox) el.withdrawalInfoBox.classList.add("visible");
 
+  // ---- info text ----
   if (el.withdrawalInfoText) {
-    if (status === "ACTIVE") {
-      el.withdrawalInfoText.textContent = `🔒 Withdrawals are locked until offer ends.`;
-    } else if (status === "UPCOMING") {
-      el.withdrawalInfoText.textContent = `⏳ Offer has not started yet.`;
-    } else if (status === "ENDED") {
-      if (withdrawalStatus === "pending") el.withdrawalInfoText.textContent = `⏳ Your previous withdrawal is pending approval.`;
-      else if (withdrawalStatus === "approved") el.withdrawalInfoText.textContent = `✅ Your previous withdrawal is approved.`;
-      else el.withdrawalInfoText.textContent = `🔓 Offer ended! You can withdraw your full balance now.`;
+    let txt;
+    if (status === "UPCOMING") txt = "⏳ Offer has not started yet.";
+    else if (status === "ACTIVE") txt = "🔒 Withdrawals are locked until offer ends.";
+    else if (ws === "pending") txt = "⏳ Your withdrawal is pending approval.";
+    else if (ws === "approved") txt = "✅ Your withdrawal is approved and being processed.";
+    else if (canWithdraw) txt = "🔓 Offer ended! You can withdraw your balance now.";
+    else if (calculatedRewards.paidAmount > 0) txt = "✅ All your rewards have been paid.";
+    else txt = "No reward available to withdraw.";
+    el.withdrawalInfoText.textContent = txt;
+  }
+
+  // ---- status box (latest withdrawal) ----
+  if (el.withdrawalStatus) {
+    const msgs = {
+      pending:  "⏳ Your withdrawal request is pending admin approval.",
+      approved: "✅ Your withdrawal has been approved and is being processed.",
+      paid:     "✅ Payment has been sent to your wallet.",
+      rejected: "❌ Your last withdrawal request was rejected." + (cw && cw.rejectReason ? ` Reason: ${cw.rejectReason}` : "")
+    };
+    if (msgs[ws]) {
+      el.withdrawalStatus.className = `withdrawal-status visible ${ws}`;
+      el.withdrawalStatus.textContent = msgs[ws];
+    } else {
+      el.withdrawalStatus.className = "withdrawal-status";
+      el.withdrawalStatus.textContent = "";
     }
   }
 
-  if (["pending", "approved", "paid"].includes(withdrawalStatus)) {
-    if (el.withdrawBtn) {
-      el.withdrawBtn.disabled = true;
-      if (withdrawalStatus === "pending") el.withdrawBtn.innerHTML = `<i class="bi bi-clock me-2"></i>Pending Approval`;
-      else if (withdrawalStatus === "approved") el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle me-2"></i>Approved`;
-      else if (withdrawalStatus === "paid") {
-        if (canWithdraw) {
-          el.withdrawBtn.disabled = false;
-          el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw New Rewards`;
-          el.withdrawBtn.className = "btn-withdraw";
-        } else {
-          el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
-        }
-      }
-    }
-
-    if (el.withdrawalStatus) {
-      el.withdrawalStatus.classList.add("visible");
-      el.withdrawalStatus.className = `withdrawal-status visible ${withdrawalStatus}`;
-      el.withdrawalStatus.textContent =
-        withdrawalStatus === "pending"  ? "⏳ Your withdrawal request is pending admin approval." :
-        withdrawalStatus === "approved" ? "✅ Your withdrawal has been approved and is being processed." :
-        "✅ Payment has been sent to your wallet.";
-    }
-
-    if (withdrawalStatus === "paid" && el.withdrawalDetails && calculatedRewards.currentWithdrawal) {
+  // ---- paid details ----
+  if (el.withdrawalDetails) {
+    if (ws === "paid" && cw) {
       el.withdrawalDetails.classList.add("visible");
-      if (el.detailAmount) el.detailAmount.textContent = `$${fmt(calculatedRewards.currentWithdrawal.amount)} USDT`;
-      if (el.detailWallet) el.detailWallet.textContent = calculatedRewards.currentWithdrawal.walletAddress || "---";
-      if (el.detailPaidDate) el.detailPaidDate.textContent = calculatedRewards.currentWithdrawal.paidAt ? new Date(calculatedRewards.currentWithdrawal.paidAt).toLocaleString() : "---";
-      if (el.detailTxHash) el.detailTxHash.textContent = calculatedRewards.currentWithdrawal.txHash || "---";
+      if (el.detailAmount) el.detailAmount.textContent = `$${fmt(cw.amount)} USDT`;
+      if (el.detailWallet) el.detailWallet.textContent = cw.walletAddress || "---";
+      if (el.detailPaidDate) el.detailPaidDate.textContent = cw.paidAt ? new Date(cw.paidAt).toLocaleString() : "---";
+      if (el.detailTxHash) el.detailTxHash.textContent = cw.txHash || "---";
+    } else {
+      el.withdrawalDetails.classList.remove("visible");
     }
-
-    if (el.walletFormGroup) el.walletFormGroup.style.display = canWithdraw ? "block" : "none";
-    return;
   }
 
-  if (canWithdraw) {
-    if (el.withdrawBtn) {
+  // ---- button ----
+  if (el.withdrawBtn) {
+    if (canWithdraw) {
       el.withdrawBtn.disabled = false;
-      el.withdrawBtn.innerHTML = `<i class="bi bi-arrow-up-right me-2"></i>Withdraw Offer Reward`;
       el.withdrawBtn.className = "btn-withdraw";
-    }
-    if (el.walletFormGroup) el.walletFormGroup.style.display = "block";
-    if (el.withdrawalStatus) el.withdrawalStatus.classList.remove("visible");
-    if (el.withdrawalDetails) el.withdrawalDetails.classList.remove("visible");
-  } else {
-    if (el.withdrawBtn) {
+      el.withdrawBtn.innerHTML = calculatedRewards.paidAmount > 0
+        ? `<i class="bi bi-arrow-up-right me-2"></i>Withdraw New Rewards`
+        : `<i class="bi bi-arrow-up-right me-2"></i>Withdraw Offer Reward`;
+    } else {
       el.withdrawBtn.disabled = true;
-      if (status === "ACTIVE" || status === "UPCOMING") el.withdrawBtn.innerHTML = `🔒 Locked Until Offer Ends`;
-      else el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
       el.withdrawBtn.className = "btn-withdraw withdrawal-locked";
+      if (ws === "pending") el.withdrawBtn.innerHTML = `<i class="bi bi-clock me-2"></i>Pending Approval`;
+      else if (ws === "approved") el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle me-2"></i>Approved`;
+      else if (status !== "ENDED") el.withdrawBtn.innerHTML = `🔒 Locked Until Offer Ends`;
+      else if (calculatedRewards.paidAmount > 0) el.withdrawBtn.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Paid ✓`;
+      else el.withdrawBtn.innerHTML = `Nothing to Withdraw`;
     }
-    if (el.walletFormGroup) el.walletFormGroup.style.display = "none";
+  }
+
+  if (el.walletFormGroup) el.walletFormGroup.style.display = canWithdraw ? "block" : "none";
+  if (withdrawalAmountInput) {
+    const wrap = withdrawalAmountInput.closest(".form-group");
+    if (wrap) wrap.style.display = canWithdraw ? "block" : "none";
+    withdrawalAmountInput.max = withdrawable;
+    if (canWithdraw && !amountPrefilled && !withdrawalAmountInput.value) {
+      withdrawalAmountInput.value = withdrawable.toFixed(2);
+      amountPrefilled = true;
+    }
   }
 }
 
 // ============================================================
-// 🏦 WITHDRAWAL
+// 🏦 WITHDRAW FLOW
 // ============================================================
 function validateWallet() {
   const val = el.walletAddressInput?.value.trim() || "";
@@ -503,45 +534,33 @@ function validateWallet() {
   if (!msg) return false;
   if (!val) {
     el.walletAddressInput.className = "form-control-custom";
-    msg.className = "wallet-validation-msg";
-    msg.textContent = "";
+    msg.className = "wallet-validation-msg"; msg.textContent = "";
     return false;
   }
   if (validateBEP20Wallet(val)) {
     el.walletAddressInput.className = "form-control-custom valid";
-    msg.className = "wallet-validation-msg valid";
-    msg.textContent = "✅ Valid BEP-20 wallet";
+    msg.className = "wallet-validation-msg valid"; msg.textContent = "✅ Valid BEP-20 wallet";
     return true;
   }
   el.walletAddressInput.className = "form-control-custom error";
-  msg.className = "wallet-validation-msg error";
-  msg.textContent = "❌ Invalid BEP-20 wallet";
+  msg.className = "wallet-validation-msg error"; msg.textContent = "❌ Invalid BEP-20 wallet";
   return false;
 }
 
 function handleWithdrawClick() {
-  const status = getCampaignStatus();
-  if (status !== "ENDED") {
-    showToast("Withdrawals unlock after offer ends on 25 Nov.", "warning");
-    return;
-  }
+  if (getCampaignStatus() !== "ENDED") { showToast("Withdrawals unlock after offer ends on 25 Nov.", "warning"); return; }
 
   const avail = calculatedRewards.withdrawable;
-  if (avail <= 0) { showToast("Nothing to withdraw.", "warning"); return; }
+  if (avail < MIN_WITHDRAW) { showToast("Nothing to withdraw.", "warning"); return; }
   if (!validateWallet()) { showToast("Enter a valid BEP-20 wallet address.", "error"); return; }
 
-  const amountVal = parseFloat(withdrawalAmountInput?.value || 0);
-  if (!amountVal || amountVal <= 0) { showToast("Enter a valid amount.", "error"); return; }
-  if (amountVal > avail) { showToast("Amount exceeds available balance.", "error"); return; }
+  const amountVal = round2(parseFloat(withdrawalAmountInput?.value || 0));
+  if (!amountVal || amountVal < MIN_WITHDRAW) { showToast(`Minimum withdrawal is $${MIN_WITHDRAW}.`, "error"); return; }
+  if (amountVal > avail + 1e-9) { showToast("Amount exceeds available balance.", "error"); return; }
 
-  const addr = el.walletAddressInput.value.trim();
   if (el.confirmAmount) el.confirmAmount.textContent = `$${fmt(amountVal)} USDT`;
-  if (el.confirmWallet) el.confirmWallet.textContent = addr;
-  if (el.confirmationModal) el.confirmationModal.classList.add("visible");
-}
-
-function generateId(prefix) {
-  return prefix + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
+  if (el.confirmWallet) el.confirmWallet.textContent = el.walletAddressInput.value.trim();
+  el.confirmationModal?.classList.add("visible");
 }
 
 async function submitWithdrawal() {
@@ -550,44 +569,55 @@ async function submitWithdrawal() {
   const origHTML = '<i class="bi bi-check-circle me-1"></i>Confirm Withdrawal';
   if (el.confirmSubmit) { el.confirmSubmit.disabled = true; el.confirmSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Processing...`; }
 
+  let lockTaken = false;
+  const lockRef = ref(db, `${P}/rewards/${currentUserId}`);
+
   try {
+    if (getCampaignStatus() !== "ENDED") { showToast("Offer has not ended yet.", "warning"); return; }
+
     const addr = el.walletAddressInput?.value.trim() || "";
     if (!validateBEP20Wallet(addr)) { showToast("Invalid wallet.", "error"); return; }
 
-    const amountVal = parseFloat(withdrawalAmountInput?.value || 0);
+    const amountVal = round2(parseFloat(withdrawalAmountInput?.value || 0));
     const avail = calculatedRewards.withdrawable;
+    if (!amountVal || amountVal < MIN_WITHDRAW || amountVal > avail + 1e-9) { showToast("Invalid amount.", "error"); return; }
 
-    if (amountVal <= 0 || amountVal > avail) { showToast("Invalid amount.", "error"); return; }
-
-    const rewardsRoot = ref(db, `${CAMPAIGN.id}/rewards/${currentUserId}`);
     const withdrawalId = generateId("dw");
     const txId = generateId("tx");
-    const timestamp = Date.now();
+    const timestamp = Date.now() + serverOffset;
 
-    const lockResult = await runTransaction(rewardsRoot, (current) => {
-      if (current && (current.status === "pending" || current.status === "approved")) {
-        return;
-      }
+    // 🔒 double-submit से बचाव (एक समय में सिर्फ एक pending/approved)
+    const lockResult = await runTransaction(lockRef, (current) => {
+      if (current && (current.status === "pending" || current.status === "approved")) return; // abort
       return {
         ...(current || {}),
-        status: "pending",
-        walletAddress: addr,
-        withdrawalId,
-        transactionId: txId,
-        requestedAmount: amountVal,
-        requestedAt: timestamp,
-        updatedAt: timestamp
+        status: "pending", walletAddress: addr, withdrawalId, transactionId: txId,
+        requestedAmount: amountVal, requestedAt: timestamp, updatedAt: timestamp
       };
     });
-
-    if (!lockResult.committed) { showToast("Withdrawal already submitted or nothing available.", "warning"); return; }
+    if (!lockResult.committed) { showToast("A withdrawal is already pending.", "warning"); return; }
+    lockTaken = true;
 
     const date = new Date(timestamp).toISOString().split("T")[0];
+    const username = currentUserData?.username || currentUserData?.name || currentUserId;
+
+    // Admin panel के लिए पूरा डेटा
     const adminData = {
-      campaignName: CAMPAIGN.name, campaignId: CAMPAIGN.id, type: "bumper_offer_withdrawal",
-      asset: "USDT", network: "BEP-20 / BNB Smart Chain", amount: amountVal, status: "pending",
-      userId: currentUserId, username: currentUserData?.username || currentUserData?.name || currentUserId,
-      walletAddress: addr, requestedAt: timestamp, withdrawalId
+      campaignName: CAMPAIGN.name, campaignId: P, type: "bumper_offer_withdrawal",
+      asset: "USDT", network: "BEP-20 / BNB Smart Chain",
+      amount: amountVal, status: "pending",
+      userId: currentUserId, username,
+      email: currentUserData?.email || null,
+      referralCode: currentUserData?._refCode || null,
+      walletAddress: addr, requestedAt: timestamp,
+      withdrawalId, transactionId: txId,
+      earnedAtRequest: calculatedRewards.totalEarned,
+      paidBeforeRequest: calculatedRewards.paidAmount
+    };
+    // User को दिखाने के लिए (सिर्फ अपना node — पढ़ना सस्ता और सुरक्षित)
+    const userWithdrawal = {
+      withdrawalId, transactionId: txId, amount: amountVal, status: "pending",
+      walletAddress: addr, requestedAt: timestamp, paidAt: null, txHash: null, rejectReason: null
     };
     const userTx = {
       type: "bumper_offer_withdrawal", subtype: `${CAMPAIGN.name} Withdrawal`,
@@ -595,26 +625,26 @@ async function submitWithdrawal() {
       status: "pending", walletAddress: addr, withdrawalId, timestamp, date,
       description: `${CAMPAIGN.name} Withdrawal of $${amountVal} USDT (BEP-20)`, txId, txHash: null
     };
-    const globalTx = { ...userTx, userId: currentUserId };
 
-    await update(ref(db), {
-      [`${CAMPAIGN.id}/withdrawals/${withdrawalId}`]: adminData,
-      [`users/${currentUserId}/offer_transactions/${txId}`]: userTx,
-      [`${CAMPAIGN.id}/transactions/${txId}`]: globalTx
-    });
+    try {
+      await update(ref(db), {
+        [`${P}/withdrawals/${withdrawalId}`]: adminData,
+        [`${P}/user_withdrawals/${currentUserId}/${withdrawalId}`]: userWithdrawal,
+        [`users/${currentUserId}/offer_transactions/${txId}`]: userTx,
+        [`${P}/transactions/${txId}`]: { ...userTx, userId: currentUserId }
+      });
+    } catch (writeErr) {
+      // लिखना fail हुआ तो lock हटाओ, वरना user हमेशा के लिए अटक जाएगा
+      await update(lockRef, { status: "failed", updatedAt: Date.now() }).catch(() => {});
+      throw writeErr;
+    }
 
     showToast("✅ Withdrawal request submitted. Awaiting admin approval.", "success");
-    if (el.confirmationModal) el.confirmationModal.classList.remove("visible");
+    el.confirmationModal?.classList.remove("visible");
     if (el.walletAddressInput) el.walletAddressInput.value = "";
     if (withdrawalAmountInput) withdrawalAmountInput.value = "";
-
-    calculatedRewards.withdrawable = Math.max(0, calculatedRewards.withdrawable - amountVal);
-    calculatedRewards.pendingAmount += amountVal;
-    calculatedRewards.currentStatus = "pending";
-
-    updateUI();
-    syncOfferData(currentUserId);
-
+    amountPrefilled = false;
+    // listener अपने आप UI अपडेट कर देगा
   } catch (err) {
     console.error(err);
     showToast("❌ " + (err.message || "Withdrawal failed."), "error");
@@ -646,7 +676,7 @@ async function handleLogout() {
     stopAutoSync();
     await signOut(auth);
     window.location.href = "login.html";
-  } catch (e) { showToast("Logout error", "error"); }
+  } catch { showToast("Logout error", "error"); }
 }
 
 function setupListeners() {
@@ -659,6 +689,10 @@ function setupListeners() {
   el.confirmCancel?.addEventListener("click", () => el.confirmationModal?.classList.remove("visible"));
   el.confirmationModal?.addEventListener("click", (e) => { if (e.target === el.confirmationModal) el.confirmationModal.classList.remove("visible"); });
   el.confirmSubmit?.addEventListener("click", submitWithdrawal);
+  // tab वापस खुलने पर (ACTIVE में) ताज़ा गिनती
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && currentUserId && getCampaignStatus() === "ACTIVE") syncRewards(currentUserId);
+  });
 }
 
 const AUTH_TIMEOUT_MS = 10000;
@@ -675,14 +709,23 @@ onAuthStateChanged(auth, async (user) => {
   clearTimeout(authTimeoutHandle);
 
   if (!user) { window.location.href = "login.html"; return; }
+  if (booted) return;          // दोबारा boot होने पर listeners दुगने न हों
+  booted = true;
   currentUserId = user.uid;
 
-  renderRewardsTable();
-  setupListeners();
-  startCountdown();
-  startAutoSync(user.uid);
-
-  if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");
+  try {
+    await initServerTime();
+    renderRewardsTable();
+    setupListeners();
+    await loadProfile(user.uid);
+    startCountdown();
+    startAutoSync(user.uid);
+  } catch (e) {
+    console.error(e);
+    showToast("Failed to load data. Please refresh.", "error");
+  } finally {
+    el.loadingOverlay?.classList.add("hidden");
+  }
 });
 
 window.addEventListener("beforeunload", () => {

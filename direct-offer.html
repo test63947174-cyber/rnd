@@ -1,274 +1,431 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<meta name="theme-color" content="#0a0414"/>
-<meta name="color-scheme" content="dark"/>
-<title>🎁 Bumper Referral Offer — RND Stake</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/>
-
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="direct-offer.css"/>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bumper Referral Offer — Admin Panel</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { color-scheme: dark; --bg: #080e1a; --panel: #132237; --line: #263b58; --muted: #93a4bd; }
+* { box-sizing: border-box; font-family: Inter, system-ui, sans-serif; }
+body { margin: 0; background: var(--bg); color: #edf3ff; min-height: 100vh; }
+.navbar-custom { background: #0b1424; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
+.wrap { max-width: 1700px; margin: auto; padding: 24px 16px; }
+.panel, .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 20px; }
+.stat { height: 100%; text-align: center; }
+.stat-num { font-weight: 800; font-size: clamp(1.2rem, 2vw, 2rem); overflow-wrap: anywhere; }
+.stat-label { color: var(--muted); font-size: .8rem; margin-top: 5px; }
+.section-title { font-size: 1.05rem; font-weight: 800; border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 14px; }
+.table-responsive { max-height: 65vh; overflow-x: auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.table-responsive > .table { min-width: 1200px; }
+.table-responsive > .table td, .table-responsive > .table th { white-space: nowrap; }
+.table-responsive > .table td:first-child { white-space: normal; min-width: 150px; }
+.table { --bs-table-bg: transparent; --bs-table-color: #edf3ff; --bs-table-border-color: var(--line); margin: 0; }
+.table thead th { position: sticky; top: 0; background: #14243a; color: #b9c8df; white-space: nowrap; z-index: 1; font-size: .78rem; }
+.table td { vertical-align: middle; font-size: .82rem; }
+.muted, .small-note { color: var(--muted); }
+.small-note { font-size: .78rem; }
+.mono { font-family: ui-monospace, monospace !important; overflow-wrap: anywhere; }
+.wallet { max-width: 270px; display: inline-block; white-space: normal; word-break: break-all; color: #8dc5ff; }
+.status { display: inline-block; border-radius: 30px; padding: 4px 10px; font-size: .75rem; font-weight: 700; text-transform: capitalize; }
+.status-pending { background: #624d1d; color: #ffd66b; }
+.status-approved { background: #173f31; color: #70e6a7; }
+.status-paid { background: #153e52; color: #79d7ff; }
+.status-rejected { background: #54272d; color: #ff9ca6; }
+.status-failed { background: #3a2b2b; color: #ffb3b3; }
+.form-control, .form-select { background: #0c1728; color: #edf3ff; border-color: #304560; }
+.form-control:focus, .form-select:focus { background: #0c1728; color: white; border-color: #4b91e2; box-shadow: none; }
+.btn-sm { white-space: nowrap; }
+.error-box { white-space: pre-wrap; display: none; }
+.loading-screen { display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.2rem; color: var(--muted); }
+.badge-soft { background: #1c2f49; color: #b9c8df; font-weight: 600; }
+@media (max-width: 576px) { .wrap { padding: 14px 10px; } .panel, .stat { padding: 13px; } .table-responsive > .table { min-width: 1200px; } }
+</style>
 </head>
-<body class="offer-body">
+<body>
 
-<div id="loadingOverlay">
-  <div class="loader-spinner"></div>
-  <div class="loader-text">Loading your offer…</div>
-</div>
-<div id="toastContainer" role="status" aria-live="polite"></div>
-
-<!-- POPUP -->
-<div class="days-remaining-popup" id="daysPopup" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
-  <div class="popup-content">
-    <span class="popup-icon" id="popupIcon">🎁</span>
-    <div class="popup-title" id="popupTitle">Withdrawal Not Available Yet</div>
-    <div class="popup-text" id="popupText">
-      Your Offer Balance is <strong>$<span id="popupRewardAmount">0</span></strong> USDT.
-      <br><br>Withdrawals unlock after the campaign ends.
-      <br><br>
-      <span style="color:#94a3b8;font-size:0.9rem;">Time remaining:</span>
-      <div class="popup-days" id="popupDaysRemaining">0</div>
-      <span style="color:#64748b;font-size:0.85rem;">until withdrawal opens</span>
-    </div>
-    <button type="button" class="popup-close-btn" id="popupCloseBtn">Got it!</button>
+<div id="loadingScreen" class="loading-screen">
+  <div class="text-center">
+    <div class="spinner-border text-success mb-3" role="status"></div>
+    <div>Checking authentication...</div>
   </div>
 </div>
 
-<!-- MODAL -->
-<div class="confirmation-overlay" id="confirmationModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
-  <div class="modal-content">
-    <span class="modal-icon">⚠️</span>
-    <div class="modal-title" id="confirmTitle">Confirm Withdrawal</div>
-    <div class="modal-details" id="confirmDetails">
-      <div class="row"><span class="label">Network</span><span class="value">BEP-20 / BNB Smart Chain</span></div>
-      <div class="row"><span class="label">Amount</span><span class="value warning" id="confirmAmount">$0.00 USDT</span></div>
-      <div class="row"><span class="label">Wallet Address</span><span class="value" id="confirmWallet">0x...</span></div>
-    </div>
-    <div class="modal-warning">
-      <i class="bi bi-exclamation-triangle me-1"></i>
-      Verify your wallet address. BEP-20 transactions are irreversible.
-    </div>
-    <div class="modal-buttons">
-      <button type="button" class="btn-cancel" id="confirmCancel">Cancel</button>
-      <button type="button" class="btn-confirm" id="confirmSubmit"><i class="bi bi-check-circle me-1"></i>Confirm Withdrawal</button>
-    </div>
-  </div>
-</div>
-
-<nav class="navbar-custom" aria-label="Main navigation">
-  <div class="container">
-    <div class="nav-inner">
-      <a href="dashboard.html" class="brand">
-        RND<span>Stake</span>
-        <small>Bumper Referral Offer</small>
+<div id="mainContent" style="display: none;">
+  <nav class="navbar navbar-custom py-3">
+    <div class="container-fluid px-3 d-flex justify-content-between gap-3 flex-wrap">
+      <a class="navbar-brand text-white fw-bold text-decoration-none" href="index.html">
+        <i class="bi bi-arrow-left me-2"></i>Main Admin
       </a>
-      <div class="nav-right">
-        <a href="dashboard.html" class="nav-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
-        <a href="direct-offer.html" class="nav-link active" aria-current="page"><i class="bi bi-fire"></i>Direct Offer</a>
-        <div class="user-badge" id="userBadge">
-          <div class="avatar" id="userAvatar">U</div>
-          <span class="name" id="userName">Loading...</span>
-          <button type="button" class="logout-btn" id="logoutBtn" title="Logout" aria-label="Logout"><i class="bi bi-box-arrow-right"></i></button>
+      <div class="fw-bold text-success">
+        <i class="bi bi-gift me-2"></i>Bumper Referral Offer Admin
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span id="liveStatus" class="small-note">Connecting...</span>
+        <button id="refreshBtn" class="btn btn-outline-info btn-sm">
+          <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <div id="pageError" class="alert alert-warning error-box"></div>
+    <div class="small-note mb-3">
+      Campaign: <strong>Bumper Referral Offer 2026</strong> · Live Firebase data
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-xl-3">
+        <div class="stat">
+          <div id="earningUsers" class="stat-num text-info">—</div>
+          <div class="stat-label">Total Claimed Users</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="stat">
+          <div id="rewardsGenerated" class="stat-num text-success">$0.00</div>
+          <div class="stat-label">Total Rewards Generated</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="stat">
+          <div id="pendingCount" class="stat-num text-warning">0</div>
+          <div class="stat-label">Pending Withdrawals</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="stat">
+          <div id="paidTotal" class="stat-num text-primary">$0.00</div>
+          <div class="stat-label">Actually Paid (USDT)</div>
         </div>
       </div>
     </div>
-  </div>
-</nav>
 
-<div class="main-content offer-main">
-  <section class="offer-hero">
-    <div class="grid-layer"></div>
-    <div class="glow-orb orb-1"></div>
-    <div class="glow-orb orb-2"></div>
-    <div class="glow-orb orb-3"></div>
-
-    <div class="hero-inner">
-      <span class="offer-badge"><i class="bi bi-stars"></i> Limited Time Referral Bonus</span>
-      <h1 class="offer-title" id="campaignTitle">🎁 BUMPER REFERRAL OFFER 🚀</h1>
-      <p class="offer-subtitle">INVITE • EARN • WITHDRAW</p>
-      <p class="offer-dates">
-        <i class="bi bi-calendar-event"></i>
-        <span id="campaignDates">20 Nov – 25 Nov 2026</span>
-        <span class="duration-pill" id="campaignDuration">6 Days Only</span>
-      </p>
-      <div id="campaignStatusBadge" class="mt-3"></div>
-
-      <div id="countdownContainer">
-        <div class="countdown-wrapper" id="countdownWrapper">
-          <div class="countdown-item"><div class="number" id="countdownDays">00</div><div class="label">Days</div></div>
-          <div class="countdown-item"><div class="number" id="countdownHours">00</div><div class="label">Hours</div></div>
-          <div class="countdown-item"><div class="number" id="countdownMinutes">00</div><div class="label">Minutes</div></div>
-          <div class="countdown-item"><div class="number" id="countdownSeconds">00</div><div class="label">Seconds</div></div>
-        </div>
-        <div id="campaignEndedMessage" style="display:none;">
-          <span class="campaign-ended-text"><i class="bi bi-clock-history"></i> The Bumper Referral Offer has ended.</span>
+    <!-- User Claims Breakdown -->
+    <section class="panel">
+      <div class="section-title"><i class="bi bi-people-fill text-success me-2"></i>Users With Claims</div>
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <input id="earningsSearch" class="form-control" placeholder="Search referrer name, username, UID...">
         </div>
       </div>
-    </div>
-  </section>
-
-  <section class="reward-wallet-card" id="rewardWalletCard">
-    <span class="wallet-icon-big">💎</span>
-    <div class="wallet-label" id="walletLabel">Your Offer Balance</div>
-    <div class="wallet-amount">
-      $<span id="walletAmount">0.00</span> <span class="currency">USDT</span>
-      <span class="final-badge" id="finalBadge" style="display:none;">✓ FINAL</span>
-    </div>
-    <div class="wallet-sub" id="walletStatusText">Get your direct referrals to buy eligible packages and grow your reward balance!</div>
-  </section>
-
-  <section class="stats-grid" id="statsGrid">
-    <div class="stat-card">
-      <div class="number green" id="statEligibleIds">0</div>
-      <div class="label">Eligible Direct Purchases</div>
-      <div class="sub">Counted per ID purchase</div>
-    </div>
-    <div class="stat-card">
-      <div class="number gold" id="statEligibleReward">$0</div>
-      <div class="label">Total Offer Rewards</div>
-      <div class="sub" id="statRewardNote">Sum of all eligible IDs</div>
-    </div>
-    <div class="stat-card">
-      <div class="number blue" id="statWithdrawable">$0</div>
-      <div class="label">Withdrawable (after end)</div>
-      <div class="sub" id="statWithdrawNote">Available after offer ends</div>
-    </div>
-    <div class="stat-card">
-      <div class="number purple" id="statPaid">$0</div>
-      <div class="label">Already Paid</div>
-      <div class="sub">Verified USDT transfers</div>
-    </div>
-  </section>
-
-  <section class="offer-section">
-    <h2 class="section-title"><i class="bi bi-table"></i> Reward Structure</h2>
-    <div class="rewards-table-wrap">
-      <table class="rewards-table">
-        <thead>
-          <tr>
-            <th scope="col">Package Amount (USDT)</th>
-            <th scope="col">Reward Per Qualified ID</th>
-          </tr>
-        </thead>
-        <tbody id="rewardsTableBody">
-          <!-- Rendered by JS -->
-        </tbody>
-      </table>
-    </div>
-    <p class="table-note">
-      <i class="bi bi-info-circle"></i>
-      Every eligible ID is rewarded separately. No single-ID limit.
-    </p>
-  </section>
-
-  <section class="offer-section">
-    <h2 class="section-title"><i class="bi bi-lightbulb"></i> How It Works</h2>
-    <div class="how-grid">
-      <div class="how-step">
-        <div class="step-num">1</div>
-        <h5>Share Your Link</h5>
-        <p>Send your unique referral link to friends and followers.</p>
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Referrer Name</th>
+              <th>Username</th>
+              <th>Referrer UID</th>
+              <th>Total Packages</th>
+              <th>Total Reward Earned</th>
+            </tr>
+          </thead>
+          <tbody id="earningsBody">
+            <tr><td colspan="5" class="text-center muted py-4">Loading...</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="how-step">
-        <div class="step-num">2</div>
-        <h5>Referral Buys Package</h5>
-        <p>Your direct referral purchases any eligible package.</p>
+    </section>
+
+    <!-- Withdrawals -->
+    <section class="panel">
+      <div class="section-title"><i class="bi bi-wallet2 text-success me-2"></i>Withdrawal Requests</div>
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <input id="withdrawalSearch" class="form-control" placeholder="Search name, UID, withdrawal ID, wallet...">
+        </div>
+        <div class="col-md-6">
+          <select id="withdrawalStatusFilter" class="form-select">
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
       </div>
-      <div class="how-step">
-        <div class="step-num">3</div>
-        <h5>Instant Bonus</h5>
-        <p>Reward is added instantly to your Offer Balance.</p>
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>User UID</th>
+              <th>Amount</th>
+              <th>Requested At</th>
+              <th>Full USDT Wallet Address</th>
+              <th>Status</th>
+              <th>Admin Actions</th>
+            </tr>
+          </thead>
+          <tbody id="withdrawalsBody">
+            <tr><td colspan="7" class="text-center muted py-4">Loading...</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="how-step">
-        <div class="step-num">4</div>
-        <h5>Withdraw After Offer Ends</h5>
-        <p>Withdraw the full accumulated balance once the campaign ends.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="offer-section">
-    <h2 class="section-title"><i class="bi bi-receipt"></i> My Earnings Breakdown</h2>
-    <div class="breakdown-grid" id="breakdownGrid">
-      <div class="breakdown-card"><div class="bd-label">$50 – $99</div><div class="bd-count" id="bdCount50">0</div><div class="bd-reward">$<span id="bdReward50">0</span></div></div>
-      <div class="breakdown-card"><div class="bd-label">$100 – $199</div><div class="bd-count" id="bdCount100">0</div><div class="bd-reward">$<span id="bdReward100">0</span></div></div>
-      <div class="breakdown-card"><div class="bd-label">$200 – $499</div><div class="bd-count" id="bdCount200">0</div><div class="bd-reward">$<span id="bdReward200">0</span></div></div>
-      <div class="breakdown-card"><div class="bd-label">$500 – $999</div><div class="bd-count" id="bdCount500">0</div><div class="bd-reward">$<span id="bdReward500">0</span></div></div>
-      <div class="breakdown-card highlight"><div class="bd-label">$1,000+</div><div class="bd-count" id="bdCount1000">0</div><div class="bd-reward">$<span id="bdReward1000">0</span></div></div>
-    </div>
-  </section>
-
-  <section class="offer-section withdrawal-section" id="withdrawalSection">
-    <h2 class="section-title"><i class="bi bi-credit-card"></i> 🎁 Offer Reward Withdrawal</h2>
-    <div class="subtitle" id="withdrawalSubtitle">Withdrawals will unlock after the campaign ends.</div>
-
-    <div class="reward-amount-display">
-      <span class="label">Your Offer Balance</span>
-      <span class="amount" id="withdrawAmount">$0.00 USDT</span>
-    </div>
-
-    <div id="withdrawalInfoBox" class="withdrawal-info-box">
-      <span id="withdrawalInfoText"></span>
-    </div>
-
-    <div class="withdrawal-details" id="withdrawalDetails">
-      <div class="detail-row"><span class="key">Amount</span><span class="value" id="detailAmount">$0.00 USDT</span></div>
-      <div class="detail-row"><span class="key">Network</span><span class="value">BEP-20 / BNB Smart Chain</span></div>
-      <div class="detail-row"><span class="key">Wallet</span><span class="value" id="detailWallet">---</span></div>
-      <div class="detail-row"><span class="key">Paid Date</span><span class="value" id="detailPaidDate">---</span></div>
-      <div class="detail-row"><span class="key">TX Hash</span><span class="value tx-hash" id="detailTxHash">---</span></div>
-    </div>
-
-    <div class="form-group" id="walletFormGroup">
-      <label for="walletAddressInput">
-        <i class="bi bi-wallet2 me-1"></i> USDT BEP-20 Wallet Address
-        <span class="network-badge ms-2">BNB Smart Chain (BEP-20)</span>
-      </label>
-      <input type="text" class="form-control-custom" id="walletAddressInput"
-             placeholder="Enter your BEP-20 USDT wallet address (0x...)"
-             autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="walletValidationMsg"/>
-      <div class="wallet-validation-msg" id="walletValidationMsg"></div>
-      <div class="warning-text">
-        <i class="bi bi-exclamation-triangle me-1"></i>
-        Sending to an unsupported network/address may result in loss of funds.
-      </div>
-    </div>
-
-    <button type="button" class="btn-withdraw" id="withdrawBtn" disabled><i class="bi bi-arrow-up-right me-2"></i>Withdraw Offer Reward</button>
-    <div class="withdrawal-status" id="withdrawalStatus"></div>
-  </section>
-
-  <section class="offer-section notice-section">
-    <h2 class="section-title"><i class="bi bi-shield-check"></i> Offer Terms</h2>
-    <ul class="offer-rules">
-      <li>Rewards are calculated <strong>per eligible ID</strong> across all five tiers.</li>
-      <li>Rewards are credited automatically upon verified referral purchase confirmation.</li>
-      <li>Duplicate transactions for the same purchase are blocked server-side.</li>
-      <li>Offer rewards are tracked separately from regular referral commissions.</li>
-      <li>Withdrawals unlock <strong>after the campaign ends on 25 Nov 2026</strong>.</li>
-      <li>New offer reward accruals stop automatically at campaign end.</li>
-      <li>All campaign dates use Indian Standard Time (IST).</li>
-    </ul>
-  </section>
+    </section>
+  </main>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-    "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+// 🔴 TESTING FIREBASE (rwebsite-e031b)
+const firebaseConfig = {
+  apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+  authDomain: "rwebsite-e031b.firebaseapp.com",
+  databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rwebsite-e031b",
+  storageBucket: "rwebsite-e031b.firebasestorage.app",
+  messagingSenderId: "376966041558",
+  appId: "1:376966041558:web:02bc9062ec182590275e77",
+  measurementId: "G-0T1FREXHD3"
+};
+
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+const CAMPAIGN_ID = "bumper_referral_offer_2026";
+
+let allUsers = {};
+let purchases = {};
+let withdrawals = {};
+let listenersStarted = false;
+
+const $ = id => document.getElementById(id);
+const money = n => "$" + (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const fmtDate = ms => ms ? new Date(Number(ms)).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—";
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    $("loadingScreen").style.display = "none";
+    $("mainContent").style.display = "block";
+    startListeners();
+  } else {
+    $("loadingScreen").innerHTML = `<div class="text-danger text-center px-3">Access Denied. Please login through the main admin panel.</div>`;
+  }
+});
+
+function startListeners() {
+  if (listenersStarted) return;
+  listenersStarted = true;
+  $("liveStatus").textContent = "Connecting...";
+
+  onValue(ref(db, "users"), snapshot => {
+    allUsers = snapshot.val() || {};
+    renderAll();
+  }, error => showError("Could not read users: " + error.message));
+
+  onValue(ref(db, `${CAMPAIGN_ID}/purchases`), snapshot => {
+    purchases = snapshot.val() || {};
+    renderAll();
+  }, error => showError("Could not read purchases: " + error.message));
+
+  onValue(ref(db, `${CAMPAIGN_ID}/withdrawals`), snapshot => {
+    withdrawals = snapshot.val() || {};
+    renderAll();
+  }, error => showError("Could not read withdrawals: " + error.message));
+}
+
+function showError(message) {
+  const el = $("pageError");
+  el.style.display = "block";
+  el.textContent = message;
+}
+
+function getUser(uid) { return allUsers[uid] || {}; }
+
+function displayName(uid, fallback = "") {
+  const user = getUser(uid);
+  return user.name || user.fullName || user.username || fallback || "Unknown user";
+}
+
+function purchaseRows() {
+  return Object.entries(purchases)
+    .map(([id, p]) => ({ id, ...(p || {}) }))
+    .filter(p => p.directReferrerUid && p.status !== "rejected");
+}
+
+function earningsByReferrer() {
+  const groups = {};
+  for (const p of purchaseRows()) {
+    const uid = String(p.directReferrerUid);
+    const reward = Number(p.rewardAmount) || 0;
+    if (!groups[uid]) groups[uid] = { uid, total: 0, packages: 0, tierBreakdown: {} };
+    groups[uid].total += reward;
+    groups[uid].packages++;
+    const tk = String(p.tierKey || "—");
+    groups[uid].tierBreakdown[tk] = (groups[uid].tierBreakdown[tk] || 0) + 1;
+  }
+  return Object.values(groups).sort((a, b) => b.total - a.total);
+}
+
+function renderAll() {
+  const rows = purchaseRows();
+  const groups = earningsByReferrer();
+  const totalReward = rows.reduce((sum, p) => sum + (Number(p.rewardAmount) || 0), 0);
+
+  $("earningUsers").textContent = groups.length.toLocaleString();
+  $("rewardsGenerated").textContent = money(totalReward);
+
+  renderEarnings(groups);
+  renderWithdrawals();
+  $("liveStatus").textContent = "● Live connected";
+}
+
+function renderEarnings(groups) {
+  const query = $("earningsSearch").value.trim().toLowerCase();
+  const filtered = groups.filter(g => {
+    const user = getUser(g.uid);
+    const hay = [g.uid, user.name, user.fullName, user.username, user.email].join(" ").toLowerCase();
+    return (!query || hay.includes(query));
+  });
+
+  $("earningsBody").innerHTML = filtered.length ? filtered.map(g => {
+    const user = getUser(g.uid);
+    const tiers = Object.entries(g.tierBreakdown).map(([k, v]) => `<span class="badge badge-soft me-1">$${k}: ${v}</span>`).join("");
+    return `
+      <tr>
+        <td><strong>${esc(displayName(g.uid))}</strong><div class="muted">${esc(user.email || "")}</div></td>
+        <td>${esc(user.username || "—")}</td>
+        <td class="mono">${esc(g.uid)}</td>
+        <td><span class="badge bg-secondary">${g.packages}</span> <div class="mt-1">${tiers}</div></td>
+        <td class="text-success fw-bold fs-6">${money(g.total)}</td>
+      </tr>
+    `;
+  }).join("") : `<tr><td colspan="5" class="text-center muted py-4">No matching users found.</td></tr>`;
+}
+
+function renderWithdrawals() {
+  const entries = Object.entries(withdrawals)
+    .map(([id, w]) => ({ id, ...(w || {}) }))
+    .sort((a, b) => (Number(b.requestedAt) || 0) - (Number(a.requestedAt) || 0));
+
+  let pending = 0, paid = 0;
+  entries.forEach(w => {
+    const amount = Number(w.amount) || 0;
+    const status = String(w.status || "pending").toLowerCase();
+    if (status === "pending") pending++;
+    else if (status === "paid") paid += amount;
+  });
+
+  $("pendingCount").textContent = pending;
+  $("paidTotal").textContent = money(paid);
+
+  const query = $("withdrawalSearch").value.trim().toLowerCase();
+  const filter = $("withdrawalStatusFilter").value;
+  const filtered = entries.filter(w => {
+    const user = getUser(w.userId || "");
+    const hay = [w.userId, w.username, w.withdrawalId, w.walletAddress, user.name, user.username].join(" ").toLowerCase();
+    return (!query || hay.includes(query)) && (filter === "all" || String(w.status || "pending").toLowerCase() === filter);
+  });
+
+  $("withdrawalsBody").innerHTML = filtered.length ? filtered.map(w => {
+    const uid = w.userId || "";
+    const user = getUser(uid);
+    const status = String(w.status || "pending").toLowerCase();
+    const wallet = String(w.walletAddress || "");
+    let actions = "";
+    if (status === "pending") {
+      actions = `
+        <button class="btn btn-success btn-sm me-1" onclick="approveWithdrawal('${w.id}')">Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="rejectWithdrawal('${w.id}')">Reject</button>`;
+    } else if (status === "approved") {
+      actions = `<button class="btn btn-primary btn-sm" onclick="markAsPaid('${w.id}')">Mark as Paid</button>`;
+    } else {
+      actions = `<span class="muted">Done</span>`;
+    }
+    return `
+      <tr>
+        <td><strong>${esc(displayName(uid, w.username))}</strong><div class="muted">${esc(w.email || user.email || "")}</div></td>
+        <td class="mono">${esc(uid)}</td>
+        <td class="text-warning fw-bold">${money(w.amount)} USDT</td>
+        <td>${fmtDate(w.requestedAt)}</td>
+        <td>
+          <div class="wallet mono">${esc(wallet || "No wallet address")}</div>
+          <div class="mt-1 d-flex gap-1 flex-wrap">
+            <button class="btn btn-outline-info btn-sm" onclick="copyAddress('${esc(wallet)}')"><i class="bi bi-clipboard me-1"></i>Copy</button>
+            <a class="btn btn-outline-light btn-sm" target="_blank" href="https://bscscan.com/address/${esc(wallet)}"><i class="bi bi-box-arrow-up-right me-1"></i>BscScan</a>
+          </div>
+        </td>
+        <td><span class="status status-${status}">${status}</span></td>
+        <td>${actions}</td>
+      </tr>`;
+  }).join("") : `<tr><td colspan="7" class="text-center muted py-4">No withdrawal requests match this filter.</td></tr>`;
+}
+
+// ✅ सिंपल और सटीक अपडेट फंक्शन (बिना permission_denied)
+async function updateWithdrawalStatus(withdrawalId, newStatus) {
+  const w = withdrawals[withdrawalId];
+  if (!w) return alert("Withdrawal not found!");
+  const uid = w.userId;
+  const now = Date.now();
+  const updates = {};
+
+  // 1. मुख्य विड्रॉल नोड
+  updates[`${CAMPAIGN_ID}/withdrawals/${withdrawalId}/status`] = newStatus;
+  updates[`${CAMPAIGN_ID}/withdrawals/${withdrawalId}/updatedAt`] = now;
+  
+  // 2. यूज़र का विड्रॉल स्टेटस (सिर्फ यही अपडेट करने की ज़रूरत है ताकि यूज़र को दिखे)
+  updates[`${CAMPAIGN_ID}/user_withdrawals/${uid}/${withdrawalId}/status`] = newStatus;
+  updates[`${CAMPAIGN_ID}/user_withdrawals/${uid}/${withdrawalId}/updatedAt`] = now;
+
+  // 3. अगर Paid हो रहा है तो txHash डालें
+  let txHash = null;
+  if (newStatus === "paid") {
+    txHash = prompt("Please enter the USDT Transaction Hash (TxHash):");
+    if (!txHash) return alert("Cancelled. TxHash is required.");
+    
+    updates[`${CAMPAIGN_ID}/withdrawals/${withdrawalId}/paidAt`] = now;
+    updates[`${CAMPAIGN_ID}/withdrawals/${withdrawalId}/txHash`] = txHash;
+    updates[`${CAMPAIGN_ID}/user_withdrawals/${uid}/${withdrawalId}/paidAt`] = now;
+    updates[`${CAMPAIGN_ID}/user_withdrawals/${uid}/${withdrawalId}/txHash`] = txHash;
+  }
+
+  try {
+    await update(ref(db), updates);
+    alert(`✅ Status updated to ${newStatus.toUpperCase()} successfully!`);
+  } catch (e) {
+    console.error(e);
+    alert("❌ Error updating status: " + e.message);
   }
 }
-</script>
 
-<script type="module" src="direct-offer.js"></script>
+window.copyAddress = function(wallet) {
+  if (!wallet || wallet === "undefined") return alert("No address to copy");
+  navigator.clipboard.writeText(wallet);
+  alert("✅ Full wallet address copied!");
+};
+
+window.approveWithdrawal = async function(id) {
+  if (!confirm("Are you sure you want to APPROVE this withdrawal?")) return;
+  await updateWithdrawalStatus(id, "approved");
+};
+
+window.rejectWithdrawal = async function(id) {
+  if (!confirm("Are you sure you want to REJECT this withdrawal?")) return;
+  await updateWithdrawalStatus(id, "rejected");
+};
+
+window.markAsPaid = async function(id) {
+  if (!confirm("Have you sent the USDT? Mark as PAID?")) return;
+  await updateWithdrawalStatus(id, "paid");
+};
+
+$("earningsSearch")?.addEventListener("input", () => renderEarnings(earningsByReferrer()));
+$("withdrawalSearch")?.addEventListener("input", renderWithdrawals);
+$("withdrawalStatusFilter")?.addEventListener("change", renderWithdrawals);
+$("refreshBtn")?.addEventListener("click", () => {
+  renderAll();
+  $("liveStatus").textContent = "● Refreshed";
+  setTimeout(() => { $("liveStatus").textContent = "● Live connected"; }, 1500);
+});
+</script>
 </body>
 </html>

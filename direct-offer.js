@@ -1,7 +1,7 @@
 // ============================================================
 // direct-offer  (v2 - fixed & cost optimised)
 // File: direct-offer.js
-// 🔴 LIVE DATES: 20 Nov → 25 Nov 2026 (IST)
+// 🟢 TESTING MODE: Offer ENDED (Withdrawal Open)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
@@ -27,13 +27,14 @@ const auth = getAuth(app);
 const db   = getDatabase(app);
 
 // ============================================================
-// 🎯 CONFIG
+// 🎯 CONFIG (टेस्टिंग के लिए तुरंत विड्रॉल खोलने हेतु सेट)
 // ============================================================
 const CAMPAIGN = {
   id: "bumper_referral_offer_2026",
   name: "Bumper Referral Offer 2026",
-  startDate: new Date("2026-11-20T00:00:00+05:30"),
-  endDate:   new Date("2026-11-25T23:59:59.999+05:30"),
+  // 🔴 टेस्टिंग के लिए: कल से शुरू होकर आज ही खत्म हो गया मान लो
+  startDate: new Date("2026-11-16T00:00:00+05:30"),
+  endDate:   new Date("2026-11-17T18:00:00+05:30"), // आज शाम 6 बजे खत्म मान लिया
   tiers: [
     { min: 50,   max: 100,      reward: 10,  key: "50",   label: "$50 – $99"   },
     { min: 100,  max: 200,      reward: 20,  key: "100",  label: "$100 – $199" },
@@ -548,7 +549,7 @@ function validateWallet() {
 }
 
 function handleWithdrawClick() {
-  if (getCampaignStatus() !== "ENDED") { showToast("Withdrawals unlock after offer ends on 25 Nov.", "warning"); return; }
+  if (getCampaignStatus() !== "ENDED") { showToast("Withdrawals unlock after offer ends.", "warning"); return; }
 
   const avail = calculatedRewards.withdrawable;
   if (avail < MIN_WITHDRAW) { showToast("Nothing to withdraw.", "warning"); return; }

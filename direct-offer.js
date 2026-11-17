@@ -392,7 +392,6 @@ function updateWithdrawalUI(withdrawable, status) {
   const ws = String(calculatedRewards.currentStatus || "available").toLowerCase();
   const cw = calculatedRewards.currentWithdrawal;
   const blocked = ws === "pending" || ws === "approved";
-  // 🔓 टेस्टिंग के लिए: स्टेटस ACTIVE होने पर भी विड्रॉल खुला है
   const canWithdraw = withdrawable >= MIN_WITHDRAW && !blocked;
 
   injectWithdrawalInput();
@@ -490,7 +489,6 @@ function validateWallet() {
 }
 
 function handleWithdrawClick() {
-  // 🔓 टेस्टिंग के लिए: टाइमर चेक हटा दिया गया है
   const avail = calculatedRewards.withdrawable;
   if (avail < MIN_WITHDRAW) { showToast("Nothing to withdraw.", "warning"); return; }
   if (!validateWallet()) { showToast("Enter a valid BEP-20 wallet address.", "error"); return; }
@@ -514,7 +512,6 @@ async function submitWithdrawal() {
   const lockRef = ref(db, `${P}/rewards/${currentUserId}`);
 
   try {
-    // 🔓 टेस्टिंग के लिए: स्टेटस चेक हटा दिया गया है
     const addr = el.walletAddressInput?.value.trim() || "";
     if (!validateBEP20Wallet(addr)) { showToast("Invalid wallet.", "error"); return; }
 

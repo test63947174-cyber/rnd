@@ -1,26 +1,21 @@
 // ============================================================
-// RND STAKING - REGISTER.JS (v3 - low Firebase usage)
-// ============================================================
-// v2 की सारी खूबियाँ वैसी ही हैं। v3 में सिर्फ़ ये बदला:
-// ✅ Referrer / upline ढूँढते समय पूरा user node डाउनलोड नहीं होता,
-//    सिर्फ़ referralCode, referredBy, email (3 छोटे fields) पढ़े जाते हैं
-// ✅ पुराने short code / username वाली query में limitToFirst(1)
-// ⚠️ Firebase Rules में "usernames" नोड ज़रूरी है (इसी की वजह से permission_denied आ रहा था)
+// RND STAKING - REGISTER.JS (v4 - Testing Firebase: rwebsite-e031b)
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, updateProfile, deleteUser } from "firebase/auth";
-import { getDatabase, ref, get, update, query, orderByChild, equalTo, limitToFirst, increment } from "firebase/database";
+import { getDatabase, ref, get, update, query, orderByChild, equalTo, increment } from "firebase/database";
 
+// 🔴 TESTING FIREBASE (rwebsite-e031b) — live पर जाने से पहले बदलना
 const firebaseConfig = {
-    apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
-    authDomain: "rwebsite-e031b.firebaseapp.com",
-    databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "rwebsite-e031b",
-    storageBucket: "rwebsite-e031b.firebasestorage.app",
-    messagingSenderId: "376966041558",
-    appId: "1:376966041558:web:02bc9062ec182590275e77",
-    measurementId: "G-0T1FREXHD3"
+  apiKey: "AIzaSyDsuqsmiwIG3Ey57MR19tr_8wJQRQ3_W64",
+  authDomain: "rwebsite-e031b.firebaseapp.com",
+  databaseURL: "https://rwebsite-e031b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rwebsite-e031b",
+  storageBucket: "rwebsite-e031b.firebasestorage.app",
+  messagingSenderId: "376966041558",
+  appId: "1:376966041558:web:02bc9062ec182590275e77",
+  measurementId: "G-0T1FREXHD3"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -30,7 +25,7 @@ const db = getDatabase(app);
 const MAX_LEVELS = 5;
 
 // ============================================================
-// TOAST SYSTEM (innerHTML में user text नहीं डालते)
+// TOAST SYSTEM
 // ============================================================
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
@@ -94,6 +89,39 @@ function appError(code, message) {
 }
 
 // ============================================================
+// PASSWORD TOGGLE
+// ============================================================
+const togglePassword = document.getElementById('togglePassword');
+if (togglePassword) {
+    togglePassword.addEventListener('click', function () {
+        const input = document.getElementById('regPassword');
+        const icon = this.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    });
+}
+
+const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+if (toggleConfirmPassword) {
+    toggleConfirmPassword.addEventListener('click', function () {
+        const input = document.getElementById('regConfirmPassword');
+        const icon = this.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    });
+}
+
+// ============================================================
 // REFERRAL FROM URL
 // ============================================================
 let referralCodeFromURL = '';
@@ -121,45 +149,39 @@ document.getElementById('regRef').addEventListener('input', function () {
 });
 
 // ============================================================
-// REFERRER LOOKUP (हल्का: पूरा node नहीं, सिर्फ़ ज़रूरी fields)
-// - मिल गया   => { uid, data: { referralCode, referredBy } }
-// - नहीं मिला => null
-// - network/permission error => THROW
+// REFERRER LOOKUP
 // ============================================================
 async function resolveUser(identifier) {
     const id = (identifier || '').trim();
     if (!id) return null;
 
-    // 1) सीधे UID से — सिर्फ़ 3 छोटे fields
     if (isValidFirebaseKey(id)) {
-        const [codeS, byS, emailS] = await Promise.all([
-            get(ref(db, `users/${id}/referralCode`)),
-            get(ref(db, `users/${id}/referredBy`)),
-            get(ref(db, `users/${id}/email`))
-        ]);
-        if (codeS.exists() || byS.exists() || emailS.exists()) {
-            return { uid: id, data: { referralCode: codeS.val() || '', referredBy: byS.val() || '' } };
+        const snap = await get(ref(db, 'users/' + id));
+        if (snap.exists()) {
+            return { uid: id, data: snap.val() };
         }
     }
 
     const usersRef = ref(db, 'users');
 
-    // 2) referralCode (पुराने short codes)
     const codeCandidates = [id];
     if (id.toUpperCase() !== id) codeCandidates.push(id.toUpperCase());
     for (const code of codeCandidates) {
-        const snap = await get(query(usersRef, orderByChild('referralCode'), equalTo(code), limitToFirst(1)));
+        const snap = await get(query(usersRef, orderByChild('referralCode'), equalTo(code)));
         if (snap.exists()) {
-            const [uid, node] = Object.entries(snap.val())[0];
-            return { uid, data: { referralCode: node.referralCode || '', referredBy: node.referredBy || '' } };
+            const found = snap.val();
+            const uids = Object.keys(found);
+            if (uids.length > 1) console.warn('⚠️ Duplicate referralCode:', code, uids);
+            return { uid: uids[0], data: found[uids[0]] };
         }
     }
 
-    // 3) username
-    const unameSnap = await get(query(usersRef, orderByChild('username'), equalTo(id), limitToFirst(1)));
+    const unameSnap = await get(query(usersRef, orderByChild('username'), equalTo(id)));
     if (unameSnap.exists()) {
-        const [uid, node] = Object.entries(unameSnap.val())[0];
-        return { uid, data: { referralCode: node.referralCode || '', referredBy: node.referredBy || '' } };
+        const found = unameSnap.val();
+        const uids = Object.keys(found);
+        if (uids.length > 1) console.warn('⚠️ Duplicate username:', id, uids);
+        return { uid: uids[0], data: found[uids[0]] };
     }
 
     return null;
@@ -202,13 +224,33 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     const name = sanitizeName(document.getElementById('regName').value);
     const email = document.getElementById('regEmail').value.trim().toLowerCase();
     const pass = document.getElementById('regPassword').value;
+    const confirmPass = document.getElementById('regConfirmPassword').value;
     const typedRef = extractRefCode(document.getElementById('regRef').value);
     const registerBtn = document.getElementById('registerBtn');
 
-    if (!name || name.length < 2) { showToast('❌ Please enter your full name', 'error'); return; }
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) { showToast('❌ Please enter a valid email address', 'error'); return; }
-    if (pass.length < 6) { showToast('❌ Password must be at least 6 characters long!', 'error'); return; }
+    // ---------- VALIDATIONS ----------
+    if (!name || name.length < 2) {
+        showToast('❌ Please enter your full name', 'error');
+        return;
+    }
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+        showToast('❌ Please enter a valid email address', 'error');
+        return;
+    }
 
+    // Strong Password Validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(pass)) {
+        showToast('❌ Password must be at least 8 characters, include 1 uppercase, 1 lowercase, 1 number, and 1 special character (@#$% etc.)', 'error');
+        return;
+    }
+
+    if (pass !== confirmPass) {
+        showToast('❌ Passwords do not match!', 'error');
+        return;
+    }
+
+    // ---------- REGISTRATION PROCESS ----------
     isSubmitting = true;
     registerBtn.disabled = true;
     registerBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating Account...';
@@ -216,7 +258,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     let createdUser = null;
 
     try {
-        // 1. Firebase Auth में account
+        // 1. Firebase Auth में account बनाओ
         const cred = await createUserWithEmailAndPassword(auth, email, pass);
         createdUser = cred.user;
         const uid = cred.user.uid;
@@ -227,7 +269,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             console.warn('updateProfile failed (non-fatal):', profileErr);
         }
 
-        // 2. Referrer और upline चेन
+        // 2. Referrer और उसकी upline चेन तैयार करो
         const finalRefCode = typedRef || referralCodeFromURL || '';
         let chain = [];
         let referredByValue = '';
@@ -245,7 +287,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             referredByValue = referrer.data.referralCode || referrer.uid;
         }
 
-        // 3. नया यूज़र (structure पहले जैसा)
+        // 3. नया यूज़र
         const userData = {
             uid: uid,
             username: uid,
@@ -283,7 +325,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             transferHistory: []
         };
 
-        // 4. एक ही atomic update
+        // 4. ✅ एक ही atomic update
         const updates = {};
         updates[`users/${uid}`] = userData;
         updates[`usernames/${uid}`] = uid;
@@ -334,7 +376,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         if (err.code === 'auth/email-already-in-use') {
             msg = '❌ This email is already registered. Please login instead.';
         } else if (err.code === 'auth/weak-password') {
-            msg = '❌ Password must be at least 6 characters.';
+            msg = '❌ Password must be at least 8 characters.';
         } else if (err.code === 'auth/invalid-email') {
             msg = '❌ Please enter a valid email address.';
         } else if (err.code === 'auth/network-request-failed') {

@@ -1,0 +1,308 @@
+/* ============================================================
+   REGISTER CSS — v2 (Refined & Consistent)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ============================================================
+   1. DESIGN TOKENS
+   ============================================================ */
+:root {
+    --primary: #2ecc71;
+    --primary-dark: #27ae60;
+    --primary-glow: rgba(46, 204, 113, 0.2);
+    --bg-dark: #060b14;
+    --bg-card: rgba(19, 34, 55, 0.9);
+    --border-color: rgba(46, 204, 113, 0.15);
+    --border-hover: rgba(46, 204, 113, 0.4);
+    --text-primary: #f0f4ff;
+    --text-secondary: #a0b8d0;
+    --text-muted: #556688;
+    --red: #ef4444;
+    --blue: #60a5fa;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --shadow-sm: 0 10px 40px rgba(0, 0, 0, 0.4);
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --t-fast: 0.3s var(--ease);
+}
+
+/* ============================================================
+   2. BASE / RESET
+   ============================================================ */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #080e1a 0%, #0f1f3a 50%, #1a2a4a 100%);
+    background-attachment: fixed;
+    color: var(--text-primary);
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    line-height: 1.5;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 10%, rgba(46, 204, 113, 0.1) 0%, transparent 45%),
+        radial-gradient(circle at 85% 90%, rgba(96, 165, 250, 0.05) 0%, transparent 45%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ============================================================
+   3. CONTAINER & CARD
+   ============================================================ */
+.register-container {
+    width: 100%;
+    max-width: 480px;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.6s var(--ease);
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card-glass {
+    background: var(--bg-card);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.logo-text {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+}
+
+.logo-text span {
+    color: var(--primary);
+}
+
+/* ============================================================
+   4. FORM CONTROLS
+   ============================================================ */
+.form-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.form-label .required {
+    color: var(--red);
+}
+
+.optional-badge {
+    font-size: 0.65rem;
+    background: rgba(46, 204, 113, 0.15);
+    color: var(--primary);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-left: auto;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 16px;
+    color: var(--text-muted);
+    font-size: 1rem;
+    pointer-events: none;
+    transition: color var(--t-fast);
+}
+
+.form-control-custom {
+    background: rgba(8, 14, 26, 0.8) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    padding: 13px 16px 13px 44px !important;
+    border-radius: 12px !important;
+    font-size: 0.95rem;
+    transition: all var(--t-fast);
+    font-weight: 500;
+    width: 100%;
+}
+
+.form-control-custom::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.form-control-custom:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.15) !important;
+    background: rgba(8, 14, 26, 0.95) !important;
+    outline: none;
+}
+
+.input-wrapper:focus-within .input-icon {
+    color: var(--primary);
+}
+
+/* Password Toggle */
+.toggle-password {
+    position: absolute;
+    right: 14px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 1.05rem;
+    border-radius: 6px;
+    transition: var(--t-fast);
+}
+
+.toggle-password:hover {
+    color: var(--primary);
+}
+
+/* Referral Notice */
+.referral-notice {
+    background: rgba(46, 204, 113, 0.05);
+    border: 1px solid rgba(46, 204, 113, 0.1);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    transition: all var(--t-fast);
+}
+
+.referral-notice.active {
+    border-color: rgba(46, 204, 113, 0.3);
+    background: rgba(46, 204, 113, 0.1);
+    color: var(--primary);
+}
+
+/* ============================================================
+   5. BUTTONS & LINKS
+   ============================================================ */
+.btn-primary-custom {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    padding: 14px;
+    border-radius: 12px;
+    width: 100%;
+    transition: all var(--t-fast);
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.25);
+    margin-top: 10px;
+}
+
+.btn-primary-custom:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(46, 204, 113, 0.4);
+}
+
+.btn-primary-custom:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.text-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 700;
+    transition: var(--t-fast);
+}
+
+.text-link:hover {
+    text-decoration: underline;
+}
+
+/* ============================================================
+   6. TOAST NOTIFICATIONS
+   ============================================================ */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast-custom {
+    background: rgba(15, 25, 45, 0.97);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 16px 20px;
+    color: var(--text-primary);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideInRight 0.4s var(--ease);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.toast-custom.success { border-left: 4px solid var(--primary); }
+.toast-custom.error   { border-left: 4px solid var(--red); }
+
+.toast-custom i { font-size: 1.4rem; flex-shrink: 0; }
+.toast-custom .toast-msg { flex: 1; line-height: 1.4; }
+
+@keyframes slideInRight {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ============================================================
+   7. RESPONSIVE
+   ============================================================ */
+@media (max-width: 576px) {
+    .card-glass { padding: 1.5rem; }
+    .logo-text { font-size: 1.5rem; }
+    .toast-container { top: 12px; right: 12px; left: 12px; max-width: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

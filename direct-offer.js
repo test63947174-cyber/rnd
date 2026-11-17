@@ -1,5 +1,5 @@
 // ============================================================
-// BUMPER REFERRAL OFFER 2026  (v2 - fixed & cost optimised)
+// direct-offer  (v2 - fixed & cost optimised)
 // File: direct-offer.js
 // 🔴 LIVE DATES: 20 Nov → 25 Nov 2026 (IST)
 // ============================================================

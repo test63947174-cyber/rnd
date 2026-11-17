@@ -313,24 +313,19 @@ async function syncRewards(uid) {
 // ============================================================
 function listenWithdrawals(uid) {
   if (unsubWithdrawals) unsubWithdrawals();
-  unsubWithdrawals = onValue(ref(db, `${P}/user_withdrawals/${uid}`), snap => {
-    withdrawalsData = snap.val() || {};
+  // 🟢 यूज़र अब सीधे मुख्य withdrawals नोड से अपना डेटा पढ़ेगा
+  unsubWithdrawals = onValue(ref(db, `${P}/withdrawals`), snap => {
+    const allW = snap.val() || {};
+    const myW = {};
+    // सिर्फ अपनी विड्रॉल फिल्टर करें
+    for (const [id, w] of Object.entries(allW)) {
+      if (w.userId === uid) myW[id] = w;
+    }
+    withdrawalsData = myW;
     recomputeBalances();
     updateUI();
   }, err => console.error("Withdrawal listener error:", err));
 }
-
-function recomputeBalances() {
-  let paid = 0, pending = 0, hasPending = false, hasApproved = false;
-  let latest = null;
-
-  for (const w of Object.values(withdrawalsData)) {
-    const amt = Number(w.amount || 0);
-    if (w.status === "paid") paid += amt;
-    else if (w.status === "pending") { pending += amt; hasPending = true; }
-    else if (w.status === "approved") { pending += amt; hasApproved = true; }
-    if (!latest || (w.requestedAt || 0) > (latest.requestedAt || 0)) latest = w;
-  }
 
   const currentStatus = hasPending ? "pending" : hasApproved ? "approved" : (latest ? latest.status : "available");
   calculatedRewards = {
